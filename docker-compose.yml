@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: sdms-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: sdms
+      POSTGRES_PASSWORD: sdms_password
+      POSTGRES_DB: sdms_db
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - sdms_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  sdms_postgres_data:
