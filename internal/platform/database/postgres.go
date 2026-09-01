@@ -2,8 +2,11 @@ package database
 
 import (
 	"fmt"
+	"log"
 
 	"sdms/internal/config"
+
+	topicpostgres "sdms/internal/modules/topic/repository/postgres"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -26,6 +29,12 @@ func NewPostgres(cfg config.DatabaseConfig) (*gorm.DB, error) {
 
 	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	if err := db.AutoMigrate(
+		&topicpostgres.TopicModel{},
+	); err != nil {
+		log.Fatal(err)
 	}
 
 	return db, nil
