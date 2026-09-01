@@ -45,7 +45,7 @@ func (r *Repository) FindAll(ctx context.Context) ([]domain.Topic, error) {
 
 func (r *Repository) FindByID(ctx context.Context, topicID uuid.UUID) (*domain.Topic, error) {
 	var model TopicModel
-	err := r.db.WithContext(ctx).First(&model, "uid = ?", topicID).Error
+	err := r.db.WithContext(ctx).Where("uid = ?", topicID).First(&model).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrTopicNotFound
 	}

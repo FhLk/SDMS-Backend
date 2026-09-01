@@ -1,19 +1,49 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"sdms/internal/modules/topic/domain"
-	"sdms/internal/modules/topic/usecase"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
-type Handler struct {
-	service *usecase.Service
+type TopicService interface {
+	Create(
+		ctx context.Context,
+		name string,
+		description string,
+	) (*domain.Topic, error)
+
+	FindAll(
+		ctx context.Context,
+	) ([]domain.Topic, error)
+
+	FindByID(
+		ctx context.Context,
+		id uuid.UUID,
+	) (*domain.Topic, error)
+
+	Update(
+		ctx context.Context,
+		id uuid.UUID,
+		name string,
+		description string,
+		isActive bool,
+	) (*domain.Topic, error)
+
+	Delete(
+		ctx context.Context,
+		id uuid.UUID,
+	) error
 }
 
-func NewHandler(service *usecase.Service) *Handler {
+type Handler struct {
+	service TopicService
+}
+
+func NewHandler(service TopicService) *Handler {
 	return &Handler{
 		service: service,
 	}
@@ -43,8 +73,8 @@ func (h *Handler) FindAll(c fiber.Ctx) error {
 
 	response := make([]TopicResponse, len(topics))
 
-	for _, topic := range topics {
-		response = append(response, newTopicResponse(topic))
+	for i, topic := range topics {
+		response[i] = newTopicResponse(topic)
 	}
 	return c.JSON(response)
 }
@@ -106,7 +136,7 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 		return handleError(c, err)
 	}
 
-	return nil
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 func handleError(c fiber.Ctx, err error) error {
