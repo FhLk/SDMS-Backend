@@ -2,10 +2,7 @@ package http
 
 import "github.com/gofiber/fiber/v3"
 
-func RegisterRoutes(
-	router fiber.Router,
-	handler *Handler,
-) {
+func RegisterRoutes(router fiber.Router, handler *Handler) {
 	topics := router.Group("/topics")
 
 	topics.Post("/", handler.Create)

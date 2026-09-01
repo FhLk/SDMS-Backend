@@ -7,7 +7,7 @@ Infrastructure
 
         ↓
 
-Phase 2
+Phase 2 ✅
 Topic
 ├── Domain
 ├── Repository Interface
