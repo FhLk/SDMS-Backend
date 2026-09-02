@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"sdms/internal/modules/topic/domain"
+	"sdms/internal/modules/topic/usecase"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
 type TopicService interface {
-	Create(
+	CreateTopic(
 		ctx context.Context,
 		name string,
 		description string,
@@ -37,19 +38,25 @@ type TopicService interface {
 		ctx context.Context,
 		id uuid.UUID,
 	) error
+
+	CreateField(
+		ctx context.Context,
+		topicUID uuid.UUID,
+		input usecase.CreateFieldInput,
+	) (*domain.TopicField, error)
 }
 
-type Handler struct {
+type TopicHandler struct {
 	service TopicService
 }
 
-func NewHandler(service TopicService) *Handler {
-	return &Handler{
+func NewTopicHandler(service TopicService) *TopicHandler {
+	return &TopicHandler{
 		service: service,
 	}
 }
 
-func (h *Handler) Create(c fiber.Ctx) error {
+func (h *TopicHandler) Create(c fiber.Ctx) error {
 	var req CreateTopicRequest
 
 	if err := c.Bind().Body(&req); err != nil {
@@ -58,14 +65,14 @@ func (h *Handler) Create(c fiber.Ctx) error {
 		})
 	}
 
-	topic, err := h.service.Create(c.Context(), req.Name, req.Description)
+	topic, err := h.service.CreateTopic(c.Context(), req.Name, req.Description)
 	if err != nil {
 		return handleError(c, err)
 	}
 	return c.Status(fiber.StatusCreated).JSON(newTopicResponse(*topic))
 }
 
-func (h *Handler) FindAll(c fiber.Ctx) error {
+func (h *TopicHandler) FindAll(c fiber.Ctx) error {
 	topics, err := h.service.FindAll(c.Context())
 	if err != nil {
 		return handleError(c, err)
@@ -79,7 +86,7 @@ func (h *Handler) FindAll(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (h *Handler) FindTopic(c fiber.Ctx) error {
+func (h *TopicHandler) FindTopic(c fiber.Ctx) error {
 	topicID, err := uuid.Parse(c.Params("id"))
 
 	if err != nil {
@@ -97,7 +104,7 @@ func (h *Handler) FindTopic(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (h *Handler) Update(c fiber.Ctx) error {
+func (h *TopicHandler) Update(c fiber.Ctx) error {
 	topicID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -124,7 +131,7 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (h *Handler) Delete(c fiber.Ctx) error {
+func (h *TopicHandler) Delete(c fiber.Ctx) error {
 	topicID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -139,6 +146,41 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+func (h *TopicHandler) CreateField(c fiber.Ctx) error {
+	topicUID, err := uuid.Parse(c.Params("topicID"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid topic id",
+		})
+	}
+
+	var req CreateFieldRequest
+
+	if err := c.Bind().Body(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	field, err := h.service.CreateField(
+		c,
+		topicUID,
+		usecase.CreateFieldInput{
+			Label:    req.Label,
+			Type:     domain.FieldType(req.Type),
+			Required: req.Required,
+			Position: req.Position,
+		},
+	)
+	if err != nil {
+		return handleError(c, err)
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(
+		newTopicFieldResponse(field),
+	)
+}
+
 func handleError(c fiber.Ctx, err error) error {
 	switch {
 	case errors.Is(err, domain.ErrTopicNotFound):
@@ -149,6 +191,14 @@ func handleError(c fiber.Ctx, err error) error {
 	case errors.Is(err, domain.ErrTopicNameEmpty):
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": err.Error(),
+		})
+	case errors.Is(err, domain.ErrTopicFieldInvalidTopicUID),
+		errors.Is(err, domain.ErrTopicFieldLabelRequired),
+		errors.Is(err, domain.ErrTopicFieldInvalidType),
+		errors.Is(err, domain.ErrTopicFieldInvalidPosition):
+
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
 		})
 
 	default:

@@ -27,8 +27,10 @@ func NewUserService(repo domain.UserRepository) *UserService {
 func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*domain.User, error) {
 	input.Username = strings.TrimSpace(input.Username)
 	input.EmployeeCode = strings.TrimSpace(input.EmployeeCode)
+	input.Prefix = strings.TrimSpace(input.Prefix)
 	input.FirstName = strings.TrimSpace(input.FirstName)
 	input.LastName = strings.TrimSpace(input.LastName)
+	input.Role = domain.Role(strings.TrimSpace(string(input.Role)))
 
 	if err := validateCreateInput(input); err != nil {
 		return nil, err
@@ -54,6 +56,7 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*domai
 		UID:          uuid.New(),
 		Username:     input.Username,
 		EmployeeCode: input.EmployeeCode,
+		Prefix:       input.Prefix,
 		FirstName:    input.FirstName,
 		LastName:     input.LastName,
 		Role:         input.Role,
@@ -120,22 +123,24 @@ func (s *UserService) GetByUsername(ctx context.Context, username string) (*doma
 // Update
 // ============================================================
 
-func (s *UserService) Update(ctx context.Context, input UpdateUserInput) (*domain.User, error) {
-	if input.UID == uuid.Nil {
+func (s *UserService) Update(ctx context.Context, id uuid.UUID, input UpdateUserInput) (*domain.User, error) {
+	if id == uuid.Nil {
 		return nil, domain.ErrInvalidUserID
 	}
 
 	input.Username = strings.TrimSpace(input.Username)
 	input.EmployeeCode = strings.TrimSpace(input.EmployeeCode)
+	input.Prefix = strings.TrimSpace(input.Prefix)
 	input.FirstName = strings.TrimSpace(input.FirstName)
 	input.LastName = strings.TrimSpace(input.LastName)
+	input.Role = domain.Role(strings.TrimSpace(string(input.Role)))
 
 	if err := validateUpdateInput(input); err != nil {
 		return nil, err
 	}
 
 	// ต้องหา user เดิมก่อน
-	existingUser, err := s.repo.FindByID(ctx, input.UID)
+	existingUser, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +150,7 @@ func (s *UserService) Update(ctx context.Context, input UpdateUserInput) (*domai
 		if err := s.ensureUsernameAvailable(
 			ctx,
 			input.Username,
-			input.UID,
+			id,
 		); err != nil {
 			return nil, err
 		}
@@ -153,17 +158,14 @@ func (s *UserService) Update(ctx context.Context, input UpdateUserInput) (*domai
 
 	// employee code เปลี่ยนหรือไม่
 	if input.EmployeeCode != existingUser.EmployeeCode {
-		if err := s.ensureEmployeeCodeAvailable(
-			ctx,
-			input.EmployeeCode,
-			input.UID,
-		); err != nil {
+		if err := s.ensureEmployeeCodeAvailable(ctx, input.EmployeeCode, id); err != nil {
 			return nil, err
 		}
 	}
 
 	existingUser.Username = input.Username
 	existingUser.EmployeeCode = input.EmployeeCode
+	existingUser.Prefix = input.Prefix
 	existingUser.FirstName = input.FirstName
 	existingUser.LastName = input.LastName
 	existingUser.Role = input.Role
@@ -179,16 +181,18 @@ func (s *UserService) Update(ctx context.Context, input UpdateUserInput) (*domai
 // Update Status
 // ============================================================
 
-func (s *UserService) UpdateStatus(ctx context.Context, input UpdateUserStatusInput) (*domain.User, error) {
-	if input.UID == uuid.Nil {
+func (s *UserService) UpdateStatus(ctx context.Context, id uuid.UUID, input UpdateUserStatusInput) (*domain.User, error) {
+	if id == uuid.Nil {
 		return nil, domain.ErrInvalidUserID
 	}
+
+	input.Status = domain.Status(strings.TrimSpace(string(input.Status)))
 
 	if !isValidStatus(input.Status) {
 		return nil, domain.ErrInvalidStatus
 	}
 
-	user, err := s.repo.FindByID(ctx, input.UID)
+	user, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -283,6 +287,10 @@ func validateCreateInput(input CreateUserInput) error {
 		return domain.ErrEmployeeCodeRequired
 	}
 
+	if input.Prefix == "" {
+		return domain.ErrPrefixRequired
+	}
+
 	if input.FirstName == "" {
 		return domain.ErrFirstNameRequired
 	}
@@ -305,6 +313,10 @@ func validateUpdateInput(input UpdateUserInput) error {
 
 	if input.EmployeeCode == "" {
 		return domain.ErrEmployeeCodeRequired
+	}
+
+	if input.Prefix == "" {
+		return domain.ErrPrefixRequired
 	}
 
 	if input.FirstName == "" {

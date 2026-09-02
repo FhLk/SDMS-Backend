@@ -32,7 +32,7 @@ func toDomain(model TopicModel) domain.Topic {
 	}
 }
 
-func fromDomain(topic domain.Topic) TopicModel {
+func toModel(topic domain.Topic) TopicModel {
 	return TopicModel{
 		UID:         topic.UID,
 		Name:        topic.Name,

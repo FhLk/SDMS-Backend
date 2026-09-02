@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type Repository interface {
+type TopicRepository interface {
 	Create(ctx context.Context, topic *Topic) error
 
 	FindAll(ctx context.Context) ([]Topic, error)

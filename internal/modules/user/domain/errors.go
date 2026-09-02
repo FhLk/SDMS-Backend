@@ -19,6 +19,10 @@ var (
 		"employee code is required",
 	)
 
+	ErrPrefixRequired = errors.New(
+		"prefix is required",
+	)
+
 	ErrFirstNameRequired = errors.New(
 		"first name is required",
 	)

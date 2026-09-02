@@ -10,7 +10,7 @@ type Role string
 
 const (
 	RoleDirector Role = "DIRECTOR"
-	RoleTeacher  Role = "TEARCHER"
+	RoleTeacher  Role = "TEACHER"
 )
 
 type Status string

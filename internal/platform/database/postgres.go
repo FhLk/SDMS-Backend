@@ -2,11 +2,11 @@ package database
 
 import (
 	"fmt"
-	"log"
 
 	"sdms/internal/config"
 
 	topicpostgres "sdms/internal/modules/topic/repository/postgres"
+	userpostgres "sdms/internal/modules/user/repository/postgres"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -33,8 +33,10 @@ func NewPostgres(cfg config.DatabaseConfig) (*gorm.DB, error) {
 
 	if err := db.AutoMigrate(
 		&topicpostgres.TopicModel{},
+		&userpostgres.UserModel{},
+		&topicpostgres.TopicFieldModel{},
 	); err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}
 
 	return db, nil

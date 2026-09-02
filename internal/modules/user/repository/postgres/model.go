@@ -1,8 +1,9 @@
 package postgres
 
 import (
-	"sdms/internal/modules/user/domain"
 	"time"
+
+	"sdms/internal/modules/user/domain"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"

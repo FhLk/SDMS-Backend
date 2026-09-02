@@ -21,8 +21,7 @@ func NewRouter(db *gorm.DB) *fiber.App {
 	v1.Get("/health", healthHandler.Health)
 
 	routes.NewRouteTopic(v1, db)
-
-	// topichttp.RegisterRoutes(v1, topicHandler)
+	routes.NewRouteUser(v1, db)
 
 	return app
 }

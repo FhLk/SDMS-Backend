@@ -9,17 +9,17 @@ import (
 	"gorm.io/gorm"
 )
 
-type Repository struct {
+type TopicRepository struct {
 	db *gorm.DB
 }
 
-func NewRepository(db *gorm.DB) *Repository {
-	return &Repository{
+func NewTopicRepository(db *gorm.DB) *TopicRepository {
+	return &TopicRepository{
 		db: db,
 	}
 }
-func (r *Repository) Create(ctx context.Context, topic *domain.Topic) error {
-	model := fromDomain(*topic)
+func (r *TopicRepository) Create(ctx context.Context, topic *domain.Topic) error {
+	model := toModel(*topic)
 
 	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
 		return err
@@ -29,7 +29,7 @@ func (r *Repository) Create(ctx context.Context, topic *domain.Topic) error {
 	return nil
 }
 
-func (r *Repository) FindAll(ctx context.Context) ([]domain.Topic, error) {
+func (r *TopicRepository) FindAll(ctx context.Context) ([]domain.Topic, error) {
 	var models []TopicModel
 	if err := r.db.WithContext(ctx).Order("created_at DESC").Find(&models).Error; err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func (r *Repository) FindAll(ctx context.Context) ([]domain.Topic, error) {
 	return topics, nil
 }
 
-func (r *Repository) FindByID(ctx context.Context, topicID uuid.UUID) (*domain.Topic, error) {
+func (r *TopicRepository) FindByID(ctx context.Context, topicID uuid.UUID) (*domain.Topic, error) {
 	var model TopicModel
 	err := r.db.WithContext(ctx).Where("uid = ?", topicID).First(&model).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -54,8 +54,8 @@ func (r *Repository) FindByID(ctx context.Context, topicID uuid.UUID) (*domain.T
 	return &topic, nil
 }
 
-func (r *Repository) Update(ctx context.Context, topic *domain.Topic) error {
-	model := fromDomain(*topic)
+func (r *TopicRepository) Update(ctx context.Context, topic *domain.Topic) error {
+	model := toModel(*topic)
 
 	result := r.db.WithContext(ctx).Model(&TopicModel{}).Where("uid = ?", model.UID).Updates(map[string]interface{}{
 		"name":        model.Name,
@@ -74,7 +74,7 @@ func (r *Repository) Update(ctx context.Context, topic *domain.Topic) error {
 	return nil
 }
 
-func (r *Repository) Delete(ctx context.Context, topicID uuid.UUID) error {
+func (r *TopicRepository) Delete(ctx context.Context, topicID uuid.UUID) error {
 
 	result := r.db.WithContext(ctx).Where("uid = ?", topicID).Delete(&TopicModel{})
 

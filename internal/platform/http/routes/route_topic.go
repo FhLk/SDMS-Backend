@@ -10,13 +10,12 @@ import (
 )
 
 func NewRouteTopic(v1 fiber.Router, db *gorm.DB) {
-	topicRepository := topicpostgres.NewRepository(db)
+	topicRepository := topicpostgres.NewTopicRepository(db)
+	topicFieldRepository := topicpostgres.NewFieldRepository(db)
 
-	topicService := topicusecase.NewService(
-		topicRepository,
-	)
+	topicService := topicusecase.NewTopicService(topicRepository, topicFieldRepository)
 
-	topicHandler := topichttp.NewHandler(topicService)
+	topicHandler := topichttp.NewTopicHandler(topicService)
 
-	topichttp.RegisterRoutes(v1, topicHandler)
+	topichttp.RegisterTopicRoutes(v1, topicHandler)
 }
