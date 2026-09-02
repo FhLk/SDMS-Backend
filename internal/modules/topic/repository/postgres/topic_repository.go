@@ -49,6 +49,9 @@ func (r *TopicRepository) FindByID(ctx context.Context, topicID uuid.UUID) (*dom
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrTopicNotFound
 	}
+	if err != nil {
+		return nil, err
+	}
 
 	topic := toDomain(model)
 	return &topic, nil

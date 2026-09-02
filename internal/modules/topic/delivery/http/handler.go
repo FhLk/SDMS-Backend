@@ -147,7 +147,7 @@ func (h *TopicHandler) Delete(c fiber.Ctx) error {
 }
 
 func (h *TopicHandler) CreateField(c fiber.Ctx) error {
-	topicUID, err := uuid.Parse(c.Params("topicID"))
+	topicUID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid topic id",
