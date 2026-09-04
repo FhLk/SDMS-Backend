@@ -96,6 +96,17 @@ func (s *fieldRepositoryStub) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+type submissionLookupStub struct {
+	hasAnyFn func(context.Context, uuid.UUID) (bool, error)
+}
+
+func (s *submissionLookupStub) HasAnyByTopicID(ctx context.Context, topicID uuid.UUID) (bool, error) {
+	if s.hasAnyFn != nil {
+		return s.hasAnyFn(ctx, topicID)
+	}
+	return false, nil
+}
+
 func TestCreateTopic(t *testing.T) {
 	t.Run("trims and persists a new active topic", func(t *testing.T) {
 		var persisted *domain.Topic
@@ -548,5 +559,70 @@ func TestDeleteField(t *testing.T) {
 	}
 	if !deleteCalled {
 		t.Error("field repository Delete was not called")
+	}
+}
+
+func TestUpdateFieldBlocksTypeChangeAfterSubmission(t *testing.T) {
+	topicID := uuid.New()
+	fieldID := uuid.New()
+	field := &domain.TopicField{UID: fieldID, TopicUID: topicID, Label: "เดิม", Type: domain.FieldTypeText}
+	updateCalled := false
+
+	service := NewTopicService(
+		&topicRepositoryStub{},
+		&fieldRepositoryStub{
+			findByIDFn: func(context.Context, uuid.UUID) (*domain.TopicField, error) { return field, nil },
+			updateFn: func(context.Context, *domain.TopicField) error {
+				updateCalled = true
+				return nil
+			},
+		},
+		&submissionLookupStub{hasAnyFn: func(_ context.Context, got uuid.UUID) (bool, error) {
+			if got != topicID {
+				t.Errorf("topic id = %s, want %s", got, topicID)
+			}
+			return true, nil
+		}},
+	)
+
+	got, err := service.UpdateField(context.Background(), topicID, fieldID, UpdateFieldInput{
+		Label: "ใหม่", Type: domain.FieldTypeDate, Position: 1,
+	})
+	if !errors.Is(err, domain.ErrTopicFieldTypeLocked) || got != nil {
+		t.Fatalf("UpdateField() = %+v, %v", got, err)
+	}
+	if updateCalled {
+		t.Fatal("field repository Update should not be called")
+	}
+	if field.Type != domain.FieldTypeText {
+		t.Fatalf("field type mutated despite lock: %s", field.Type)
+	}
+}
+
+func TestDeleteFieldBlocksDeleteAfterSubmission(t *testing.T) {
+	topicID := uuid.New()
+	fieldID := uuid.New()
+	deleteCalled := false
+
+	service := NewTopicService(
+		&topicRepositoryStub{},
+		&fieldRepositoryStub{
+			findByIDFn: func(context.Context, uuid.UUID) (*domain.TopicField, error) {
+				return &domain.TopicField{UID: fieldID, TopicUID: topicID, Type: domain.FieldTypeText}, nil
+			},
+			deleteFn: func(context.Context, uuid.UUID) error {
+				deleteCalled = true
+				return nil
+			},
+		},
+		&submissionLookupStub{hasAnyFn: func(context.Context, uuid.UUID) (bool, error) { return true, nil }},
+	)
+
+	err := service.DeleteField(context.Background(), topicID, fieldID)
+	if !errors.Is(err, domain.ErrTopicFieldDeleteLocked) {
+		t.Fatalf("expected ErrTopicFieldDeleteLocked, got %v", err)
+	}
+	if deleteCalled {
+		t.Fatal("field repository Delete should not be called")
 	}
 }

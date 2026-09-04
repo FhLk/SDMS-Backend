@@ -31,12 +31,12 @@ func (r *repository) Create(
 			values := model.Values
 			model.Values = nil
 
-			if err := tx.Create(&model).Error; err != nil {
+			if err := tx.Omit("Topic", "Submitter").Create(&model).Error; err != nil {
 				return err
 			}
 
 			if len(values) > 0 {
-				if err := tx.Create(&values).Error; err != nil {
+				if err := tx.Omit("Field").Create(&values).Error; err != nil {
 					return err
 				}
 			}
@@ -88,6 +88,42 @@ func (r *repository) FindAllByTopicID(
 	return submissions, nil
 }
 
+func (r *repository) FindAllByTopicIDAndSubmittedBy(
+	ctx context.Context,
+	topicUID uuid.UUID,
+	submittedBy uuid.UUID,
+) ([]domain.Submission, error) {
+	var models []SubmissionModel
+
+	if err := r.db.
+		WithContext(ctx).
+		Where(
+			"topic_uid = ? AND submitted_by = ?",
+			topicUID,
+			submittedBy,
+		).
+		Order("created_at DESC").
+		Find(&models).
+		Error; err != nil {
+		return nil, err
+	}
+
+	submissions := make(
+		[]domain.Submission,
+		0,
+		len(models),
+	)
+
+	for _, model := range models {
+		submissions = append(
+			submissions,
+			toDomain(model),
+		)
+	}
+
+	return submissions, nil
+}
+
 func (r *repository) FindByIDAndTopicID(
 	ctx context.Context,
 	submissionUID uuid.UUID,
@@ -117,4 +153,55 @@ func (r *repository) FindByIDAndTopicID(
 	submission := toDomain(model)
 
 	return &submission, nil
+}
+
+func (r *repository) FindByIDAndTopicIDAndSubmittedBy(
+	ctx context.Context,
+	submissionUID uuid.UUID,
+	topicUID uuid.UUID,
+	submittedBy uuid.UUID,
+) (*domain.Submission, error) {
+	var model SubmissionModel
+
+	err := r.db.
+		WithContext(ctx).
+		Preload("Values").
+		Where(
+			"uid = ? AND topic_uid = ? AND submitted_by = ?",
+			submissionUID,
+			topicUID,
+			submittedBy,
+		).
+		First(&model).
+		Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, domain.ErrSubmissionNotFound
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	submission := toDomain(model)
+
+	return &submission, nil
+}
+
+func (r *repository) HasAnyByTopicID(
+	ctx context.Context,
+	topicUID uuid.UUID,
+) (bool, error) {
+	var count int64
+	if err := r.db.
+		WithContext(ctx).
+		Model(&SubmissionModel{}).
+		Where("topic_uid = ?", topicUID).
+		Limit(1).
+		Count(&count).
+		Error; err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }

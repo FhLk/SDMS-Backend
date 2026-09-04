@@ -1,6 +1,11 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+
+	"github.com/google/uuid"
+)
 
 var (
 	ErrSubmissionNotFound = errors.New(
@@ -13,6 +18,22 @@ var (
 
 	ErrSubmissionSubmittedByRequired = errors.New(
 		"submitted by is required",
+	)
+
+	ErrSubmissionSubmitterNotFound = errors.New(
+		"submission submitter not found",
+	)
+
+	ErrSubmissionSubmitterMustBeTeacher = errors.New(
+		"submission submitter must be a teacher",
+	)
+
+	ErrSubmissionSubmitterInactive = errors.New(
+		"submission submitter is inactive",
+	)
+
+	ErrSubmissionTopicInactive = errors.New(
+		"topic is not accepting submissions",
 	)
 
 	ErrSubmissionInvalidField = errors.New(
@@ -35,3 +56,43 @@ var (
 		"file field is not supported by normal submission",
 	)
 )
+
+// FieldError keeps the original sentinel error while attaching enough field
+// metadata for an HTTP client to highlight the exact dynamic-form control.
+type FieldError struct {
+	Err        error
+	FieldUID   uuid.UUID
+	FieldLabel string
+}
+
+func (e *FieldError) Error() string {
+	if e == nil {
+		return ""
+	}
+
+	if e.FieldLabel != "" {
+		return fmt.Sprintf("%s: %s", e.Err.Error(), e.FieldLabel)
+	}
+
+	if e.FieldUID != uuid.Nil {
+		return fmt.Sprintf("%s: %s", e.Err.Error(), e.FieldUID)
+	}
+
+	return e.Err.Error()
+}
+
+func (e *FieldError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+
+	return e.Err
+}
+
+func NewFieldError(err error, fieldUID uuid.UUID, fieldLabel string) error {
+	return &FieldError{
+		Err:        err,
+		FieldUID:   fieldUID,
+		FieldLabel: fieldLabel,
+	}
+}

@@ -8,18 +8,30 @@ import (
 	"github.com/google/uuid"
 )
 
+type SubmissionLookupRepository interface {
+	HasAnyByTopicID(ctx context.Context, topicUID uuid.UUID) (bool, error)
+}
+
 type TopicService struct {
-	topicRepo domain.TopicRepository
-	fieldRepo domain.FieldRepository
+	topicRepo      domain.TopicRepository
+	fieldRepo      domain.FieldRepository
+	submissionRepo SubmissionLookupRepository
 }
 
 func NewTopicService(
 	topicRepo domain.TopicRepository,
 	fieldRepo domain.FieldRepository,
+	submissionRepos ...SubmissionLookupRepository,
 ) *TopicService {
+	var submissionRepo SubmissionLookupRepository
+	if len(submissionRepos) > 0 {
+		submissionRepo = submissionRepos[0]
+	}
+
 	return &TopicService{
-		topicRepo: topicRepo,
-		fieldRepo: fieldRepo,
+		topicRepo:      topicRepo,
+		fieldRepo:      fieldRepo,
+		submissionRepo: submissionRepo,
 	}
 }
 
@@ -149,7 +161,10 @@ func (s *TopicService) UpdateField(ctx context.Context, topicID uuid.UUID, field
 
 	input.Label = strings.TrimSpace(input.Label)
 
-	if err := field.Update(
+	// Validate on a copy first so invalid input never mutates the persisted entity
+	// and still returns the proper validation error even when schema changes are locked.
+	candidate := *field
+	if err := candidate.Update(
 		input.Label,
 		input.Type,
 		input.Required,
@@ -159,6 +174,17 @@ func (s *TopicService) UpdateField(ctx context.Context, topicID uuid.UUID, field
 		return nil, err
 	}
 
+	if candidate.Type != field.Type {
+		hasSubmissions, err := s.topicHasSubmissions(ctx, topicID)
+		if err != nil {
+			return nil, err
+		}
+		if hasSubmissions {
+			return nil, domain.ErrTopicFieldTypeLocked
+		}
+	}
+
+	*field = candidate
 	if err := s.fieldRepo.Update(ctx, field); err != nil {
 		return nil, err
 	}
@@ -171,7 +197,23 @@ func (s *TopicService) DeleteField(ctx context.Context, topicID uuid.UUID, field
 		return err
 	}
 
+	hasSubmissions, err := s.topicHasSubmissions(ctx, topicID)
+	if err != nil {
+		return err
+	}
+	if hasSubmissions {
+		return domain.ErrTopicFieldDeleteLocked
+	}
+
 	return s.fieldRepo.Delete(ctx, fieldID)
+}
+
+func (s *TopicService) topicHasSubmissions(ctx context.Context, topicID uuid.UUID) (bool, error) {
+	if s.submissionRepo == nil {
+		return false, nil
+	}
+
+	return s.submissionRepo.HasAnyByTopicID(ctx, topicID)
 }
 
 func (s *TopicService) findFieldInTopic(ctx context.Context, topicID uuid.UUID, fieldID uuid.UUID) (*domain.TopicField, error) {

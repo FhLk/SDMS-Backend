@@ -8,6 +8,7 @@ import (
 
 	submissiondomain "sdms/internal/modules/submission/domain"
 	topicdomain "sdms/internal/modules/topic/domain"
+	userdomain "sdms/internal/modules/user/domain"
 
 	"github.com/google/uuid"
 )
@@ -23,11 +24,29 @@ type fakeSubmissionRepository struct {
 		uuid.UUID,
 	) ([]submissiondomain.Submission, error)
 
+	findAllByTopicIDAndSubmittedByFn func(
+		context.Context,
+		uuid.UUID,
+		uuid.UUID,
+	) ([]submissiondomain.Submission, error)
+
 	findByIDAndTopicIDFn func(
 		context.Context,
 		uuid.UUID,
 		uuid.UUID,
 	) (*submissiondomain.Submission, error)
+
+	findByIDAndTopicIDAndSubmittedByFn func(
+		context.Context,
+		uuid.UUID,
+		uuid.UUID,
+		uuid.UUID,
+	) (*submissiondomain.Submission, error)
+
+	hasAnyByTopicIDFn func(
+		context.Context,
+		uuid.UUID,
+	) (bool, error)
 }
 
 func (f *fakeSubmissionRepository) Create(
@@ -55,6 +74,22 @@ func (f *fakeSubmissionRepository) FindAllByTopicID(
 	return []submissiondomain.Submission{}, nil
 }
 
+func (f *fakeSubmissionRepository) FindAllByTopicIDAndSubmittedBy(
+	ctx context.Context,
+	topicUID uuid.UUID,
+	submittedBy uuid.UUID,
+) ([]submissiondomain.Submission, error) {
+	if f.findAllByTopicIDAndSubmittedByFn != nil {
+		return f.findAllByTopicIDAndSubmittedByFn(
+			ctx,
+			topicUID,
+			submittedBy,
+		)
+	}
+
+	return []submissiondomain.Submission{}, nil
+}
+
 func (f *fakeSubmissionRepository) FindByIDAndTopicID(
 	ctx context.Context,
 	submissionUID uuid.UUID,
@@ -69,6 +104,35 @@ func (f *fakeSubmissionRepository) FindByIDAndTopicID(
 	}
 
 	return nil, submissiondomain.ErrSubmissionNotFound
+}
+
+func (f *fakeSubmissionRepository) FindByIDAndTopicIDAndSubmittedBy(
+	ctx context.Context,
+	submissionUID uuid.UUID,
+	topicUID uuid.UUID,
+	submittedBy uuid.UUID,
+) (*submissiondomain.Submission, error) {
+	if f.findByIDAndTopicIDAndSubmittedByFn != nil {
+		return f.findByIDAndTopicIDAndSubmittedByFn(
+			ctx,
+			submissionUID,
+			topicUID,
+			submittedBy,
+		)
+	}
+
+	return nil, submissiondomain.ErrSubmissionNotFound
+}
+
+func (f *fakeSubmissionRepository) HasAnyByTopicID(
+	ctx context.Context,
+	topicUID uuid.UUID,
+) (bool, error) {
+	if f.hasAnyByTopicIDFn != nil {
+		return f.hasAnyByTopicIDFn(ctx, topicUID)
+	}
+
+	return false, nil
 }
 
 type fakeTopicRepository struct {
@@ -242,6 +306,18 @@ func (f *fakeFieldRepository) Delete(
 	return nil
 }
 
+type fakeUserLookupRepository struct {
+	findByIDFn func(context.Context, uuid.UUID) (*userdomain.User, error)
+}
+
+func (f *fakeUserLookupRepository) FindByID(ctx context.Context, id uuid.UUID) (*userdomain.User, error) {
+	if f.findByIDFn != nil {
+		return f.findByIDFn(ctx, id)
+	}
+
+	return nil, userdomain.ErrUserNotFound
+}
+
 func raw(value string) json.RawMessage {
 	return json.RawMessage(value)
 }
@@ -260,8 +336,9 @@ func TestSubmissionServiceCreateSuccess(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID:  topicUID,
-				Name: "รายงานโครงการ",
+				UID:      topicUID,
+				IsActive: true,
+				Name:     "รายงานโครงการ",
 			}, nil
 		},
 	}
@@ -482,7 +559,8 @@ func TestSubmissionServiceCreateRequiredFieldMissing(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID: topicUID,
+				UID:      topicUID,
+				IsActive: true,
 			}, nil
 		},
 	}
@@ -541,7 +619,8 @@ func TestSubmissionServiceCreateInvalidField(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID: topicUID,
+				UID:      topicUID,
+				IsActive: true,
 			}, nil
 		},
 	}
@@ -603,7 +682,8 @@ func TestSubmissionServiceCreateDuplicateField(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID: topicUID,
+				UID:      topicUID,
+				IsActive: true,
 			}, nil
 		},
 	}
@@ -669,7 +749,8 @@ func TestSubmissionServiceCreateInvalidNumber(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID: topicUID,
+				UID:      topicUID,
+				IsActive: true,
 			}, nil
 		},
 	}
@@ -734,7 +815,8 @@ func TestSubmissionServiceCreateInvalidDate(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID: topicUID,
+				UID:      topicUID,
+				IsActive: true,
 			}, nil
 		},
 	}
@@ -799,7 +881,8 @@ func TestSubmissionServiceCreateFileFieldUnsupported(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID: topicUID,
+				UID:      topicUID,
+				IsActive: true,
 			}, nil
 		},
 	}
@@ -858,7 +941,8 @@ func TestSubmissionServiceCreateRepositoryError(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID: topicUID,
+				UID:      topicUID,
+				IsActive: true,
 			}, nil
 		},
 	}
@@ -928,7 +1012,8 @@ func TestSubmissionServiceFindAllByTopicIDSuccess(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID: topicUID,
+				UID:      topicUID,
+				IsActive: true,
 			}, nil
 		},
 	}
@@ -979,6 +1064,65 @@ func TestSubmissionServiceFindAllByTopicIDSuccess(t *testing.T) {
 	}
 }
 
+func TestSubmissionServiceFindAllByTopicIDAndSubmittedBySuccess(t *testing.T) {
+	topicUID := uuid.New()
+	teacherUID := uuid.New()
+
+	topicRepo := &fakeTopicRepository{
+		findByIDFn: func(
+			ctx context.Context,
+			id uuid.UUID,
+		) (*topicdomain.Topic, error) {
+			return &topicdomain.Topic{
+				UID:      topicUID,
+				IsActive: true,
+			}, nil
+		},
+	}
+
+	expected := []submissiondomain.Submission{
+		{
+			UID:         uuid.New(),
+			TopicUID:    topicUID,
+			SubmittedBy: teacherUID,
+		},
+	}
+
+	submissionRepo := &fakeSubmissionRepository{
+		findAllByTopicIDAndSubmittedByFn: func(
+			ctx context.Context,
+			tID uuid.UUID,
+			submittedBy uuid.UUID,
+		) ([]submissiondomain.Submission, error) {
+			if tID != topicUID {
+				t.Fatalf("expected topic UID %s, got %s", topicUID, tID)
+			}
+			if submittedBy != teacherUID {
+				t.Fatalf("expected teacher UID %s, got %s", teacherUID, submittedBy)
+			}
+			return expected, nil
+		},
+	}
+
+	service := NewSubmissionService(
+		submissionRepo,
+		topicRepo,
+		&fakeFieldRepository{},
+	)
+
+	result, err := service.FindAllByTopicIDAndSubmittedBy(
+		context.Background(),
+		topicUID,
+		teacherUID,
+	)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(result) != 1 || result[0].SubmittedBy != teacherUID {
+		t.Fatalf("unexpected filtered submissions: %+v", result)
+	}
+}
+
 func TestSubmissionServiceFindByIDSuccess(t *testing.T) {
 	topicUID := uuid.New()
 	submissionUID := uuid.New()
@@ -989,7 +1133,8 @@ func TestSubmissionServiceFindByIDSuccess(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID: topicUID,
+				UID:      topicUID,
+				IsActive: true,
 			}, nil
 		},
 	}
@@ -1035,6 +1180,103 @@ func TestSubmissionServiceFindByIDSuccess(t *testing.T) {
 	}
 }
 
+func TestSubmissionServiceFindByIDForSubmitterSuccess(t *testing.T) {
+	topicUID := uuid.New()
+	submissionUID := uuid.New()
+	teacherUID := uuid.New()
+
+	topicRepo := &fakeTopicRepository{
+		findByIDFn: func(
+			ctx context.Context,
+			id uuid.UUID,
+		) (*topicdomain.Topic, error) {
+			return &topicdomain.Topic{
+				UID:      topicUID,
+				IsActive: true,
+			}, nil
+		},
+	}
+
+	submissionRepo := &fakeSubmissionRepository{
+		findByIDAndTopicIDAndSubmittedByFn: func(
+			ctx context.Context,
+			sID uuid.UUID,
+			tID uuid.UUID,
+			submittedBy uuid.UUID,
+		) (*submissiondomain.Submission, error) {
+			if sID != submissionUID || tID != topicUID || submittedBy != teacherUID {
+				t.Fatalf("unexpected filter values")
+			}
+			return &submissiondomain.Submission{
+				UID:         submissionUID,
+				TopicUID:    topicUID,
+				SubmittedBy: teacherUID,
+			}, nil
+		},
+	}
+
+	service := NewSubmissionService(
+		submissionRepo,
+		topicRepo,
+		&fakeFieldRepository{},
+	)
+
+	result, err := service.FindByIDForSubmitter(
+		context.Background(),
+		topicUID,
+		submissionUID,
+		teacherUID,
+	)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if result.SubmittedBy != teacherUID {
+		t.Fatalf("expected submitted_by %s, got %s", teacherUID, result.SubmittedBy)
+	}
+}
+
+func TestSubmissionServiceFindByIDForSubmitterNotFoundWhenOwnerDoesNotMatch(t *testing.T) {
+	topicUID := uuid.New()
+	submissionUID := uuid.New()
+	teacherUID := uuid.New()
+
+	topicRepo := &fakeTopicRepository{
+		findByIDFn: func(
+			ctx context.Context,
+			id uuid.UUID,
+		) (*topicdomain.Topic, error) {
+			return &topicdomain.Topic{UID: topicUID}, nil
+		},
+	}
+
+	submissionRepo := &fakeSubmissionRepository{
+		findByIDAndTopicIDAndSubmittedByFn: func(
+			context.Context,
+			uuid.UUID,
+			uuid.UUID,
+			uuid.UUID,
+		) (*submissiondomain.Submission, error) {
+			return nil, submissiondomain.ErrSubmissionNotFound
+		},
+	}
+
+	service := NewSubmissionService(
+		submissionRepo,
+		topicRepo,
+		&fakeFieldRepository{},
+	)
+
+	_, err := service.FindByIDForSubmitter(
+		context.Background(),
+		topicUID,
+		submissionUID,
+		teacherUID,
+	)
+	if !errors.Is(err, submissiondomain.ErrSubmissionNotFound) {
+		t.Fatalf("expected submission not found, got %v", err)
+	}
+}
+
 func TestSubmissionServiceCreateValidSelectValue(t *testing.T) {
 	topicUID := uuid.New()
 	fieldUID := uuid.New()
@@ -1046,7 +1288,8 @@ func TestSubmissionServiceCreateValidSelectValue(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID: topicUID,
+				UID:      topicUID,
+				IsActive: true,
 			}, nil
 		},
 	}
@@ -1158,7 +1401,8 @@ func TestSubmissionServiceCreateInvalidSelectValue(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID: topicUID,
+				UID:      topicUID,
+				IsActive: true,
 			}, nil
 		},
 	}
@@ -1249,7 +1493,8 @@ func TestSubmissionServiceCreateSelectValueMustBeString(t *testing.T) {
 			id uuid.UUID,
 		) (*topicdomain.Topic, error) {
 			return &topicdomain.Topic{
-				UID: topicUID,
+				UID:      topicUID,
+				IsActive: true,
 			}, nil
 		},
 	}
@@ -1307,5 +1552,142 @@ func TestSubmissionServiceCreateSelectValueMustBeString(t *testing.T) {
 			"expected ErrSubmissionInvalidValue, got %v",
 			err,
 		)
+	}
+}
+
+func TestSubmissionServiceCreateRejectsInactiveTopic(t *testing.T) {
+	topicUID := uuid.New()
+	createCalled := false
+
+	service := NewSubmissionService(
+		&fakeSubmissionRepository{createFn: func(context.Context, *submissiondomain.Submission) error {
+			createCalled = true
+			return nil
+		}},
+		&fakeTopicRepository{findByIDFn: func(context.Context, uuid.UUID) (*topicdomain.Topic, error) {
+			return &topicdomain.Topic{UID: topicUID, IsActive: false}, nil
+		}},
+		&fakeFieldRepository{},
+	)
+
+	_, err := service.Create(context.Background(), topicUID, CreateSubmissionInput{SubmittedBy: uuid.New()})
+	if !errors.Is(err, submissiondomain.ErrSubmissionTopicInactive) {
+		t.Fatalf("expected ErrSubmissionTopicInactive, got %v", err)
+	}
+	if createCalled {
+		t.Fatal("repository Create should not be called")
+	}
+}
+
+func TestSubmissionServiceCreateAcceptsEmptyOptionalValues(t *testing.T) {
+	topicUID := uuid.New()
+	dateUID := uuid.New()
+	numberUID := uuid.New()
+	selectUID := uuid.New()
+
+	service := NewSubmissionService(
+		&fakeSubmissionRepository{},
+		&fakeTopicRepository{findByIDFn: func(context.Context, uuid.UUID) (*topicdomain.Topic, error) {
+			return &topicdomain.Topic{UID: topicUID, IsActive: true}, nil
+		}},
+		&fakeFieldRepository{findAllByTopicIDFn: func(context.Context, uuid.UUID) ([]topicdomain.TopicField, error) {
+			return []topicdomain.TopicField{
+				{UID: dateUID, TopicUID: topicUID, Label: "วันที่", Type: topicdomain.FieldTypeDate},
+				{UID: numberUID, TopicUID: topicUID, Label: "จำนวน", Type: topicdomain.FieldTypeNumber},
+				{UID: selectUID, TopicUID: topicUID, Label: "ประเภท", Type: topicdomain.FieldTypeSelect, Options: []topicdomain.SelectOption{{Label: "A", Value: "a"}}},
+			}, nil
+		}},
+	)
+
+	submission, err := service.Create(context.Background(), topicUID, CreateSubmissionInput{
+		SubmittedBy: uuid.New(),
+		Values: []SubmissionValueInput{
+			{FieldUID: dateUID, Value: raw(`""`)},
+			{FieldUID: numberUID, Value: raw(`"   "`)},
+			{FieldUID: selectUID, Value: raw(`""`)},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected empty optional values to be accepted, got %v", err)
+	}
+	if len(submission.Values) != 0 {
+		t.Fatalf("expected empty optional fields not to be stored, got %d values", len(submission.Values))
+	}
+}
+
+func TestSubmissionServiceCreateValidatesSubmitter(t *testing.T) {
+	topicUID := uuid.New()
+	teacherUID := uuid.New()
+	topicRepo := &fakeTopicRepository{findByIDFn: func(context.Context, uuid.UUID) (*topicdomain.Topic, error) {
+		return &topicdomain.Topic{UID: topicUID, IsActive: true}, nil
+	}}
+
+	tests := []struct {
+		name    string
+		userFn  func(context.Context, uuid.UUID) (*userdomain.User, error)
+		wantErr error
+	}{
+		{
+			name: "user not found",
+			userFn: func(context.Context, uuid.UUID) (*userdomain.User, error) {
+				return nil, userdomain.ErrUserNotFound
+			},
+			wantErr: submissiondomain.ErrSubmissionSubmitterNotFound,
+		},
+		{
+			name: "director cannot submit as teacher",
+			userFn: func(context.Context, uuid.UUID) (*userdomain.User, error) {
+				return &userdomain.User{UID: teacherUID, Role: userdomain.RoleDirector, Status: userdomain.StatusActive}, nil
+			},
+			wantErr: submissiondomain.ErrSubmissionSubmitterMustBeTeacher,
+		},
+		{
+			name: "inactive teacher",
+			userFn: func(context.Context, uuid.UUID) (*userdomain.User, error) {
+				return &userdomain.User{UID: teacherUID, Role: userdomain.RoleTeacher, Status: userdomain.StatusInactive}, nil
+			},
+			wantErr: submissiondomain.ErrSubmissionSubmitterInactive,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := NewSubmissionService(
+				&fakeSubmissionRepository{},
+				topicRepo,
+				&fakeFieldRepository{},
+				&fakeUserLookupRepository{findByIDFn: tt.userFn},
+			)
+			_, err := service.Create(context.Background(), topicUID, CreateSubmissionInput{SubmittedBy: teacherUID})
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected %v, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestSubmissionServiceFieldErrorContainsFieldUID(t *testing.T) {
+	topicUID := uuid.New()
+	fieldUID := uuid.New()
+	service := NewSubmissionService(
+		&fakeSubmissionRepository{},
+		&fakeTopicRepository{findByIDFn: func(context.Context, uuid.UUID) (*topicdomain.Topic, error) {
+			return &topicdomain.Topic{UID: topicUID, IsActive: true}, nil
+		}},
+		&fakeFieldRepository{findAllByTopicIDFn: func(context.Context, uuid.UUID) ([]topicdomain.TopicField, error) {
+			return []topicdomain.TopicField{{UID: fieldUID, TopicUID: topicUID, Label: "วันที่", Type: topicdomain.FieldTypeDate, Required: true}}, nil
+		}},
+	)
+
+	_, err := service.Create(context.Background(), topicUID, CreateSubmissionInput{
+		SubmittedBy: uuid.New(),
+		Values:      []SubmissionValueInput{{FieldUID: fieldUID, Value: raw(`"not-a-date"`)}},
+	})
+	var fieldErr *submissiondomain.FieldError
+	if !errors.As(err, &fieldErr) {
+		t.Fatalf("expected FieldError, got %T: %v", err, err)
+	}
+	if fieldErr.FieldUID != fieldUID || fieldErr.FieldLabel != "วันที่" {
+		t.Fatalf("unexpected field metadata: %+v", fieldErr)
 	}
 }

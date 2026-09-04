@@ -524,6 +524,17 @@ func TestTopicHandlerUpdateField(t *testing.T) {
 		t.Errorf("response = %+v", body)
 	}
 
+	service.updateFieldFn = func(_ context.Context, _, _ uuid.UUID, input usecase.UpdateFieldInput) (*domain.TopicField, error) {
+		if len(input.Options) != 2 || input.Options[0].Value != "academic" || input.Options[1].Value != "hr" {
+			t.Fatalf("select options were not forwarded: %+v", input.Options)
+		}
+		return &domain.TopicField{UID: fieldID, TopicUID: topicID, Label: input.Label, Type: input.Type, Options: input.Options}, nil
+	}
+	resp = topicRequest(t, newTopicTestApp(service), nethttp.MethodPut, "/api/v1/topics/"+topicID.String()+"/fields/"+fieldID.String(), []byte(`{"label":"ฝ่ายงาน","type":"select","required":false,"position":0,"options":[{"label":"วิชาการ","value":"academic"},{"label":"บุคคล","value":"hr"}]}`))
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("select update status = %d", resp.StatusCode)
+	}
+
 	resp = topicRequest(t, newTopicTestApp(&topicServiceStub{}), nethttp.MethodPut, "/api/v1/topics/"+topicID.String()+"/fields/"+fieldID.String(), []byte(`{"label":`))
 	if resp.StatusCode != fiber.StatusBadRequest {
 		t.Fatalf("invalid body status = %d", resp.StatusCode)
@@ -544,6 +555,14 @@ func TestTopicHandlerUpdateField(t *testing.T) {
 	if validationBody["error"] != domain.ErrTopicFieldInvalidType.Error() {
 		t.Errorf("response = %+v", validationBody)
 	}
+
+	service.updateFieldFn = func(context.Context, uuid.UUID, uuid.UUID, usecase.UpdateFieldInput) (*domain.TopicField, error) {
+		return nil, domain.ErrTopicFieldTypeLocked
+	}
+	resp = topicRequest(t, newTopicTestApp(service), nethttp.MethodPut, "/api/v1/topics/"+topicID.String()+"/fields/"+fieldID.String(), []byte(`{"label":"x","type":"date","required":false,"position":0}`))
+	if resp.StatusCode != fiber.StatusConflict {
+		t.Fatalf("locked field status = %d", resp.StatusCode)
+	}
 }
 
 func TestTopicHandlerDeleteField(t *testing.T) {
@@ -562,6 +581,16 @@ func TestTopicHandlerDeleteField(t *testing.T) {
 	if resp.StatusCode != fiber.StatusNoContent {
 		resp.Body.Close()
 		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	service.deleteFieldFn = func(context.Context, uuid.UUID, uuid.UUID) error {
+		return domain.ErrTopicFieldDeleteLocked
+	}
+	resp = topicRequest(t, newTopicTestApp(service), nethttp.MethodDelete, "/api/v1/topics/"+topicID.String()+"/fields/"+fieldID.String(), nil)
+	if resp.StatusCode != fiber.StatusConflict {
+		resp.Body.Close()
+		t.Fatalf("locked delete status = %d", resp.StatusCode)
 	}
 	resp.Body.Close()
 

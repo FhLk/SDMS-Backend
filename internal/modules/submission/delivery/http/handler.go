@@ -24,10 +24,23 @@ type SubmissionService interface {
 		topicUID uuid.UUID,
 	) ([]submissiondomain.Submission, error)
 
+	FindAllByTopicIDAndSubmittedBy(
+		ctx context.Context,
+		topicUID uuid.UUID,
+		submittedBy uuid.UUID,
+	) ([]submissiondomain.Submission, error)
+
 	FindByID(
 		ctx context.Context,
 		topicUID uuid.UUID,
 		submissionUID uuid.UUID,
+	) (*submissiondomain.Submission, error)
+
+	FindByIDForSubmitter(
+		ctx context.Context,
+		topicUID uuid.UUID,
+		submissionUID uuid.UUID,
+		submittedBy uuid.UUID,
 	) (*submissiondomain.Submission, error)
 }
 
@@ -107,10 +120,31 @@ func (h *SubmissionHandler) FindAll(c fiber.Ctx) error {
 		)
 	}
 
-	submissions, err := h.service.FindAllByTopicID(
-		c.Context(),
-		topicUID,
-	)
+	var submissions []submissiondomain.Submission
+
+	// Temporary ownership filter until authentication can provide the current user.
+	submittedByParam := c.Query("submitted_by")
+	if submittedByParam == "" {
+		submissions, err = h.service.FindAllByTopicID(
+			c.Context(),
+			topicUID,
+		)
+	} else {
+		submittedBy, parseErr := uuid.Parse(submittedByParam)
+		if parseErr != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(
+				fiber.Map{
+					"message": "invalid submitted_by",
+				},
+			)
+		}
+
+		submissions, err = h.service.FindAllByTopicIDAndSubmittedBy(
+			c.Context(),
+			topicUID,
+			submittedBy,
+		)
+	}
 
 	if err != nil {
 		return handleError(c, err)
@@ -142,11 +176,33 @@ func (h *SubmissionHandler) FindByID(c fiber.Ctx) error {
 		)
 	}
 
-	submission, err := h.service.FindByID(
-		c.Context(),
-		topicUID,
-		submissionUID,
-	)
+	var submission *submissiondomain.Submission
+
+	// Temporary ownership check until authentication can provide the current user.
+	submittedByParam := c.Query("submitted_by")
+	if submittedByParam == "" {
+		submission, err = h.service.FindByID(
+			c.Context(),
+			topicUID,
+			submissionUID,
+		)
+	} else {
+		submittedBy, parseErr := uuid.Parse(submittedByParam)
+		if parseErr != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(
+				fiber.Map{
+					"message": "invalid submitted_by",
+				},
+			)
+		}
+
+		submission, err = h.service.FindByIDForSubmitter(
+			c.Context(),
+			topicUID,
+			submissionUID,
+			submittedBy,
+		)
+	}
 	if err != nil {
 		return handleError(c, err)
 	}
@@ -157,6 +213,17 @@ func (h *SubmissionHandler) FindByID(c fiber.Ctx) error {
 }
 
 func handleError(c fiber.Ctx, err error) error {
+	var fieldErr *submissiondomain.FieldError
+	if errors.As(err, &fieldErr) {
+		status := fiber.StatusBadRequest
+		return c.Status(status).JSON(fiber.Map{
+			"code":        submissionErrorCode(fieldErr.Err),
+			"message":     fieldErr.Error(),
+			"field_uid":   fieldErr.FieldUID,
+			"field_label": fieldErr.FieldLabel,
+		})
+	}
+
 	switch {
 	case errors.Is(err, topicdomain.ErrTopicNotFound),
 		errors.Is(err, submissiondomain.ErrSubmissionNotFound):
@@ -174,6 +241,22 @@ func handleError(c fiber.Ctx, err error) error {
 		errors.Is(
 			err,
 			submissiondomain.ErrSubmissionSubmittedByRequired,
+		),
+		errors.Is(
+			err,
+			submissiondomain.ErrSubmissionSubmitterNotFound,
+		),
+		errors.Is(
+			err,
+			submissiondomain.ErrSubmissionSubmitterMustBeTeacher,
+		),
+		errors.Is(
+			err,
+			submissiondomain.ErrSubmissionSubmitterInactive,
+		),
+		errors.Is(
+			err,
+			submissiondomain.ErrSubmissionTopicInactive,
 		),
 		errors.Is(
 			err,
@@ -198,6 +281,7 @@ func handleError(c fiber.Ctx, err error) error {
 
 		return c.Status(fiber.StatusBadRequest).JSON(
 			fiber.Map{
+				"code":    submissionErrorCode(err),
 				"message": err.Error(),
 			},
 		)
@@ -210,5 +294,34 @@ func handleError(c fiber.Ctx, err error) error {
 				"message": "internal server error",
 			},
 		)
+	}
+}
+
+func submissionErrorCode(err error) string {
+	switch {
+	case errors.Is(err, submissiondomain.ErrSubmissionRequiredFieldMissing):
+		return "REQUIRED_FIELD_MISSING"
+	case errors.Is(err, submissiondomain.ErrSubmissionInvalidValue):
+		return "INVALID_SUBMISSION_VALUE"
+	case errors.Is(err, submissiondomain.ErrSubmissionInvalidField):
+		return "INVALID_SUBMISSION_FIELD"
+	case errors.Is(err, submissiondomain.ErrSubmissionDuplicateField):
+		return "DUPLICATE_SUBMISSION_FIELD"
+	case errors.Is(err, submissiondomain.ErrSubmissionFileFieldUnsupported):
+		return "FILE_FIELD_UNSUPPORTED"
+	case errors.Is(err, submissiondomain.ErrSubmissionTopicInactive):
+		return "TOPIC_INACTIVE"
+	case errors.Is(err, submissiondomain.ErrSubmissionSubmitterNotFound):
+		return "SUBMITTER_NOT_FOUND"
+	case errors.Is(err, submissiondomain.ErrSubmissionSubmitterMustBeTeacher):
+		return "SUBMITTER_MUST_BE_TEACHER"
+	case errors.Is(err, submissiondomain.ErrSubmissionSubmitterInactive):
+		return "SUBMITTER_INACTIVE"
+	case errors.Is(err, submissiondomain.ErrSubmissionSubmittedByRequired):
+		return "SUBMITTED_BY_REQUIRED"
+	case errors.Is(err, submissiondomain.ErrSubmissionTopicUIDRequired):
+		return "TOPIC_UID_REQUIRED"
+	default:
+		return "INVALID_SUBMISSION"
 	}
 }

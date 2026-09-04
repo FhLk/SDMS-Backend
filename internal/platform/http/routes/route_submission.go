@@ -6,6 +6,7 @@ import (
 	submissionusecase "sdms/internal/modules/submission/usecase"
 
 	topicpostgres "sdms/internal/modules/topic/repository/postgres"
+	userpostgres "sdms/internal/modules/user/repository/postgres"
 
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/gorm"
@@ -21,7 +22,14 @@ func NewRouteSubmission(
 
 	fieldRepository := topicpostgres.NewFieldRepository(db)
 
-	submissionService := submissionusecase.NewSubmissionService(submissionRepository, topicRepository, fieldRepository)
+	userRepository := userpostgres.NewUserRepository(db)
+
+	submissionService := submissionusecase.NewSubmissionService(
+		submissionRepository,
+		topicRepository,
+		fieldRepository,
+		userRepository,
+	)
 
 	submissionHandler := submissionhttp.NewSubmissionHandler(submissionService)
 

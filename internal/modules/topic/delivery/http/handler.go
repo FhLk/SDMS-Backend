@@ -269,6 +269,7 @@ func (h *TopicHandler) UpdateField(c fiber.Ctx) error {
 			Type:     domain.FieldType(req.Type),
 			Required: req.Required,
 			Position: req.Position,
+			Options:  toDomainSelectOptions(req.Options),
 		},
 	)
 	if err != nil {
@@ -358,6 +359,11 @@ func handleError(c fiber.Ctx, err error) error {
 		})
 	case errors.Is(err, domain.ErrTopicNameEmpty):
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": err.Error(),
+		})
+	case errors.Is(err, domain.ErrTopicFieldTypeLocked),
+		errors.Is(err, domain.ErrTopicFieldDeleteLocked):
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
 			"message": err.Error(),
 		})
 	case errors.Is(err, domain.ErrTopicFieldInvalidTopicUID),

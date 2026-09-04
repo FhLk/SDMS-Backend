@@ -13,6 +13,8 @@ var (
 	ErrTopicFieldInvalidType     = errors.New("invalid topic field type")
 	ErrTopicFieldInvalidPosition = errors.New("topic field position must be greater than or equal to zero")
 	ErrTopicFieldNotFound        = errors.New("topic field not found")
+	ErrTopicFieldTypeLocked      = errors.New("topic field type cannot be changed after submissions exist")
+	ErrTopicFieldDeleteLocked    = errors.New("topic field cannot be deleted after submissions exist")
 )
 
 var (

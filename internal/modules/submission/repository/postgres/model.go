@@ -4,19 +4,21 @@ import (
 	"time"
 
 	"sdms/internal/modules/submission/domain"
+	topicpostgres "sdms/internal/modules/topic/repository/postgres"
+	userpostgres "sdms/internal/modules/user/repository/postgres"
 
 	"github.com/google/uuid"
 )
 
 type SubmissionModel struct {
-	UID         uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TopicUID    uuid.UUID `gorm:"type:uuid;not null;index"`
-	SubmittedBy uuid.UUID `gorm:"type:uuid;not null;index"`
-
-	Values []SubmissionValueModel `gorm:"foreignKey:SubmissionUID;references:UID;constraint:OnDelete:CASCADE;"`
-
-	CreatedAt time.Time `gorm:"not null"`
-	UpdatedAt time.Time `gorm:"not null"`
+	UID         uuid.UUID                `gorm:"type:uuid;primaryKey"`
+	TopicUID    uuid.UUID                `gorm:"type:uuid;not null;index"`
+	SubmittedBy uuid.UUID                `gorm:"type:uuid;not null;index"`
+	Topic       topicpostgres.TopicModel `gorm:"foreignKey:TopicUID;references:UID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	Submitter   userpostgres.UserModel   `gorm:"foreignKey:SubmittedBy;references:UID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	Values      []SubmissionValueModel   `gorm:"foreignKey:SubmissionUID;references:UID;constraint:OnDelete:CASCADE;"`
+	CreatedAt   time.Time                `gorm:"not null"`
+	UpdatedAt   time.Time                `gorm:"not null"`
 }
 
 func (SubmissionModel) TableName() string {
@@ -24,16 +26,15 @@ func (SubmissionModel) TableName() string {
 }
 
 type SubmissionValueModel struct {
-	UID           uuid.UUID `gorm:"type:uuid;primaryKey"`
-	SubmissionUID uuid.UUID `gorm:"type:uuid;not null;index"`
-	FieldUID      uuid.UUID `gorm:"type:uuid;not null;index"`
-
-	TextValue   *string    `gorm:"type:text"`
-	NumberValue *float64   `gorm:"type:double precision"`
-	DateValue   *time.Time `gorm:"type:date"`
-
-	CreatedAt time.Time `gorm:"not null"`
-	UpdatedAt time.Time `gorm:"not null"`
+	UID           uuid.UUID                     `gorm:"type:uuid;primaryKey"`
+	SubmissionUID uuid.UUID                     `gorm:"type:uuid;not null;uniqueIndex:idx_submission_field"`
+	FieldUID      uuid.UUID                     `gorm:"type:uuid;not null;uniqueIndex:idx_submission_field;index"`
+	Field         topicpostgres.TopicFieldModel `gorm:"foreignKey:FieldUID;references:UID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	TextValue     *string                       `gorm:"type:text"`
+	NumberValue   *float64                      `gorm:"type:double precision"`
+	DateValue     *time.Time                    `gorm:"type:date"`
+	CreatedAt     time.Time                     `gorm:"not null"`
+	UpdatedAt     time.Time                     `gorm:"not null"`
 }
 
 func (SubmissionValueModel) TableName() string {
