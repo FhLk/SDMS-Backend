@@ -5,6 +5,7 @@ import (
 
 	"sdms/internal/config"
 
+	submissionpostgres "sdms/internal/modules/submission/repository/postgres"
 	topicpostgres "sdms/internal/modules/topic/repository/postgres"
 	userpostgres "sdms/internal/modules/user/repository/postgres"
 
@@ -35,6 +36,8 @@ func NewPostgres(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		&topicpostgres.TopicModel{},
 		&userpostgres.UserModel{},
 		&topicpostgres.TopicFieldModel{},
+		&submissionpostgres.SubmissionModel{},
+		&submissionpostgres.SubmissionValueModel{},
 	); err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}

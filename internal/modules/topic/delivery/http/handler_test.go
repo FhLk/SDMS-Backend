@@ -19,12 +19,17 @@ import (
 )
 
 type topicServiceStub struct {
-	createTopicFn func(context.Context, string, string) (*domain.Topic, error)
-	findAllFn     func(context.Context) ([]domain.Topic, error)
-	findByIDFn    func(context.Context, uuid.UUID) (*domain.Topic, error)
-	updateFn      func(context.Context, uuid.UUID, string, string, bool) (*domain.Topic, error)
-	deleteFn      func(context.Context, uuid.UUID) error
-	createFieldFn func(context.Context, uuid.UUID, usecase.CreateFieldInput) (*domain.TopicField, error)
+	createTopicFn         func(context.Context, string, string) (*domain.Topic, error)
+	findAllFn             func(context.Context) ([]domain.Topic, error)
+	findByIDFn            func(context.Context, uuid.UUID) (*domain.Topic, error)
+	findTopicWithFieldsFn func(context.Context, uuid.UUID) (*domain.Topic, []domain.TopicField, error)
+	updateFn              func(context.Context, uuid.UUID, string, string, bool) (*domain.Topic, error)
+	deleteFn              func(context.Context, uuid.UUID) error
+	createFieldFn         func(context.Context, uuid.UUID, usecase.CreateFieldInput) (*domain.TopicField, error)
+	findFieldsByTopicIDFn func(context.Context, uuid.UUID) ([]domain.TopicField, error)
+	findFieldByIDFn       func(context.Context, uuid.UUID, uuid.UUID) (*domain.TopicField, error)
+	updateFieldFn         func(context.Context, uuid.UUID, uuid.UUID, usecase.UpdateFieldInput) (*domain.TopicField, error)
+	deleteFieldFn         func(context.Context, uuid.UUID, uuid.UUID) error
 }
 
 func (s *topicServiceStub) CreateTopic(ctx context.Context, name, description string) (*domain.Topic, error) {
@@ -48,6 +53,13 @@ func (s *topicServiceStub) FindByID(ctx context.Context, id uuid.UUID) (*domain.
 	return nil, errors.New("unexpected FindByID call")
 }
 
+func (s *topicServiceStub) FindTopicWithFields(ctx context.Context, id uuid.UUID) (*domain.Topic, []domain.TopicField, error) {
+	if s.findTopicWithFieldsFn != nil {
+		return s.findTopicWithFieldsFn(ctx, id)
+	}
+	return nil, nil, errors.New("unexpected FindTopicWithFields call")
+}
+
 func (s *topicServiceStub) Update(ctx context.Context, id uuid.UUID, name, description string, active bool) (*domain.Topic, error) {
 	if s.updateFn != nil {
 		return s.updateFn(ctx, id, name, description, active)
@@ -67,6 +79,34 @@ func (s *topicServiceStub) CreateField(ctx context.Context, id uuid.UUID, input 
 		return s.createFieldFn(ctx, id, input)
 	}
 	return nil, errors.New("unexpected CreateField call")
+}
+
+func (s *topicServiceStub) FindFieldsByTopicID(ctx context.Context, id uuid.UUID) ([]domain.TopicField, error) {
+	if s.findFieldsByTopicIDFn != nil {
+		return s.findFieldsByTopicIDFn(ctx, id)
+	}
+	return nil, errors.New("unexpected FindFieldsByTopicID call")
+}
+
+func (s *topicServiceStub) FindFieldByID(ctx context.Context, topicID, fieldID uuid.UUID) (*domain.TopicField, error) {
+	if s.findFieldByIDFn != nil {
+		return s.findFieldByIDFn(ctx, topicID, fieldID)
+	}
+	return nil, errors.New("unexpected FindFieldByID call")
+}
+
+func (s *topicServiceStub) UpdateField(ctx context.Context, topicID, fieldID uuid.UUID, input usecase.UpdateFieldInput) (*domain.TopicField, error) {
+	if s.updateFieldFn != nil {
+		return s.updateFieldFn(ctx, topicID, fieldID, input)
+	}
+	return nil, errors.New("unexpected UpdateField call")
+}
+
+func (s *topicServiceStub) DeleteField(ctx context.Context, topicID, fieldID uuid.UUID) error {
+	if s.deleteFieldFn != nil {
+		return s.deleteFieldFn(ctx, topicID, fieldID)
+	}
+	return errors.New("unexpected DeleteField call")
 }
 
 func newTopicTestApp(service TopicService) *fiber.App {
@@ -184,20 +224,26 @@ func TestTopicHandlerFindAll(t *testing.T) {
 }
 
 func TestTopicHandlerFindByID(t *testing.T) {
-	id := uuid.New()
+	topicID := uuid.New()
+	fieldID := uuid.New()
 
-	t.Run("success", func(t *testing.T) {
-		service := &topicServiceStub{findByIDFn: func(_ context.Context, got uuid.UUID) (*domain.Topic, error) {
-			if got != id {
-				t.Errorf("id = %s, want %s", got, id)
+	t.Run("success includes fields", func(t *testing.T) {
+		service := &topicServiceStub{findTopicWithFieldsFn: func(_ context.Context, got uuid.UUID) (*domain.Topic, []domain.TopicField, error) {
+			if got != topicID {
+				t.Errorf("id = %s, want %s", got, topicID)
 			}
-			return &domain.Topic{UID: id, Name: "topic"}, nil
+			return &domain.Topic{UID: topicID, Name: "topic", IsActive: true}, []domain.TopicField{
+				{UID: fieldID, TopicUID: topicID, Label: "วันที่", Type: domain.FieldTypeDate, Required: true, Position: 0},
+			}, nil
 		}}
-		resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodGet, "/api/v1/topics/"+id.String(), nil)
+
+		resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodGet, "/api/v1/topics/"+topicID.String(), nil)
 		if resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d", resp.StatusCode)
 		}
-		if body := decodeTopicBody[TopicResponse](t, resp); body.UID != id {
+
+		body := decodeTopicBody[TopicDetailResponse](t, resp)
+		if body.UID != topicID || body.Name != "topic" || len(body.Fields) != 1 || body.Fields[0].UID != fieldID {
 			t.Errorf("response = %+v", body)
 		}
 	})
@@ -214,10 +260,10 @@ func TestTopicHandlerFindByID(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		service := &topicServiceStub{findByIDFn: func(context.Context, uuid.UUID) (*domain.Topic, error) {
-			return nil, domain.ErrTopicNotFound
+		service := &topicServiceStub{findTopicWithFieldsFn: func(context.Context, uuid.UUID) (*domain.Topic, []domain.TopicField, error) {
+			return nil, nil, domain.ErrTopicNotFound
 		}}
-		resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodGet, "/api/v1/topics/"+id.String(), nil)
+		resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodGet, "/api/v1/topics/"+topicID.String(), nil)
 		if resp.StatusCode != fiber.StatusNotFound {
 			t.Fatalf("status = %d", resp.StatusCode)
 		}
@@ -378,5 +424,170 @@ func TestTopicErrorMappingForEveryFieldValidationError(t *testing.T) {
 				t.Errorf("response = %+v", body)
 			}
 		})
+	}
+}
+
+func TestTopicHandlerFindFields(t *testing.T) {
+	topicID := uuid.New()
+	fieldID := uuid.New()
+	service := &topicServiceStub{
+		findFieldsByTopicIDFn: func(_ context.Context, id uuid.UUID) ([]domain.TopicField, error) {
+			if id != topicID {
+				t.Errorf("topic id = %s, want %s", id, topicID)
+			}
+			return []domain.TopicField{{UID: fieldID, TopicUID: topicID, Label: "ชื่อ", Type: domain.FieldTypeText}}, nil
+		},
+	}
+
+	resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodGet, "/api/v1/topics/"+topicID.String()+"/fields", nil)
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	body := decodeTopicBody[[]TopicFieldResponse](t, resp)
+	if len(body) != 1 || body[0].UID != fieldID {
+		t.Errorf("response = %+v", body)
+	}
+
+	resp = topicRequest(t, newTopicTestApp(&topicServiceStub{}), nethttp.MethodGet, "/api/v1/topics/bad/fields", nil)
+	if resp.StatusCode != fiber.StatusBadRequest {
+		t.Fatalf("invalid topic status = %d", resp.StatusCode)
+	}
+	invalidBody := decodeTopicBody[map[string]string](t, resp)
+	if invalidBody["error"] != "invalid topic id" {
+		t.Errorf("response = %+v", invalidBody)
+	}
+}
+
+func TestTopicHandlerFindField(t *testing.T) {
+	topicID := uuid.New()
+	fieldID := uuid.New()
+	service := &topicServiceStub{
+		findFieldByIDFn: func(_ context.Context, gotTopicID, gotFieldID uuid.UUID) (*domain.TopicField, error) {
+			if gotTopicID != topicID || gotFieldID != fieldID {
+				t.Errorf("ids = %s/%s, want %s/%s", gotTopicID, gotFieldID, topicID, fieldID)
+			}
+			return &domain.TopicField{UID: fieldID, TopicUID: topicID, Label: "field", Type: domain.FieldTypeText}, nil
+		},
+	}
+
+	resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodGet, "/api/v1/topics/"+topicID.String()+"/fields/"+fieldID.String(), nil)
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if body := decodeTopicBody[TopicFieldResponse](t, resp); body.UID != fieldID {
+		t.Errorf("response = %+v", body)
+	}
+
+	resp = topicRequest(t, newTopicTestApp(&topicServiceStub{}), nethttp.MethodGet, "/api/v1/topics/"+topicID.String()+"/fields/bad", nil)
+	if resp.StatusCode != fiber.StatusBadRequest {
+		t.Fatalf("invalid field status = %d", resp.StatusCode)
+	}
+	invalidBody := decodeTopicBody[map[string]string](t, resp)
+	if invalidBody["error"] != "invalid field id" {
+		t.Errorf("response = %+v", invalidBody)
+	}
+
+	service.findFieldByIDFn = func(context.Context, uuid.UUID, uuid.UUID) (*domain.TopicField, error) {
+		return nil, domain.ErrTopicFieldNotFound
+	}
+	resp = topicRequest(t, newTopicTestApp(service), nethttp.MethodGet, "/api/v1/topics/"+topicID.String()+"/fields/"+fieldID.String(), nil)
+	if resp.StatusCode != fiber.StatusNotFound {
+		t.Fatalf("not found status = %d", resp.StatusCode)
+	}
+	notFoundBody := decodeTopicBody[map[string]string](t, resp)
+	if notFoundBody["message"] != domain.ErrTopicFieldNotFound.Error() {
+		t.Errorf("response = %+v", notFoundBody)
+	}
+}
+
+func TestTopicHandlerUpdateField(t *testing.T) {
+	topicID := uuid.New()
+	fieldID := uuid.New()
+	service := &topicServiceStub{
+		updateFieldFn: func(_ context.Context, gotTopicID, gotFieldID uuid.UUID, input usecase.UpdateFieldInput) (*domain.TopicField, error) {
+			if gotTopicID != topicID || gotFieldID != fieldID {
+				t.Errorf("ids = %s/%s, want %s/%s", gotTopicID, gotFieldID, topicID, fieldID)
+			}
+			if input.Label != "เหตุผล" || input.Type != domain.FieldTypeTextarea || !input.Required || input.Position != 2 {
+				t.Errorf("input = %+v", input)
+			}
+			return &domain.TopicField{UID: fieldID, TopicUID: topicID, Label: input.Label, Type: input.Type, Required: input.Required, Position: input.Position}, nil
+		},
+	}
+
+	resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodPut, "/api/v1/topics/"+topicID.String()+"/fields/"+fieldID.String(), []byte(`{"label":"เหตุผล","type":"textarea","required":true,"position":2}`))
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	body := decodeTopicBody[TopicFieldResponse](t, resp)
+	if body.UID != fieldID || body.Label != "เหตุผล" || body.Type != "textarea" || !body.Required || body.Position != 2 {
+		t.Errorf("response = %+v", body)
+	}
+
+	resp = topicRequest(t, newTopicTestApp(&topicServiceStub{}), nethttp.MethodPut, "/api/v1/topics/"+topicID.String()+"/fields/"+fieldID.String(), []byte(`{"label":`))
+	if resp.StatusCode != fiber.StatusBadRequest {
+		t.Fatalf("invalid body status = %d", resp.StatusCode)
+	}
+	invalidBody := decodeTopicBody[map[string]string](t, resp)
+	if invalidBody["error"] != "invalid request body" {
+		t.Errorf("response = %+v", invalidBody)
+	}
+
+	service.updateFieldFn = func(context.Context, uuid.UUID, uuid.UUID, usecase.UpdateFieldInput) (*domain.TopicField, error) {
+		return nil, domain.ErrTopicFieldInvalidType
+	}
+	resp = topicRequest(t, newTopicTestApp(service), nethttp.MethodPut, "/api/v1/topics/"+topicID.String()+"/fields/"+fieldID.String(), []byte(`{"label":"x","type":"bad","required":false,"position":0}`))
+	if resp.StatusCode != fiber.StatusBadRequest {
+		t.Fatalf("validation status = %d", resp.StatusCode)
+	}
+	validationBody := decodeTopicBody[map[string]string](t, resp)
+	if validationBody["error"] != domain.ErrTopicFieldInvalidType.Error() {
+		t.Errorf("response = %+v", validationBody)
+	}
+}
+
+func TestTopicHandlerDeleteField(t *testing.T) {
+	topicID := uuid.New()
+	fieldID := uuid.New()
+	service := &topicServiceStub{
+		deleteFieldFn: func(_ context.Context, gotTopicID, gotFieldID uuid.UUID) error {
+			if gotTopicID != topicID || gotFieldID != fieldID {
+				t.Errorf("ids = %s/%s, want %s/%s", gotTopicID, gotFieldID, topicID, fieldID)
+			}
+			return nil
+		},
+	}
+
+	resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodDelete, "/api/v1/topics/"+topicID.String()+"/fields/"+fieldID.String(), nil)
+	if resp.StatusCode != fiber.StatusNoContent {
+		resp.Body.Close()
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	service.deleteFieldFn = func(context.Context, uuid.UUID, uuid.UUID) error {
+		return domain.ErrTopicFieldNotFound
+	}
+	resp = topicRequest(t, newTopicTestApp(service), nethttp.MethodDelete, "/api/v1/topics/"+topicID.String()+"/fields/"+fieldID.String(), nil)
+	if resp.StatusCode != fiber.StatusNotFound {
+		resp.Body.Close()
+		t.Fatalf("not found status = %d", resp.StatusCode)
+	}
+	notFoundBody := decodeTopicBody[map[string]string](t, resp)
+	if notFoundBody["message"] != domain.ErrTopicFieldNotFound.Error() {
+		t.Errorf("response = %+v", notFoundBody)
+	}
+}
+
+func TestTopicFieldNotFoundMapsTo404(t *testing.T) {
+	app := fiber.New()
+	app.Get("/", func(c fiber.Ctx) error { return handleError(c, domain.ErrTopicFieldNotFound) })
+	resp := topicRequest(t, app, nethttp.MethodGet, "/", nil)
+	if resp.StatusCode != fiber.StatusNotFound {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	body := decodeTopicBody[map[string]string](t, resp)
+	if body["message"] != domain.ErrTopicFieldNotFound.Error() {
+		t.Errorf("response = %+v", body)
 	}
 }

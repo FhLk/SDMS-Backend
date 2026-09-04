@@ -115,3 +115,86 @@ func (s *TopicService) Delete(ctx context.Context, topicID uuid.UUID) error {
 
 	return s.topicRepo.Delete(ctx, topicID)
 }
+
+func (s *TopicService) FindTopicWithFields(ctx context.Context, topicID uuid.UUID) (*domain.Topic, []domain.TopicField, error) {
+	topic, err := s.topicRepo.FindByID(ctx, topicID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	fields, err := s.fieldRepo.FindAllByTopicID(ctx, topicID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return topic, fields, nil
+}
+
+func (s *TopicService) FindFieldsByTopicID(ctx context.Context, topicID uuid.UUID) ([]domain.TopicField, error) {
+	if topicID == uuid.Nil {
+		return nil, domain.ErrTopicFieldInvalidTopicUID
+	}
+
+	if _, err := s.topicRepo.FindByID(ctx, topicID); err != nil {
+		return nil, err
+	}
+
+	return s.fieldRepo.FindAllByTopicID(ctx, topicID)
+}
+
+func (s *TopicService) FindFieldByID(ctx context.Context, topicID uuid.UUID, fieldID uuid.UUID) (*domain.TopicField, error) {
+	return s.findFieldInTopic(ctx, topicID, fieldID)
+}
+
+func (s *TopicService) UpdateField(ctx context.Context, topicID uuid.UUID, fieldID uuid.UUID, input UpdateFieldInput) (*domain.TopicField, error) {
+	field, err := s.findFieldInTopic(ctx, topicID, fieldID)
+	if err != nil {
+		return nil, err
+	}
+
+	input.Label = strings.TrimSpace(input.Label)
+
+	if err := field.Update(
+		input.Label,
+		input.Type,
+		input.Required,
+		input.Position,
+	); err != nil {
+		return nil, err
+	}
+
+	if err := s.fieldRepo.Update(ctx, field); err != nil {
+		return nil, err
+	}
+
+	return field, nil
+}
+
+func (s *TopicService) DeleteField(ctx context.Context, topicID uuid.UUID, fieldID uuid.UUID) error {
+	if _, err := s.findFieldInTopic(ctx, topicID, fieldID); err != nil {
+		return err
+	}
+
+	return s.fieldRepo.Delete(ctx, fieldID)
+}
+
+func (s *TopicService) findFieldInTopic(ctx context.Context, topicID uuid.UUID, fieldID uuid.UUID) (*domain.TopicField, error) {
+	if topicID == uuid.Nil {
+		return nil, domain.ErrTopicFieldInvalidTopicUID
+	}
+
+	if _, err := s.topicRepo.FindByID(ctx, topicID); err != nil {
+		return nil, err
+	}
+
+	field, err := s.fieldRepo.FindByID(ctx, fieldID)
+	if err != nil {
+		return nil, err
+	}
+
+	if field.TopicUID != topicID {
+		return nil, domain.ErrTopicFieldNotFound
+	}
+
+	return field, nil
+}

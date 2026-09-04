@@ -75,3 +75,21 @@ func TestNewTopicFieldValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestTopicFieldUpdate(t *testing.T) {
+	field, err := NewTopicField(uuid.New(), "old", FieldTypeText, false, 0)
+	if err != nil {
+		t.Fatalf("NewTopicField() error = %v", err)
+	}
+
+	if err := field.Update("new", FieldTypeTextarea, true, 3); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if field.Label != "new" || field.Type != FieldTypeTextarea || !field.Required || field.Position != 3 {
+		t.Errorf("field = %+v", field)
+	}
+
+	if err := field.Update("", FieldTypeText, false, 0); !errors.Is(err, ErrTopicFieldLabelRequired) {
+		t.Fatalf("Update() error = %v, want %v", err, ErrTopicFieldLabelRequired)
+	}
+}

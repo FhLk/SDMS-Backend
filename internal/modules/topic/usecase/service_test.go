@@ -409,3 +409,144 @@ func TestDeleteTopic(t *testing.T) {
 		}
 	})
 }
+
+func TestFindTopicWithFields(t *testing.T) {
+	topicID := uuid.New()
+	topic := &domain.Topic{UID: topicID, Name: "topic"}
+	fields := []domain.TopicField{{UID: uuid.New(), TopicUID: topicID, Label: "one", Position: 0}}
+
+	service := NewTopicService(&topicRepositoryStub{
+		findByIDFn: func(_ context.Context, id uuid.UUID) (*domain.Topic, error) {
+			if id != topicID {
+				t.Errorf("topic id = %s, want %s", id, topicID)
+			}
+			return topic, nil
+		},
+	}, &fieldRepositoryStub{
+		findAllByTopicIDFn: func(_ context.Context, id uuid.UUID) ([]domain.TopicField, error) {
+			if id != topicID {
+				t.Errorf("field topic id = %s, want %s", id, topicID)
+			}
+			return fields, nil
+		},
+	})
+
+	gotTopic, gotFields, err := service.FindTopicWithFields(context.Background(), topicID)
+	if err != nil {
+		t.Fatalf("FindTopicWithFields() error = %v", err)
+	}
+	if gotTopic != topic || len(gotFields) != 1 || gotFields[0].UID != fields[0].UID {
+		t.Fatalf("FindTopicWithFields() = %+v, %+v", gotTopic, gotFields)
+	}
+}
+
+func TestFindFieldsByTopicID(t *testing.T) {
+	topicID := uuid.New()
+	fields := []domain.TopicField{{UID: uuid.New(), TopicUID: topicID, Position: 1}}
+	service := NewTopicService(&topicRepositoryStub{}, &fieldRepositoryStub{
+		findAllByTopicIDFn: func(context.Context, uuid.UUID) ([]domain.TopicField, error) { return fields, nil },
+	})
+
+	got, err := service.FindFieldsByTopicID(context.Background(), topicID)
+	if err != nil || len(got) != 1 || got[0].UID != fields[0].UID {
+		t.Fatalf("FindFieldsByTopicID() = %+v, %v", got, err)
+	}
+
+	service = NewTopicService(&topicRepositoryStub{
+		findByIDFn: func(context.Context, uuid.UUID) (*domain.Topic, error) { return nil, domain.ErrTopicNotFound },
+	}, &fieldRepositoryStub{})
+	if got, err := service.FindFieldsByTopicID(context.Background(), topicID); !errors.Is(err, domain.ErrTopicNotFound) || got != nil {
+		t.Fatalf("FindFieldsByTopicID() = %+v, %v", got, err)
+	}
+}
+
+func TestFindFieldByIDRequiresFieldToBelongToTopic(t *testing.T) {
+	topicID := uuid.New()
+	fieldID := uuid.New()
+
+	t.Run("success", func(t *testing.T) {
+		field := &domain.TopicField{UID: fieldID, TopicUID: topicID}
+		service := NewTopicService(&topicRepositoryStub{}, &fieldRepositoryStub{
+			findByIDFn: func(_ context.Context, id uuid.UUID) (*domain.TopicField, error) {
+				if id != fieldID {
+					t.Errorf("field id = %s, want %s", id, fieldID)
+				}
+				return field, nil
+			},
+		})
+		got, err := service.FindFieldByID(context.Background(), topicID, fieldID)
+		if err != nil || got != field {
+			t.Fatalf("FindFieldByID() = %+v, %v", got, err)
+		}
+	})
+
+	t.Run("field from another topic is hidden", func(t *testing.T) {
+		service := NewTopicService(&topicRepositoryStub{}, &fieldRepositoryStub{
+			findByIDFn: func(context.Context, uuid.UUID) (*domain.TopicField, error) {
+				return &domain.TopicField{UID: fieldID, TopicUID: uuid.New()}, nil
+			},
+		})
+		got, err := service.FindFieldByID(context.Background(), topicID, fieldID)
+		if !errors.Is(err, domain.ErrTopicFieldNotFound) || got != nil {
+			t.Fatalf("FindFieldByID() = %+v, %v", got, err)
+		}
+	})
+}
+
+func TestUpdateField(t *testing.T) {
+	topicID := uuid.New()
+	fieldID := uuid.New()
+	field := &domain.TopicField{UID: fieldID, TopicUID: topicID, Label: "old", Type: domain.FieldTypeText}
+	updateCalled := false
+
+	service := NewTopicService(&topicRepositoryStub{}, &fieldRepositoryStub{
+		findByIDFn: func(context.Context, uuid.UUID) (*domain.TopicField, error) { return field, nil },
+		updateFn: func(_ context.Context, got *domain.TopicField) error {
+			updateCalled = true
+			if got != field {
+				t.Error("repository received a different field pointer")
+			}
+			return nil
+		},
+	})
+
+	got, err := service.UpdateField(context.Background(), topicID, fieldID, UpdateFieldInput{
+		Label: "  updated  ", Type: domain.FieldTypeDate, Required: true, Position: 2,
+	})
+	if err != nil || got != field || !updateCalled {
+		t.Fatalf("UpdateField() = %+v, %v, updateCalled=%v", got, err, updateCalled)
+	}
+	if got.Label != "updated" || got.Type != domain.FieldTypeDate || !got.Required || got.Position != 2 {
+		t.Errorf("updated field = %+v", got)
+	}
+
+	got, err = service.UpdateField(context.Background(), topicID, fieldID, UpdateFieldInput{Label: " ", Type: domain.FieldTypeText})
+	if !errors.Is(err, domain.ErrTopicFieldLabelRequired) || got != nil {
+		t.Fatalf("validation UpdateField() = %+v, %v", got, err)
+	}
+}
+
+func TestDeleteField(t *testing.T) {
+	topicID := uuid.New()
+	fieldID := uuid.New()
+	deleteCalled := false
+	service := NewTopicService(&topicRepositoryStub{}, &fieldRepositoryStub{
+		findByIDFn: func(context.Context, uuid.UUID) (*domain.TopicField, error) {
+			return &domain.TopicField{UID: fieldID, TopicUID: topicID}, nil
+		},
+		deleteFn: func(_ context.Context, id uuid.UUID) error {
+			deleteCalled = true
+			if id != fieldID {
+				t.Errorf("delete id = %s, want %s", id, fieldID)
+			}
+			return nil
+		},
+	})
+
+	if err := service.DeleteField(context.Background(), topicID, fieldID); err != nil {
+		t.Fatalf("DeleteField() error = %v", err)
+	}
+	if !deleteCalled {
+		t.Error("field repository Delete was not called")
+	}
+}

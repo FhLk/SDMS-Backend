@@ -12,4 +12,5 @@ var (
 	ErrTopicFieldLabelRequired   = errors.New("topic field label is required")
 	ErrTopicFieldInvalidType     = errors.New("invalid topic field type")
 	ErrTopicFieldInvalidPosition = errors.New("topic field position must be greater than or equal to zero")
+	ErrTopicFieldNotFound        = errors.New("topic field not found")
 )

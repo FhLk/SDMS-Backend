@@ -17,3 +17,10 @@ type CreateFieldRequest struct {
 	Required bool   `json:"required"`
 	Position int    `json:"position"`
 }
+
+type UpdateFieldRequest struct {
+	Label    string `json:"label"`
+	Type     string `json:"type"`
+	Required bool   `json:"required"`
+	Position int    `json:"position"`
+}

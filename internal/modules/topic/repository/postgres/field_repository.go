@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 
 	"sdms/internal/modules/topic/domain"
 
@@ -38,16 +39,14 @@ func (r *fieldRepository) Create(
 	return nil
 }
 
-func (r *fieldRepository) FindAllByTopicID(
-	ctx context.Context,
-	topicUID uuid.UUID,
-) ([]domain.TopicField, error) {
+func (r *fieldRepository) FindAllByTopicID(ctx context.Context, topicUID uuid.UUID) ([]domain.TopicField, error) {
 	var models []TopicFieldModel
 
 	if err := r.db.
 		WithContext(ctx).
 		Where("topic_uid = ?", topicUID).
 		Order("position ASC").
+		Order("created_at ASC").
 		Find(&models).
 		Error; err != nil {
 		return nil, err
@@ -65,16 +64,19 @@ func (r *fieldRepository) FindAllByTopicID(
 	return fields, nil
 }
 
-func (r *fieldRepository) FindByID(
-	ctx context.Context,
-	fieldUID uuid.UUID,
-) (*domain.TopicField, error) {
+func (r *fieldRepository) FindByID(ctx context.Context, fieldUID uuid.UUID) (*domain.TopicField, error) {
 	var model TopicFieldModel
 
-	if err := r.db.
+	err := r.db.
 		WithContext(ctx).
 		First(&model, "uid = ?", fieldUID).
-		Error; err != nil {
+		Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, domain.ErrTopicFieldNotFound
+	}
+
+	if err != nil {
 		return nil, err
 	}
 

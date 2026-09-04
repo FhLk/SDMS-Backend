@@ -16,15 +16,9 @@ type TopicResponse struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-func newTopicResponse(topic domain.Topic) TopicResponse {
-	return TopicResponse{
-		UID:         topic.UID,
-		Name:        topic.Name,
-		Description: topic.Description,
-		IsActive:    topic.IsActive,
-		CreatedAt:   topic.CreatedAt,
-		UpdatedAt:   topic.UpdatedAt,
-	}
+type TopicDetailResponse struct {
+	TopicResponse
+	Fields []TopicFieldResponse `json:"fields"`
 }
 
 type TopicFieldResponse struct {
@@ -36,6 +30,46 @@ type TopicFieldResponse struct {
 	Position  int       `json:"position"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func newTopicDetailResponse(
+	topic domain.Topic,
+	fields []domain.TopicField,
+) TopicDetailResponse {
+	return TopicDetailResponse{
+		TopicResponse: newTopicResponse(topic),
+		Fields:        newTopicFieldListResponse(fields),
+	}
+}
+
+func newTopicFieldListResponse(
+	fields []domain.TopicField,
+) []TopicFieldResponse {
+	response := make(
+		[]TopicFieldResponse,
+		0,
+		len(fields),
+	)
+
+	for i := range fields {
+		response = append(
+			response,
+			newTopicFieldResponse(&fields[i]),
+		)
+	}
+
+	return response
+}
+
+func newTopicResponse(topic domain.Topic) TopicResponse {
+	return TopicResponse{
+		UID:         topic.UID,
+		Name:        topic.Name,
+		Description: topic.Description,
+		IsActive:    topic.IsActive,
+		CreatedAt:   topic.CreatedAt,
+		UpdatedAt:   topic.UpdatedAt,
+	}
 }
 
 func newTopicFieldResponse(field *domain.TopicField) TopicFieldResponse {

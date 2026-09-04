@@ -49,20 +49,13 @@ func NewTopicField(
 	required bool,
 	position int,
 ) (*TopicField, error) {
-	if topicUID == uuid.Nil {
-		return nil, ErrTopicFieldInvalidTopicUID
-	}
-
-	if label == "" {
-		return nil, ErrTopicFieldLabelRequired
-	}
-
-	if !fieldType.IsValid() {
-		return nil, ErrTopicFieldInvalidType
-	}
-
-	if position < 0 {
-		return nil, ErrTopicFieldInvalidPosition
+	if err := validateTopicField(
+		topicUID,
+		label,
+		fieldType,
+		position,
+	); err != nil {
+		return nil, err
 	}
 
 	return &TopicField{
@@ -73,4 +66,52 @@ func NewTopicField(
 		Required: required,
 		Position: position,
 	}, nil
+}
+
+func validateTopicField(
+	topicUID uuid.UUID,
+	label string,
+	fieldType FieldType,
+	position int,
+) error {
+	if topicUID == uuid.Nil {
+		return ErrTopicFieldInvalidTopicUID
+	}
+
+	if label == "" {
+		return ErrTopicFieldLabelRequired
+	}
+
+	if !fieldType.IsValid() {
+		return ErrTopicFieldInvalidType
+	}
+
+	if position < 0 {
+		return ErrTopicFieldInvalidPosition
+	}
+
+	return nil
+}
+
+func (f *TopicField) Update(
+	label string,
+	fieldType FieldType,
+	required bool,
+	position int,
+) error {
+	if err := validateTopicField(
+		f.TopicUID,
+		label,
+		fieldType,
+		position,
+	); err != nil {
+		return err
+	}
+
+	f.Label = label
+	f.Type = fieldType
+	f.Required = required
+	f.Position = position
+
+	return nil
 }

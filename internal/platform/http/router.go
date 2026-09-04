@@ -22,6 +22,7 @@ func NewRouter(db *gorm.DB) *fiber.App {
 
 	routes.NewRouteTopic(v1, db)
 	routes.NewRouteUser(v1, db)
+	routes.NewRouteSubmission(v1, db)
 
 	return app
 }
