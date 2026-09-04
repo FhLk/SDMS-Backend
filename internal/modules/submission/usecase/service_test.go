@@ -1034,3 +1034,278 @@ func TestSubmissionServiceFindByIDSuccess(t *testing.T) {
 		)
 	}
 }
+
+func TestSubmissionServiceCreateValidSelectValue(t *testing.T) {
+	topicUID := uuid.New()
+	fieldUID := uuid.New()
+	userUID := uuid.New()
+
+	topicRepo := &fakeTopicRepository{
+		findByIDFn: func(
+			ctx context.Context,
+			id uuid.UUID,
+		) (*topicdomain.Topic, error) {
+			return &topicdomain.Topic{
+				UID: topicUID,
+			}, nil
+		},
+	}
+
+	fieldRepo := &fakeFieldRepository{
+		findAllByTopicIDFn: func(
+			ctx context.Context,
+			id uuid.UUID,
+		) ([]topicdomain.TopicField, error) {
+			return []topicdomain.TopicField{
+				{
+					UID:      fieldUID,
+					TopicUID: topicUID,
+					Label:    "ฝ่ายงาน",
+					Type:     topicdomain.FieldTypeSelect,
+					Required: true,
+					Options: []topicdomain.SelectOption{
+						{
+							Label: "วิชาการ",
+							Value: "academic",
+						},
+						{
+							Label: "บุคคล",
+							Value: "hr",
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	createCalled := false
+
+	submissionRepo := &fakeSubmissionRepository{
+		createFn: func(
+			ctx context.Context,
+			submission *submissiondomain.Submission,
+		) error {
+			createCalled = true
+			return nil
+		},
+	}
+
+	service := NewSubmissionService(
+		submissionRepo,
+		topicRepo,
+		fieldRepo,
+	)
+
+	submission, err := service.Create(
+		context.Background(),
+		topicUID,
+		CreateSubmissionInput{
+			SubmittedBy: userUID,
+			Values: []SubmissionValueInput{
+				{
+					FieldUID: fieldUID,
+					Value:    raw(`"academic"`),
+				},
+			},
+		},
+	)
+
+	if err != nil {
+		t.Fatalf(
+			"expected nil error, got %v",
+			err,
+		)
+	}
+
+	if !createCalled {
+		t.Fatal(
+			"expected repository Create to be called",
+		)
+	}
+
+	if submission == nil {
+		t.Fatal("expected submission, got nil")
+	}
+
+	if len(submission.Values) != 1 {
+		t.Fatalf(
+			"expected 1 value, got %d",
+			len(submission.Values),
+		)
+	}
+
+	value := submission.Values[0]
+
+	if value.TextValue == nil {
+		t.Fatal("expected TextValue")
+	}
+
+	if *value.TextValue != "academic" {
+		t.Errorf(
+			"expected academic, got %q",
+			*value.TextValue,
+		)
+	}
+}
+
+func TestSubmissionServiceCreateInvalidSelectValue(t *testing.T) {
+	topicUID := uuid.New()
+	fieldUID := uuid.New()
+
+	topicRepo := &fakeTopicRepository{
+		findByIDFn: func(
+			ctx context.Context,
+			id uuid.UUID,
+		) (*topicdomain.Topic, error) {
+			return &topicdomain.Topic{
+				UID: topicUID,
+			}, nil
+		},
+	}
+
+	fieldRepo := &fakeFieldRepository{
+		findAllByTopicIDFn: func(
+			ctx context.Context,
+			id uuid.UUID,
+		) ([]topicdomain.TopicField, error) {
+			return []topicdomain.TopicField{
+				{
+					UID:      fieldUID,
+					TopicUID: topicUID,
+					Label:    "ฝ่ายงาน",
+					Type:     topicdomain.FieldTypeSelect,
+					Required: true,
+					Options: []topicdomain.SelectOption{
+						{
+							Label: "วิชาการ",
+							Value: "academic",
+						},
+						{
+							Label: "บุคคล",
+							Value: "hr",
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	createCalled := false
+
+	submissionRepo := &fakeSubmissionRepository{
+		createFn: func(
+			ctx context.Context,
+			submission *submissiondomain.Submission,
+		) error {
+			createCalled = true
+			return nil
+		},
+	}
+
+	service := NewSubmissionService(
+		submissionRepo,
+		topicRepo,
+		fieldRepo,
+	)
+
+	_, err := service.Create(
+		context.Background(),
+		topicUID,
+		CreateSubmissionInput{
+			SubmittedBy: uuid.New(),
+			Values: []SubmissionValueInput{
+				{
+					FieldUID: fieldUID,
+					Value:    raw(`"finance"`),
+				},
+			},
+		},
+	)
+
+	if !errors.Is(
+		err,
+		submissiondomain.ErrSubmissionInvalidValue,
+	) {
+		t.Fatalf(
+			"expected ErrSubmissionInvalidValue, got %v",
+			err,
+		)
+	}
+
+	if createCalled {
+		t.Error(
+			"repository Create should not be called",
+		)
+	}
+}
+
+func TestSubmissionServiceCreateSelectValueMustBeString(t *testing.T) {
+	topicUID := uuid.New()
+	fieldUID := uuid.New()
+
+	topicRepo := &fakeTopicRepository{
+		findByIDFn: func(
+			ctx context.Context,
+			id uuid.UUID,
+		) (*topicdomain.Topic, error) {
+			return &topicdomain.Topic{
+				UID: topicUID,
+			}, nil
+		},
+	}
+
+	fieldRepo := &fakeFieldRepository{
+		findAllByTopicIDFn: func(
+			ctx context.Context,
+			id uuid.UUID,
+		) ([]topicdomain.TopicField, error) {
+			return []topicdomain.TopicField{
+				{
+					UID:      fieldUID,
+					TopicUID: topicUID,
+					Label:    "ฝ่ายงาน",
+					Type:     topicdomain.FieldTypeSelect,
+					Required: true,
+					Options: []topicdomain.SelectOption{
+						{
+							Label: "วิชาการ",
+							Value: "academic",
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	service := NewSubmissionService(
+		&fakeSubmissionRepository{},
+		topicRepo,
+		fieldRepo,
+	)
+
+	_, err := service.Create(
+		context.Background(),
+		topicUID,
+		CreateSubmissionInput{
+			SubmittedBy: uuid.New(),
+			Values: []SubmissionValueInput{
+				{
+					FieldUID: fieldUID,
+
+					// ผิด เพราะ select ต้องเป็น string
+					Value: raw(`123`),
+				},
+			},
+		},
+	)
+
+	if !errors.Is(
+		err,
+		submissiondomain.ErrSubmissionInvalidValue,
+	) {
+		t.Fatalf(
+			"expected ErrSubmissionInvalidValue, got %v",
+			err,
+		)
+	}
+}

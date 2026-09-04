@@ -7,6 +7,7 @@ type CreateFieldInput struct {
 	Type     domain.FieldType
 	Required bool
 	Position int
+	Options  []domain.SelectOption
 }
 
 type UpdateFieldInput struct {
@@ -14,4 +15,5 @@ type UpdateFieldInput struct {
 	Type     domain.FieldType
 	Required bool
 	Position int
+	Options  []domain.SelectOption
 }

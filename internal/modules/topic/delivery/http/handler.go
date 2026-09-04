@@ -197,6 +197,7 @@ func (h *TopicHandler) CreateField(c fiber.Ctx) error {
 			Type:     domain.FieldType(req.Type),
 			Required: req.Required,
 			Position: req.Position,
+			Options:  toDomainSelectOptions(req.Options),
 		},
 	)
 	if err != nil {
@@ -334,6 +335,19 @@ func handleTopicFieldParamError(c fiber.Ctx, err error) error {
 	}
 }
 
+func toDomainSelectOptions(options []SelectOptionRequest) []domain.SelectOption {
+	result := make([]domain.SelectOption, 0, len(options))
+
+	for _, option := range options {
+		result = append(result, domain.SelectOption{
+			Label: option.Label,
+			Value: option.Value,
+		})
+	}
+
+	return result
+}
+
 func handleError(c fiber.Ctx, err error) error {
 	switch {
 	case errors.Is(err, domain.ErrTopicNotFound),
@@ -342,7 +356,6 @@ func handleError(c fiber.Ctx, err error) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"message": err.Error(),
 		})
-
 	case errors.Is(err, domain.ErrTopicNameEmpty):
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": err.Error(),
@@ -350,12 +363,16 @@ func handleError(c fiber.Ctx, err error) error {
 	case errors.Is(err, domain.ErrTopicFieldInvalidTopicUID),
 		errors.Is(err, domain.ErrTopicFieldLabelRequired),
 		errors.Is(err, domain.ErrTopicFieldInvalidType),
-		errors.Is(err, domain.ErrTopicFieldInvalidPosition):
+		errors.Is(err, domain.ErrTopicFieldInvalidPosition),
+		errors.Is(err, domain.ErrTopicFieldSelectOptionsRequired),
+		errors.Is(err, domain.ErrTopicFieldSelectOptionLabelRequired),
+		errors.Is(err, domain.ErrTopicFieldSelectOptionValueRequired),
+		errors.Is(err, domain.ErrTopicFieldSelectOptionDuplicateValue),
+		errors.Is(err, domain.ErrTopicFieldOptionsOnlyForSelect):
 
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
 		})
-
 	default:
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "internal server error",

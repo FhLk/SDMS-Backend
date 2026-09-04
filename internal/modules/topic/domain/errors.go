@@ -14,3 +14,11 @@ var (
 	ErrTopicFieldInvalidPosition = errors.New("topic field position must be greater than or equal to zero")
 	ErrTopicFieldNotFound        = errors.New("topic field not found")
 )
+
+var (
+	ErrTopicFieldSelectOptionsRequired      = errors.New("select field requires at least one option")
+	ErrTopicFieldSelectOptionLabelRequired  = errors.New("select option label is required")
+	ErrTopicFieldSelectOptionValueRequired  = errors.New("select option value is required")
+	ErrTopicFieldSelectOptionDuplicateValue = errors.New("select option value must be unique")
+	ErrTopicFieldOptionsOnlyForSelect       = errors.New("options are only allowed for select fields")
+)

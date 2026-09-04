@@ -22,14 +22,20 @@ type TopicDetailResponse struct {
 }
 
 type TopicFieldResponse struct {
-	UID       uuid.UUID `json:"uid"`
-	TopicUID  uuid.UUID `json:"topic_uid"`
-	Label     string    `json:"label"`
-	Type      string    `json:"type"`
-	Required  bool      `json:"required"`
-	Position  int       `json:"position"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	UID       uuid.UUID              `json:"uid"`
+	TopicUID  uuid.UUID              `json:"topic_uid"`
+	Label     string                 `json:"label"`
+	Type      string                 `json:"type"`
+	Required  bool                   `json:"required"`
+	Position  int                    `json:"position"`
+	Options   []SelectOptionResponse `json:"options"`
+	CreatedAt time.Time              `json:"created_at"`
+	UpdatedAt time.Time              `json:"updated_at"`
+}
+
+type SelectOptionResponse struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
 }
 
 func newTopicDetailResponse(
@@ -80,7 +86,23 @@ func newTopicFieldResponse(field *domain.TopicField) TopicFieldResponse {
 		Type:      string(field.Type),
 		Required:  field.Required,
 		Position:  field.Position,
+		Options:   newSelectOptionResponse(field.Options),
 		CreatedAt: field.CreatedAt,
 		UpdatedAt: field.UpdatedAt,
 	}
+}
+
+func newSelectOptionResponse(
+	options []domain.SelectOption,
+) []SelectOptionResponse {
+	result := make([]SelectOptionResponse, 0, len(options))
+
+	for _, option := range options {
+		result = append(result, SelectOptionResponse{
+			Label: option.Label,
+			Value: option.Value,
+		})
+	}
+
+	return result
 }

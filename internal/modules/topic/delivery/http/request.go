@@ -5,6 +5,11 @@ type CreateTopicRequest struct {
 	Description string `json:"description"`
 }
 
+type SelectOptionRequest struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
 type UpdateTopicRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -12,15 +17,17 @@ type UpdateTopicRequest struct {
 }
 
 type CreateFieldRequest struct {
-	Label    string `json:"label"`
-	Type     string `json:"type"`
-	Required bool   `json:"required"`
-	Position int    `json:"position"`
+	Label    string                `json:"label"`
+	Type     string                `json:"type"`
+	Required bool                  `json:"required"`
+	Position int                   `json:"position"`
+	Options  []SelectOptionRequest `json:"options"`
 }
 
 type UpdateFieldRequest struct {
-	Label    string `json:"label"`
-	Type     string `json:"type"`
-	Required bool   `json:"required"`
-	Position int    `json:"position"`
+	Label    string                `json:"label"`
+	Type     string                `json:"type"`
+	Required bool                  `json:"required"`
+	Position int                   `json:"position"`
+	Options  []SelectOptionRequest `json:"options"`
 }

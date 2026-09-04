@@ -179,8 +179,7 @@ func parseSubmissionValue(
 	switch field.Type {
 
 	case topicdomain.FieldTypeText,
-		topicdomain.FieldTypeTextarea,
-		topicdomain.FieldTypeSelect:
+		topicdomain.FieldTypeTextarea:
 
 		var text string
 
@@ -195,6 +194,25 @@ func parseSubmissionValue(
 		}
 
 		value.TextValue = &text
+
+	case topicdomain.FieldTypeSelect:
+		var selectedValue string
+
+		if err := json.Unmarshal(raw, &selectedValue); err != nil {
+			return value, invalidValueError(field)
+		}
+
+		selectedValue = strings.TrimSpace(selectedValue)
+
+		if selectedValue == "" {
+			return value, invalidValueError(field)
+		}
+
+		if !field.HasSelectOption(selectedValue) {
+			return value, invalidValueError(field)
+		}
+
+		value.TextValue = &selectedValue
 
 	case topicdomain.FieldTypeNumber:
 		var number float64
@@ -212,7 +230,10 @@ func parseSubmissionValue(
 			return value, invalidValueError(field)
 		}
 
-		date, err := time.Parse("2006-01-02", dateString)
+		date, err := time.Parse(
+			"2006-01-02",
+			dateString,
+		)
 		if err != nil {
 			return value, invalidValueError(field)
 		}

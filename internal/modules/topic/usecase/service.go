@@ -44,32 +44,27 @@ func (s *TopicService) CreateTopic(ctx context.Context, name string, description
 	return topic, nil
 }
 
-func (s *TopicService) CreateField(
-	ctx context.Context,
-	topicUID uuid.UUID,
-	input CreateFieldInput,
-) (*domain.TopicField, error) {
+func (s *TopicService) CreateField(ctx context.Context, topicUID uuid.UUID, input CreateFieldInput) (*domain.TopicField, error) {
 
-	// 1. ตรวจสอบก่อนว่า Topic มีจริง
 	_, err := s.topicRepo.FindByID(ctx, topicUID)
 	if err != nil {
 		return nil, err
 	}
 
 	input.Label = strings.TrimSpace(input.Label)
-	// 2. ให้ Domain เป็นคนสร้าง TopicField
-	field, err := domain.NewTopicField(
+
+	field, err := domain.NewTopicFieldWithOptions(
 		topicUID,
 		input.Label,
 		input.Type,
 		input.Required,
 		input.Position,
+		input.Options,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	// 3. บันทึกลง Repository
 	if err := s.fieldRepo.Create(ctx, field); err != nil {
 		return nil, err
 	}
@@ -159,6 +154,7 @@ func (s *TopicService) UpdateField(ctx context.Context, topicID uuid.UUID, field
 		input.Type,
 		input.Required,
 		input.Position,
+		input.Options,
 	); err != nil {
 		return nil, err
 	}
