@@ -17,6 +17,7 @@ type SubmissionModel struct {
 	Topic       topicpostgres.TopicModel `gorm:"foreignKey:TopicUID;references:UID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	Submitter   userpostgres.UserModel   `gorm:"foreignKey:SubmittedBy;references:UID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	Values      []SubmissionValueModel   `gorm:"foreignKey:SubmissionUID;references:UID;constraint:OnDelete:CASCADE;"`
+	Files       []SubmissionFileModel    `gorm:"foreignKey:SubmissionUID;references:UID;constraint:OnDelete:CASCADE;"`
 	CreatedAt   time.Time                `gorm:"not null"`
 	UpdatedAt   time.Time                `gorm:"not null"`
 }
@@ -94,11 +95,17 @@ func toDomain(model SubmissionModel) domain.Submission {
 		)
 	}
 
+	files := make([]domain.SubmissionFile, 0, len(model.Files))
+	for _, file := range model.Files {
+		files = append(files, toFileDomain(file))
+	}
+
 	return domain.Submission{
 		UID:         model.UID,
 		TopicUID:    model.TopicUID,
 		SubmittedBy: model.SubmittedBy,
 		Values:      values,
+		Files:       files,
 		CreatedAt:   model.CreatedAt,
 		UpdatedAt:   model.UpdatedAt,
 	}

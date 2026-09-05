@@ -6,6 +6,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 	keys := []string{
 		"APP_ENV", "APP_PORT", "DB_HOST", "DB_PORT", "DB_USER",
 		"DB_PASSWORD", "DB_NAME", "DB_SSLMODE", "DB_TIMEZONE",
+		"UPLOAD_DIR", "UPLOAD_MAX_SIZE_MB",
 	}
 	for _, key := range keys {
 		t.Setenv(key, "")
@@ -25,6 +26,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	if cfg.Database.SSLMode != "disable" || cfg.Database.TimeZone != "Asia/Bangkok" {
 		t.Errorf("database options = %+v", cfg.Database)
 	}
+	if cfg.Upload.Dir != "uploads" || cfg.Upload.MaxSizeBytes != 100*1024*1024 {
+		t.Errorf("upload config = %+v", cfg.Upload)
+	}
 }
 
 func TestLoadUsesEnvironmentValues(t *testing.T) {
@@ -32,6 +36,7 @@ func TestLoadUsesEnvironmentValues(t *testing.T) {
 		"APP_ENV": "test", "APP_PORT": "9090", "DB_HOST": "db",
 		"DB_PORT": "6432", "DB_USER": "tester", "DB_PASSWORD": "secret",
 		"DB_NAME": "sdms_test", "DB_SSLMODE": "require", "DB_TIMEZONE": "UTC",
+		"UPLOAD_DIR": "test-uploads", "UPLOAD_MAX_SIZE_MB": "5",
 	}
 	for key, value := range values {
 		t.Setenv(key, value)
@@ -46,6 +51,9 @@ func TestLoadUsesEnvironmentValues(t *testing.T) {
 		cfg.Database.Password != "secret" || cfg.Database.Name != "sdms_test" ||
 		cfg.Database.SSLMode != "require" || cfg.Database.TimeZone != "UTC" {
 		t.Errorf("Database config = %+v", cfg.Database)
+	}
+	if cfg.Upload.Dir != "test-uploads" || cfg.Upload.MaxSizeBytes != 5*1024*1024 {
+		t.Errorf("Upload config = %+v", cfg.Upload)
 	}
 }
 

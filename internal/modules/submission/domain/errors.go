@@ -55,6 +55,50 @@ var (
 	ErrSubmissionFileFieldUnsupported = errors.New(
 		"file field is not supported by normal submission",
 	)
+
+	ErrSubmissionFileNotFound = errors.New(
+		"submission file not found",
+	)
+
+	ErrSubmissionFileSubmissionUIDRequired = errors.New(
+		"submission file submission uid is required",
+	)
+
+	ErrSubmissionFileFieldUIDRequired = errors.New(
+		"submission file field uid is required",
+	)
+
+	ErrSubmissionFileNameRequired = errors.New(
+		"submission file name is required",
+	)
+
+	ErrSubmissionFileStoragePathRequired = errors.New(
+		"submission file storage path is required",
+	)
+
+	ErrSubmissionFileEmpty = errors.New(
+		"uploaded file is empty",
+	)
+
+	ErrSubmissionFileTooLarge = errors.New(
+		"uploaded file is too large",
+	)
+
+	ErrSubmissionFileTypeNotAllowed = errors.New(
+		"uploaded file type is not allowed",
+	)
+
+	ErrSubmissionFileFieldNotFile = errors.New(
+		"submission field is not a file field",
+	)
+
+	ErrSubmissionFileFieldTopicMismatch = errors.New(
+		"submission file field does not belong to the submission topic",
+	)
+
+	ErrSubmissionFileAlreadyExists = errors.New(
+		"a file already exists for this submission field",
+	)
 )
 
 // FieldError keeps the original sentinel error while attaching enough field

@@ -38,6 +38,7 @@ func NewPostgres(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		&topicpostgres.TopicFieldModel{},
 		&submissionpostgres.SubmissionModel{},
 		&submissionpostgres.SubmissionValueModel{},
+		&submissionpostgres.SubmissionFileModel{},
 	); err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}

@@ -24,7 +24,7 @@ func main() {
 
 	log.Println("database connected")
 
-	app := httpserver.NewRouter(db)
+	app := httpserver.NewRouter(db, cfg)
 
 	address := ":" + cfg.App.Port
 

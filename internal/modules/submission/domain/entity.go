@@ -11,6 +11,7 @@ type Submission struct {
 	TopicUID    uuid.UUID
 	SubmittedBy uuid.UUID
 	Values      []SubmissionValue
+	Files       []SubmissionFile
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

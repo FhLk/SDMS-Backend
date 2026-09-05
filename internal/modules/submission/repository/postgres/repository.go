@@ -140,6 +140,7 @@ func (r *repository) FindByIDAndTopicID(
 	err := r.db.
 		WithContext(ctx).
 		Preload("Values").
+		Preload("Files").
 		Where(
 			"uid = ? AND topic_uid = ?",
 			submissionUID,
@@ -172,6 +173,7 @@ func (r *repository) FindByIDAndTopicIDAndSubmittedBy(
 	err := r.db.
 		WithContext(ctx).
 		Preload("Values").
+		Preload("Files").
 		Where(
 			"uid = ? AND topic_uid = ? AND submitted_by = ?",
 			submissionUID,

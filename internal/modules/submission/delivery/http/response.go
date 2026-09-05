@@ -13,6 +13,7 @@ type SubmissionResponse struct {
 	TopicUID    uuid.UUID                 `json:"topic_uid"`
 	SubmittedBy uuid.UUID                 `json:"submitted_by"`
 	Values      []SubmissionValueResponse `json:"values"`
+	Files       []SubmissionFileResponse  `json:"files"`
 	CreatedAt   time.Time                 `json:"created_at"`
 	UpdatedAt   time.Time                 `json:"updated_at"`
 }
@@ -21,6 +22,19 @@ type SubmissionValueResponse struct {
 	UID      uuid.UUID `json:"uid"`
 	FieldUID uuid.UUID `json:"field_uid"`
 	Value    any       `json:"value"`
+}
+
+type SubmissionFileResponse struct {
+	UID              uuid.UUID `json:"uid"`
+	SubmissionUID    uuid.UUID `json:"submission_uid"`
+	FieldUID         uuid.UUID `json:"field_uid"`
+	OriginalFilename string    `json:"original_filename"`
+	ContentType      string    `json:"content_type"`
+	Size             int64     `json:"size"`
+	ViewURL          string    `json:"view_url"`
+	DownloadURL      string    `json:"download_url"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type SubmissionListResponse struct {
@@ -56,11 +70,17 @@ func newSubmissionResponse(
 		)
 	}
 
+	files := make([]SubmissionFileResponse, 0, len(submission.Files))
+	for _, file := range submission.Files {
+		files = append(files, newSubmissionFileResponse(file))
+	}
+
 	return SubmissionResponse{
 		UID:         submission.UID,
 		TopicUID:    submission.TopicUID,
 		SubmittedBy: submission.SubmittedBy,
 		Values:      values,
+		Files:       files,
 		CreatedAt:   submission.CreatedAt,
 		UpdatedAt:   submission.UpdatedAt,
 	}
@@ -158,5 +178,20 @@ func newSubmissionPreviewValueResponse(
 		Type:     value.FieldType,
 		Position: value.FieldPosition,
 		Value:    valueResponse.Value,
+	}
+}
+
+func newSubmissionFileResponse(file domain.SubmissionFile) SubmissionFileResponse {
+	return SubmissionFileResponse{
+		UID:              file.UID,
+		SubmissionUID:    file.SubmissionUID,
+		FieldUID:         file.FieldUID,
+		OriginalFilename: file.OriginalFilename,
+		ContentType:      file.ContentType,
+		Size:             file.Size,
+		ViewURL:          "/api/v1/submission-files/" + file.UID.String() + "/view",
+		DownloadURL:      "/api/v1/submission-files/" + file.UID.String() + "/download",
+		CreatedAt:        file.CreatedAt,
+		UpdatedAt:        file.UpdatedAt,
 	}
 }

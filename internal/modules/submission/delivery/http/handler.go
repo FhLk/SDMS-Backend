@@ -216,6 +216,9 @@ func handleError(c fiber.Ctx, err error) error {
 	var fieldErr *submissiondomain.FieldError
 	if errors.As(err, &fieldErr) {
 		status := fiber.StatusBadRequest
+		if errors.Is(fieldErr.Err, submissiondomain.ErrSubmissionFileAlreadyExists) {
+			status = fiber.StatusConflict
+		}
 		return c.Status(status).JSON(fiber.Map{
 			"code":        submissionErrorCode(fieldErr.Err),
 			"message":     fieldErr.Error(),
@@ -226,13 +229,27 @@ func handleError(c fiber.Ctx, err error) error {
 
 	switch {
 	case errors.Is(err, topicdomain.ErrTopicNotFound),
-		errors.Is(err, submissiondomain.ErrSubmissionNotFound):
+		errors.Is(err, topicdomain.ErrTopicFieldNotFound),
+		errors.Is(err, submissiondomain.ErrSubmissionNotFound),
+		errors.Is(err, submissiondomain.ErrSubmissionFileNotFound):
 
 		return c.Status(fiber.StatusNotFound).JSON(
 			fiber.Map{
 				"message": err.Error(),
 			},
 		)
+
+	case errors.Is(err, submissiondomain.ErrSubmissionFileTooLarge):
+		return c.Status(fiber.StatusRequestEntityTooLarge).JSON(fiber.Map{
+			"code":    submissionErrorCode(err),
+			"message": err.Error(),
+		})
+
+	case errors.Is(err, submissiondomain.ErrSubmissionFileTypeNotAllowed):
+		return c.Status(fiber.StatusUnsupportedMediaType).JSON(fiber.Map{
+			"code":    submissionErrorCode(err),
+			"message": err.Error(),
+		})
 
 	case errors.Is(
 		err,
@@ -277,7 +294,14 @@ func handleError(c fiber.Ctx, err error) error {
 		errors.Is(
 			err,
 			submissiondomain.ErrSubmissionFileFieldUnsupported,
-		):
+		),
+		errors.Is(err, submissiondomain.ErrSubmissionFileSubmissionUIDRequired),
+		errors.Is(err, submissiondomain.ErrSubmissionFileFieldUIDRequired),
+		errors.Is(err, submissiondomain.ErrSubmissionFileNameRequired),
+		errors.Is(err, submissiondomain.ErrSubmissionFileStoragePathRequired),
+		errors.Is(err, submissiondomain.ErrSubmissionFileEmpty),
+		errors.Is(err, submissiondomain.ErrSubmissionFileFieldNotFile),
+		errors.Is(err, submissiondomain.ErrSubmissionFileFieldTopicMismatch):
 
 		return c.Status(fiber.StatusBadRequest).JSON(
 			fiber.Map{
@@ -309,6 +333,18 @@ func submissionErrorCode(err error) string {
 		return "DUPLICATE_SUBMISSION_FIELD"
 	case errors.Is(err, submissiondomain.ErrSubmissionFileFieldUnsupported):
 		return "FILE_FIELD_UNSUPPORTED"
+	case errors.Is(err, submissiondomain.ErrSubmissionFileTooLarge):
+		return "FILE_TOO_LARGE"
+	case errors.Is(err, submissiondomain.ErrSubmissionFileTypeNotAllowed):
+		return "FILE_TYPE_NOT_ALLOWED"
+	case errors.Is(err, submissiondomain.ErrSubmissionFileAlreadyExists):
+		return "FILE_ALREADY_EXISTS"
+	case errors.Is(err, submissiondomain.ErrSubmissionFileFieldNotFile):
+		return "FIELD_NOT_FILE"
+	case errors.Is(err, submissiondomain.ErrSubmissionFileFieldTopicMismatch):
+		return "FILE_FIELD_TOPIC_MISMATCH"
+	case errors.Is(err, submissiondomain.ErrSubmissionFileEmpty):
+		return "FILE_EMPTY"
 	case errors.Is(err, submissiondomain.ErrSubmissionTopicInactive):
 		return "TOPIC_INACTIVE"
 	case errors.Is(err, submissiondomain.ErrSubmissionSubmitterNotFound):

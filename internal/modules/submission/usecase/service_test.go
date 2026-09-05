@@ -871,7 +871,7 @@ func TestSubmissionServiceCreateInvalidDate(t *testing.T) {
 	}
 }
 
-func TestSubmissionServiceCreateFileFieldUnsupported(t *testing.T) {
+func TestSubmissionServiceCreateAllowsRequiredFileToBeUploadedAfterward(t *testing.T) {
 	topicUID := uuid.New()
 	fieldUID := uuid.New()
 
@@ -904,8 +904,14 @@ func TestSubmissionServiceCreateFileFieldUnsupported(t *testing.T) {
 		},
 	}
 
+	created := false
 	service := NewSubmissionService(
-		&fakeSubmissionRepository{},
+		&fakeSubmissionRepository{
+			createFn: func(ctx context.Context, submission *submissiondomain.Submission) error {
+				created = true
+				return nil
+			},
+		},
 		topicRepo,
 		fieldRepo,
 	)
@@ -918,14 +924,40 @@ func TestSubmissionServiceCreateFileFieldUnsupported(t *testing.T) {
 		},
 	)
 
-	if !errors.Is(
-		err,
-		submissiondomain.ErrSubmissionFileFieldUnsupported,
-	) {
-		t.Fatalf(
-			"expected ErrSubmissionFileFieldUnsupported, got %v",
-			err,
-		)
+	if err != nil {
+		t.Fatalf("expected create to succeed before file upload, got %v", err)
+	}
+	if !created {
+		t.Fatal("expected repository Create to be called")
+	}
+}
+
+func TestSubmissionServiceCreateRejectsFileContentInJSONValues(t *testing.T) {
+	topicUID := uuid.New()
+	fieldUID := uuid.New()
+
+	topicRepo := &fakeTopicRepository{
+		findByIDFn: func(ctx context.Context, id uuid.UUID) (*topicdomain.Topic, error) {
+			return &topicdomain.Topic{UID: topicUID, IsActive: true}, nil
+		},
+	}
+	fieldRepo := &fakeFieldRepository{
+		findAllByTopicIDFn: func(ctx context.Context, id uuid.UUID) ([]topicdomain.TopicField, error) {
+			return []topicdomain.TopicField{{
+				UID: fieldUID, TopicUID: topicUID, Label: "เอกสารโครงการ",
+				Type: topicdomain.FieldTypeFile, Required: true,
+			}}, nil
+		},
+	}
+
+	service := NewSubmissionService(&fakeSubmissionRepository{}, topicRepo, fieldRepo)
+	_, err := service.Create(context.Background(), topicUID, CreateSubmissionInput{
+		SubmittedBy: uuid.New(),
+		Values:      []SubmissionValueInput{{FieldUID: fieldUID, Value: raw(`"file.pdf"`)}},
+	})
+
+	if !errors.Is(err, submissiondomain.ErrSubmissionFileFieldUnsupported) {
+		t.Fatalf("expected ErrSubmissionFileFieldUnsupported, got %v", err)
 	}
 }
 

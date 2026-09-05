@@ -133,19 +133,13 @@ func (s *SubmissionService) Create(
 	for _, field := range fields {
 		rawValue, exists := inputMap[field.UID]
 
-		// Optional field ที่ไม่ส่ง, null หรือ "" ให้ถือว่าไม่ได้กรอก
-		if !exists || isEmptySubmissionInput(rawValue) {
-			if field.Required {
-				if field.Type == topicdomain.FieldTypeFile {
-					return nil, submissiondomain.NewFieldError(
-						submissiondomain.ErrSubmissionFileFieldUnsupported,
-						field.UID,
-						field.Label,
-					)
-				}
-
+		// File fields are uploaded after the submission is created via
+		// multipart/form-data. A required file therefore does not block this
+		// first step, but clients must not put file content in the JSON values.
+		if field.Type == topicdomain.FieldTypeFile {
+			if exists && !isEmptySubmissionInput(rawValue) {
 				return nil, submissiondomain.NewFieldError(
-					submissiondomain.ErrSubmissionRequiredFieldMissing,
+					submissiondomain.ErrSubmissionFileFieldUnsupported,
 					field.UID,
 					field.Label,
 				)
@@ -153,12 +147,16 @@ func (s *SubmissionService) Create(
 			continue
 		}
 
-		if field.Type == topicdomain.FieldTypeFile {
-			return nil, submissiondomain.NewFieldError(
-				submissiondomain.ErrSubmissionFileFieldUnsupported,
-				field.UID,
-				field.Label,
-			)
+		// Optional field ที่ไม่ส่ง, null หรือ "" ให้ถือว่าไม่ได้กรอก
+		if !exists || isEmptySubmissionInput(rawValue) {
+			if field.Required {
+				return nil, submissiondomain.NewFieldError(
+					submissiondomain.ErrSubmissionRequiredFieldMissing,
+					field.UID,
+					field.Label,
+				)
+			}
+			continue
 		}
 
 		value, err := parseSubmissionValue(field, rawValue)
