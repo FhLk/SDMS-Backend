@@ -180,7 +180,7 @@ func TestCreateField(t *testing.T) {
 		service := NewTopicService(topicRepo, fieldRepo)
 
 		field, err := service.CreateField(context.Background(), topicID, CreateFieldInput{
-			Label: "  วันที่ส่ง  ", Type: domain.FieldTypeDate, Required: true, Position: 1,
+			Label: "  วันที่ส่ง  ", Type: domain.FieldTypeDate, Required: true, IsPreview: true, Position: 1,
 		})
 		if err != nil {
 			t.Fatalf("CreateField() error = %v", err)
@@ -189,7 +189,7 @@ func TestCreateField(t *testing.T) {
 			t.Fatal("topic lookup or field persistence was not performed")
 		}
 		if field.UID == uuid.Nil || field.TopicUID != topicID || field.Label != "วันที่ส่ง" ||
-			field.Type != domain.FieldTypeDate || !field.Required || field.Position != 1 {
+			field.Type != domain.FieldTypeDate || !field.Required || !field.IsPreview || field.Position != 1 {
 			t.Errorf("field = %+v", field)
 		}
 	})
@@ -522,12 +522,12 @@ func TestUpdateField(t *testing.T) {
 	})
 
 	got, err := service.UpdateField(context.Background(), topicID, fieldID, UpdateFieldInput{
-		Label: "  updated  ", Type: domain.FieldTypeDate, Required: true, Position: 2,
+		Label: "  updated  ", Type: domain.FieldTypeDate, Required: true, IsPreview: true, Position: 2,
 	})
 	if err != nil || got != field || !updateCalled {
 		t.Fatalf("UpdateField() = %+v, %v, updateCalled=%v", got, err, updateCalled)
 	}
-	if got.Label != "updated" || got.Type != domain.FieldTypeDate || !got.Required || got.Position != 2 {
+	if got.Label != "updated" || got.Type != domain.FieldTypeDate || !got.Required || !got.IsPreview || got.Position != 2 {
 		t.Errorf("updated field = %+v", got)
 	}
 
@@ -624,5 +624,39 @@ func TestDeleteFieldBlocksDeleteAfterSubmission(t *testing.T) {
 	}
 	if deleteCalled {
 		t.Fatal("field repository Delete should not be called")
+	}
+}
+
+func TestCreateFieldRejectsMoreThanThreePreviewFields(t *testing.T) {
+	topicID := uuid.New()
+	createCalled := false
+
+	service := NewTopicService(
+		&topicRepositoryStub{},
+		&fieldRepositoryStub{
+			findAllByTopicIDFn: func(context.Context, uuid.UUID) ([]domain.TopicField, error) {
+				return []domain.TopicField{
+					{UID: uuid.New(), TopicUID: topicID, IsPreview: true},
+					{UID: uuid.New(), TopicUID: topicID, IsPreview: true},
+					{UID: uuid.New(), TopicUID: topicID, IsPreview: true},
+				}, nil
+			},
+			createFn: func(context.Context, *domain.TopicField) error {
+				createCalled = true
+				return nil
+			},
+		},
+	)
+
+	field, err := service.CreateField(context.Background(), topicID, CreateFieldInput{
+		Label:     "field 4",
+		Type:      domain.FieldTypeText,
+		IsPreview: true,
+	})
+	if !errors.Is(err, domain.ErrTopicFieldPreviewLimit) || field != nil {
+		t.Fatalf("CreateField() = %+v, %v", field, err)
+	}
+	if createCalled {
+		t.Fatal("field repository Create should not be called")
 	}
 }

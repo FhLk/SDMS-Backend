@@ -24,6 +24,7 @@ type TopicField struct {
 	Label     string
 	Type      FieldType
 	Required  bool
+	IsPreview bool
 	Position  int
 	Options   []SelectOption
 	CreatedAt time.Time

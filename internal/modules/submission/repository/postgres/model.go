@@ -108,13 +108,17 @@ func toValueDomain(
 	model SubmissionValueModel,
 ) domain.SubmissionValue {
 	return domain.SubmissionValue{
-		UID:           model.UID,
-		SubmissionUID: model.SubmissionUID,
-		FieldUID:      model.FieldUID,
-		TextValue:     model.TextValue,
-		NumberValue:   model.NumberValue,
-		DateValue:     model.DateValue,
-		CreatedAt:     model.CreatedAt,
-		UpdatedAt:     model.UpdatedAt,
+		UID:            model.UID,
+		SubmissionUID:  model.SubmissionUID,
+		FieldUID:       model.FieldUID,
+		FieldLabel:     model.Field.Label,
+		FieldType:      model.Field.Type,
+		FieldIsPreview: model.Field.IsPreview,
+		FieldPosition:  model.Field.Position,
+		TextValue:      model.TextValue,
+		NumberValue:    model.NumberValue,
+		DateValue:      model.DateValue,
+		CreatedAt:      model.CreatedAt,
+		UpdatedAt:      model.UpdatedAt,
 	}
 }

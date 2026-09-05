@@ -19,11 +19,18 @@ type SubmissionValue struct {
 	UID           uuid.UUID
 	SubmissionUID uuid.UUID
 	FieldUID      uuid.UUID
-	TextValue     *string
-	NumberValue   *float64
-	DateValue     *time.Time
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	// Field metadata is populated when reading submissions together with
+	// their topic field definitions. It is intentionally read-only metadata
+	// so list endpoints can render a useful preview without another lookup.
+	FieldLabel     string
+	FieldType      string
+	FieldIsPreview bool
+	FieldPosition  int
+	TextValue      *string
+	NumberValue    *float64
+	DateValue      *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 func NewSubmission(

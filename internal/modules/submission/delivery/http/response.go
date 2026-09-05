@@ -2,6 +2,7 @@ package http
 
 import (
 	"sdms/internal/modules/submission/domain"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,11 +24,20 @@ type SubmissionValueResponse struct {
 }
 
 type SubmissionListResponse struct {
-	UID         uuid.UUID `json:"uid"`
-	TopicUID    uuid.UUID `json:"topic_uid"`
-	SubmittedBy uuid.UUID `json:"submitted_by"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	UID           uuid.UUID                        `json:"uid"`
+	TopicUID      uuid.UUID                        `json:"topic_uid"`
+	SubmittedBy   uuid.UUID                        `json:"submitted_by"`
+	PreviewValues []SubmissionPreviewValueResponse `json:"preview_values"`
+	CreatedAt     time.Time                        `json:"created_at"`
+	UpdatedAt     time.Time                        `json:"updated_at"`
+}
+
+type SubmissionPreviewValueResponse struct {
+	FieldUID uuid.UUID `json:"field_uid"`
+	Label    string    `json:"label"`
+	Type     string    `json:"type"`
+	Position int       `json:"position"`
+	Value    any       `json:"value"`
 }
 
 func newSubmissionResponse(
@@ -92,17 +102,61 @@ func newSubmissionListResponse(
 	)
 
 	for _, submission := range submissions {
+		values := append(
+			[]domain.SubmissionValue(nil),
+			submission.Values...,
+		)
+		sort.SliceStable(values, func(i, j int) bool {
+			return values[i].FieldPosition < values[j].FieldPosition
+		})
+
+		previewValues := make(
+			[]SubmissionPreviewValueResponse,
+			0,
+			3,
+		)
+
+		for _, value := range values {
+			if !value.FieldIsPreview {
+				continue
+			}
+
+			previewValues = append(
+				previewValues,
+				newSubmissionPreviewValueResponse(value),
+			)
+
+			if len(previewValues) == 3 {
+				break
+			}
+		}
+
 		response = append(
 			response,
 			SubmissionListResponse{
-				UID:         submission.UID,
-				TopicUID:    submission.TopicUID,
-				SubmittedBy: submission.SubmittedBy,
-				CreatedAt:   submission.CreatedAt,
-				UpdatedAt:   submission.UpdatedAt,
+				UID:           submission.UID,
+				TopicUID:      submission.TopicUID,
+				SubmittedBy:   submission.SubmittedBy,
+				PreviewValues: previewValues,
+				CreatedAt:     submission.CreatedAt,
+				UpdatedAt:     submission.UpdatedAt,
 			},
 		)
 	}
 
 	return response
+}
+
+func newSubmissionPreviewValueResponse(
+	value domain.SubmissionValue,
+) SubmissionPreviewValueResponse {
+	valueResponse := newSubmissionValueResponse(value)
+
+	return SubmissionPreviewValueResponse{
+		FieldUID: value.FieldUID,
+		Label:    value.FieldLabel,
+		Type:     value.FieldType,
+		Position: value.FieldPosition,
+		Value:    valueResponse.Value,
+	}
 }

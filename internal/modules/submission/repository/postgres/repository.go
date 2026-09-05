@@ -65,6 +65,9 @@ func (r *repository) FindAllByTopicID(
 
 	if err := r.db.
 		WithContext(ctx).
+
+		// โหลดค่าที่กรอก พร้อมข้อมูล field
+		Preload("Values.Field").
 		Where("topic_uid = ?", topicUID).
 		Order("created_at DESC").
 		Find(&models).
@@ -97,6 +100,9 @@ func (r *repository) FindAllByTopicIDAndSubmittedBy(
 
 	if err := r.db.
 		WithContext(ctx).
+
+		// โหลดค่าที่กรอก พร้อมข้อมูล field
+		Preload("Values.Field").
 		Where(
 			"topic_uid = ? AND submitted_by = ?",
 			topicUID,
@@ -193,6 +199,7 @@ func (r *repository) HasAnyByTopicID(
 	topicUID uuid.UUID,
 ) (bool, error) {
 	var count int64
+
 	if err := r.db.
 		WithContext(ctx).
 		Model(&SubmissionModel{}).

@@ -14,6 +14,7 @@ type TopicFieldModel struct {
 	Label     string                `gorm:"type:varchar(255);not null"`
 	Type      string                `gorm:"type:varchar(50);not null"`
 	Required  bool                  `gorm:"not null;default:false"`
+	IsPreview bool                  `gorm:"not null;default:false"`
 	Position  int                   `gorm:"not null"`
 	Options   []domain.SelectOption `gorm:"serializer:json;type:jsonb"`
 	CreatedAt time.Time             `gorm:"not null"`
@@ -32,6 +33,7 @@ func toTopicFieldDomain(model TopicFieldModel) domain.TopicField {
 		Label:     model.Label,
 		Type:      domain.FieldType(model.Type),
 		Required:  model.Required,
+		IsPreview: model.IsPreview,
 		Position:  model.Position,
 		Options:   model.Options,
 		CreatedAt: model.CreatedAt,
@@ -46,6 +48,7 @@ func toTopicFieldModel(field domain.TopicField) TopicFieldModel {
 		Label:     field.Label,
 		Type:      string(field.Type),
 		Required:  field.Required,
+		IsPreview: field.IsPreview,
 		Position:  field.Position,
 		Options:   field.Options,
 		CreatedAt: field.CreatedAt,

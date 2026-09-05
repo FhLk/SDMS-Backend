@@ -27,6 +27,7 @@ type TopicFieldResponse struct {
 	Label     string                 `json:"label"`
 	Type      string                 `json:"type"`
 	Required  bool                   `json:"required"`
+	IsPreview bool                   `json:"is_preview"`
 	Position  int                    `json:"position"`
 	Options   []SelectOptionResponse `json:"options"`
 	CreatedAt time.Time              `json:"created_at"`
@@ -85,6 +86,7 @@ func newTopicFieldResponse(field *domain.TopicField) TopicFieldResponse {
 		Label:     field.Label,
 		Type:      string(field.Type),
 		Required:  field.Required,
+		IsPreview: field.IsPreview,
 		Position:  field.Position,
 		Options:   newSelectOptionResponse(field.Options),
 		CreatedAt: field.CreatedAt,

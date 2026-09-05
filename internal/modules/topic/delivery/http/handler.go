@@ -193,11 +193,12 @@ func (h *TopicHandler) CreateField(c fiber.Ctx) error {
 		c,
 		topicUID,
 		usecase.CreateFieldInput{
-			Label:    req.Label,
-			Type:     domain.FieldType(req.Type),
-			Required: req.Required,
-			Position: req.Position,
-			Options:  toDomainSelectOptions(req.Options),
+			Label:     req.Label,
+			Type:      domain.FieldType(req.Type),
+			Required:  req.Required,
+			IsPreview: req.IsPreview,
+			Position:  req.Position,
+			Options:   toDomainSelectOptions(req.Options),
 		},
 	)
 	if err != nil {
@@ -265,11 +266,12 @@ func (h *TopicHandler) UpdateField(c fiber.Ctx) error {
 		topicUID,
 		fieldUID,
 		usecase.UpdateFieldInput{
-			Label:    req.Label,
-			Type:     domain.FieldType(req.Type),
-			Required: req.Required,
-			Position: req.Position,
-			Options:  toDomainSelectOptions(req.Options),
+			Label:     req.Label,
+			Type:      domain.FieldType(req.Type),
+			Required:  req.Required,
+			IsPreview: req.IsPreview,
+			Position:  req.Position,
+			Options:   toDomainSelectOptions(req.Options),
 		},
 	)
 	if err != nil {
@@ -374,7 +376,8 @@ func handleError(c fiber.Ctx, err error) error {
 		errors.Is(err, domain.ErrTopicFieldSelectOptionLabelRequired),
 		errors.Is(err, domain.ErrTopicFieldSelectOptionValueRequired),
 		errors.Is(err, domain.ErrTopicFieldSelectOptionDuplicateValue),
-		errors.Is(err, domain.ErrTopicFieldOptionsOnlyForSelect):
+		errors.Is(err, domain.ErrTopicFieldOptionsOnlyForSelect),
+		errors.Is(err, domain.ErrTopicFieldPreviewLimit):
 
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),

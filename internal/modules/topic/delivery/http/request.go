@@ -17,17 +17,19 @@ type UpdateTopicRequest struct {
 }
 
 type CreateFieldRequest struct {
-	Label    string                `json:"label"`
-	Type     string                `json:"type"`
-	Required bool                  `json:"required"`
-	Position int                   `json:"position"`
-	Options  []SelectOptionRequest `json:"options"`
+	Label     string                `json:"label"`
+	Type      string                `json:"type"`
+	Required  bool                  `json:"required"`
+	IsPreview bool                  `json:"is_preview"`
+	Position  int                   `json:"position"`
+	Options   []SelectOptionRequest `json:"options"`
 }
 
 type UpdateFieldRequest struct {
-	Label    string                `json:"label"`
-	Type     string                `json:"type"`
-	Required bool                  `json:"required"`
-	Position int                   `json:"position"`
-	Options  []SelectOptionRequest `json:"options"`
+	Label     string                `json:"label"`
+	Type      string                `json:"type"`
+	Required  bool                  `json:"required"`
+	IsPreview bool                  `json:"is_preview"`
+	Position  int                   `json:"position"`
+	Options   []SelectOptionRequest `json:"options"`
 }
