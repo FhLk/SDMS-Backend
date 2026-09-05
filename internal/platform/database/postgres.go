@@ -2,7 +2,6 @@ package database
 
 import (
 	"fmt"
-
 	"sdms/internal/config"
 
 	submissionpostgres "sdms/internal/modules/submission/repository/postgres"

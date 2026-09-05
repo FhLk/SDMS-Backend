@@ -6,6 +6,7 @@ import (
 	"sdms/internal/platform/http/routes"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"gorm.io/gorm"
 )
 
@@ -20,6 +21,32 @@ func NewRouter(db *gorm.DB, configs ...*config.Config) *fiber.App {
 		AppName:   "School Document Management System",
 		BodyLimit: int(bodyLimit),
 	})
+
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{
+			fiber.MethodGet,
+			fiber.MethodPost,
+			fiber.MethodPut,
+			fiber.MethodPatch,
+			fiber.MethodDelete,
+			fiber.MethodOptions,
+			fiber.MethodHead,
+		},
+		AllowHeaders: []string{
+			"Origin",
+			"Content-Type",
+			"Accept",
+			"Range",
+		},
+		ExposeHeaders: []string{
+			"Content-Disposition",
+			"Content-Length",
+			"Content-Range",
+			"Accept-Ranges",
+		},
+		MaxAge: 3600,
+	}))
 
 	healthHandler := healthhttp.NewHandler(db)
 

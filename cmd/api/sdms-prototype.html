@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDMS Prototype — School Document Management System</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --panel: #ffffff;
+    --ink: #16202e;
+    --muted: #6b7891;
+    --line: #e3e8f0;
+    --brand: #3f51b5;
+    --brand-dark: #32409a;
+    --brand-soft: #eef1fc;
+    --ok: #147a52;
+    --ok-soft: #e6f5ee;
+    --warn: #9a6212;
+    --warn-soft: #fdf3e2;
+    --err: #b3261e;
+    --err-soft: #fdecea;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Sarabun", "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  a { color: var(--brand); }
+  h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -.01em; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 17px; }
+  h3 { font-size: 15px; }
+  p { margin: 0; }
+
+  /* ---------- layout ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 10px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 30;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .brand .logo {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--brand); color: #fff;
+    display: grid; place-items: center; font-size: 13px; font-weight: 700;
+  }
+  .brand small { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
+  .topbar .spacer { flex: 1; }
+  .conn { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #c3cad6; }
+  .dot.on { background: #22c55e; }
+  .dot.off { background: #ef4444; }
+  .whoami { display: flex; align-items: center; gap: 10px; }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--brand-soft); color: var(--brand-dark);
+    display: grid; place-items: center; font-weight: 700; font-size: 12px;
+  }
+  .whoami .name { font-weight: 600; line-height: 1.2; }
+  .whoami .sub { font-size: 11px; color: var(--muted); line-height: 1.2; }
+
+  .shell { display: flex; min-height: calc(100vh - 51px); }
+  .sidebar {
+    width: 226px; flex: 0 0 226px;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    padding: 16px 12px;
+  }
+  .nav-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 8px 10px 4px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; text-align: left;
+    padding: 9px 10px; margin-bottom: 2px;
+    border: 0; border-radius: 8px; background: transparent;
+    color: var(--ink); font: inherit; cursor: pointer;
+  }
+  .nav-item:hover { background: #f1f4f9; }
+  .nav-item.active { background: var(--brand-soft); color: var(--brand-dark); font-weight: 600; }
+  .nav-item .ico { width: 18px; text-align: center; }
+  .main { flex: 1; padding: 22px 26px 60px; min-width: 0; }
+  .page-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+  .page-head .spacer { flex: 1; }
+  .page-head .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .crumb { background: none; border: 0; color: var(--brand); cursor: pointer; font: inherit; padding: 0; margin-bottom: 6px; }
+  .crumb:hover { text-decoration: underline; }
+
+  /* ---------- primitives ---------- */
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  .card-head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+  .card-head .spacer { flex: 1; }
+  .card-body { padding: 16px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; align-items: start; }
+
+  button { font-family: inherit; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 13px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink);
+    font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
+  }
+  .btn:hover { background: #f5f7fb; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-dark); }
+  .btn.danger { color: var(--err); border-color: #f0c8c5; }
+  .btn.danger:hover { background: var(--err-soft); }
+  .btn.sm { padding: 5px 9px; font-size: 12px; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  td.actions .btn-row, .file-row .btn-row { flex-wrap: nowrap; }
+
+  label.field { display: block; margin-bottom: 14px; }
+  label.field > .lbl { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 5px; }
+  label.field > .hint { display: block; font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  input[type=text], input[type=number], input[type=date], input[type=file], select, textarea {
+    width: 100%; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: #fff; color: var(--ink); font: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
+  textarea { min-height: 84px; resize: vertical; }
+  .check { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 13px; }
+  .check input { width: 16px; height: 16px; }
+  .req { color: var(--err); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; background: #fafbfd; }
+  tbody tr:hover { background: #fafbfe; }
+  td.actions { text-align: right; white-space: nowrap; }
+  .table-wrap { overflow-x: auto; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 600; background: #eef1f6; color: #4a5568;
+  }
+  .badge.ok { background: var(--ok-soft); color: var(--ok); }
+  .badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .badge.err { background: var(--err-soft); color: var(--err); }
+  .badge.brand { background: var(--brand-soft); color: var(--brand-dark); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--muted); }
+
+  .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .empty .big { font-size: 28px; margin-bottom: 8px; }
+
+  .alert { padding: 11px 13px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+  .alert.err { background: var(--err-soft); color: #8c1d18; border: 1px solid #f3cdc9; }
+  .alert.info { background: var(--brand-soft); color: var(--brand-dark); border: 1px solid #d6ddf8; }
+  .alert.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid #f2dfbe; }
+  .alert code { font-size: 11.5px; opacity: .8; }
+
+  /* ---------- modal ---------- */
+  .backdrop {
+    position: fixed; inset: 0; background: rgba(16,24,40,.42);
+    display: grid; place-items: center; padding: 20px; z-index: 60;
+  }
+  .modal {
+    background: var(--panel); border-radius: 12px; width: 100%; max-width: 560px;
+    max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(16,24,40,.28);
+  }
+  .modal.wide { max-width: 720px; }
+  .modal-head { padding: 15px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; }
+  .modal-head .spacer { flex: 1; }
+  .modal-body { padding: 18px; overflow-y: auto; }
+  .modal-foot { padding: 13px 18px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+  .x { border: 0; background: none; font-size: 20px; line-height: 1; color: var(--muted); cursor: pointer; padding: 0 4px; }
+
+  /* ---------- toast ---------- */
+  #toasts { position: fixed; right: 18px; bottom: 18px; z-index: 90; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: #1f2937; color: #fff; padding: 10px 14px; border-radius: 8px;
+    font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.2); max-width: 380px;
+  }
+  .toast.ok { background: #10633f; }
+  .toast.err { background: #8c1d18; }
+
+  /* ---------- login ---------- */
+  .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 30px 16px; }
+  .login { width: 100%; max-width: 720px; }
+  .login-head { text-align: center; margin-bottom: 20px; }
+  .login-head .logo { width: 46px; height: 46px; border-radius: 12px; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 700; margin: 0 auto 10px; }
+  .user-pick {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px;
+    background: #fff; cursor: pointer; margin-bottom: 8px; font: inherit;
+  }
+  .user-pick:hover { border-color: var(--brand); background: var(--brand-soft); }
+  .user-pick .spacer { flex: 1; }
+  .user-pick .nm { font-weight: 600; }
+  .user-pick .mt { font-size: 12px; color: var(--muted); }
+
+  /* ---------- misc ---------- */
+  .kv { display: grid; grid-template-columns: 190px 1fr; gap: 2px 14px; }
+  .kv dt { color: var(--muted); font-size: 12.5px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .kv dd { margin: 0; padding: 7px 0; border-bottom: 1px solid var(--line); word-break: break-word; }
+  .file-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .file-row .spacer { flex: 1; }
+  .file-ico { width: 34px; height: 34px; border-radius: 8px; background: var(--brand-soft); display: grid; place-items: center; font-size: 15px; }
+  .opt-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .opt-row input { flex: 1; }
+  .preview-form { background: #fbfcfe; border: 1px dashed var(--line); border-radius: 10px; padding: 16px; }
+  .steps { display: flex; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 12px; flex-wrap: wrap; }
+  .step { padding: 3px 10px; border-radius: 999px; background: #eef1f6; }
+  .step.done { background: var(--ok-soft); color: var(--ok); }
+  .step.active { background: var(--brand-soft); color: var(--brand-dark); font-weight: 600; }
+  .step.fail { background: var(--err-soft); color: var(--err); }
+  @media (max-width: 760px) {
+    .shell { flex-direction: column; }
+    .sidebar { width: 100%; flex: none; border-right: 0; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px; }
+    .nav-label { display: none; }
+    .nav-item { width: auto; }
+    .main { padding: 16px; }
+    .kv { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal-root"></div>
+<div id="toasts"></div>
+
+<script>
+/* =========================================================================
+   SDMS Frontend Prototype
+   -------------------------------------------------------------------------
+   ไฟล์เดียว ไม่ต้อง build — เปิดด้วยเบราว์เซอร์ได้เลย
+   คุยกับ SDMS-Backend (Go + Fiber v3) ผ่าน REST API
+   หมายเหตุ: Backend ยังไม่มีระบบ authentication
+             หน้า "เข้าสู่ระบบ" จึงเป็นการ "เลือกผู้ใช้" เพื่อจำลอง session
+             และใช้ uid ของผู้ใช้ที่เลือกเป็น submitted_by
+   ========================================================================= */
+
+const DEFAULT_BASE = "http://localhost:8080/api/v1";
+
+const state = {
+  baseUrl: DEFAULT_BASE,
+  online: null,          // null = ยังไม่ตรวจ, true/false
+  me: null,              // ผู้ใช้ที่ "ล็อกอิน" อยู่
+  users: [],             // cache รายชื่อผู้ใช้ (ใช้แสดงชื่อผู้ส่ง)
+  view: "topics",
+  params: {},
+  data: {},              // ข้อมูลของ view ปัจจุบัน
+  loading: false,
+  error: null,
+};
+
+/* ---------------------------------------------------------------- helpers */
+const $ = (sel, root = document) => root.querySelector(sel);
+const el = (tag, props = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k === "html") n.innerHTML = v;
+    else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === "value") n.value = v;
+    else if (v === true) n.setAttribute(k, "");
+    else n.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    n.appendChild(typeof kid === "string" || typeof kid === "number" ? document.createTextNode(String(kid)) : kid);
+  }
+  return n;
+};
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function toast(msg, kind = "") {
+  const t = el("div", { class: "toast " + kind }, msg);
+  $("#toasts").appendChild(t);
+  setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity .3s"; }, 3200);
+  setTimeout(() => t.remove(), 3600);
+}
+
+const FIELD_TYPES = [
+  { value: "text",     label: "ข้อความสั้น" },
+  { value: "textarea", label: "ข้อความยาว" },
+  { value: "number",   label: "ตัวเลข" },
+  { value: "date",     label: "วันที่" },
+  { value: "select",   label: "ตัวเลือก (dropdown)" },
+  { value: "file",     label: "ไฟล์แนบ" },
+];
+const typeLabel = (t) => (FIELD_TYPES.find((x) => x.value === t) || { label: t }).label;
+
+// นามสกุลไฟล์ที่ backend อนุญาต (internal/modules/submission/usecase/file_service.go)
+const ALLOWED_EXT = [".pdf", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".mp4"];
+
+const ROLE_LABEL = { DIRECTOR: "ผู้อำนวยการ", TEACHER: "ครู" };
+const STATUS_LABEL = { ACTIVE: "ใช้งาน", INACTIVE: "ระงับ" };
+
+// แปลข้อความ error จาก backend เป็นภาษาไทย (ตกไปใช้ข้อความเดิมถ้าไม่มี)
+const ERR_TH = {
+  "topic not found": "ไม่พบหัวข้อนี้",
+  "topic name is required": "กรุณากรอกชื่อหัวข้อ",
+  "topic field not found": "ไม่พบฟิลด์นี้",
+  "topic field label is required": "กรุณากรอกป้ายกำกับฟิลด์",
+  "invalid topic field type": "ชนิดฟิลด์ไม่ถูกต้อง",
+  "topic field type cannot be changed after submissions exist": "เปลี่ยนชนิดฟิลด์ไม่ได้ เพราะมีการส่งข้อมูลเข้ามาแล้ว",
+  "topic field cannot be deleted after submissions exist": "ลบฟิลด์ไม่ได้ เพราะมีการส่งข้อมูลเข้ามาแล้ว",
+  "a topic can have at most 3 preview fields": "หนึ่งหัวข้อกำหนดฟิลด์แสดงในตารางได้สูงสุด 3 ฟิลด์",
+  "select field requires at least one option": "ฟิลด์แบบตัวเลือกต้องมีอย่างน้อย 1 ตัวเลือก",
+  "select option label is required": "กรุณากรอกป้ายกำกับของตัวเลือก",
+  "select option value is required": "กรุณากรอกค่าของตัวเลือก",
+  "select option value must be unique": "ค่าของตัวเลือกต้องไม่ซ้ำกัน",
+  "options are only allowed for select fields": "กำหนดตัวเลือกได้เฉพาะฟิลด์แบบ dropdown",
+  "user not found": "ไม่พบผู้ใช้",
+  "username is required": "กรุณากรอกชื่อผู้ใช้",
+  "employee code is required": "กรุณากรอกรหัสพนักงาน",
+  "prefix is required": "กรุณากรอกคำนำหน้า",
+  "first name is required": "กรุณากรอกชื่อ",
+  "last name is required": "กรุณากรอกนามสกุล",
+  "invalid role": "บทบาทไม่ถูกต้อง",
+  "invalid status": "สถานะไม่ถูกต้อง",
+  "username already exists": "ชื่อผู้ใช้นี้ถูกใช้แล้ว",
+  "employee code already exists": "รหัสพนักงานนี้ถูกใช้แล้ว",
+  "submission not found": "ไม่พบรายการที่ส่ง",
+};
+const CODE_TH = {
+  REQUIRED_FIELD_MISSING: "ยังไม่ได้กรอกข้อมูลที่จำเป็น",
+  INVALID_SUBMISSION_VALUE: "ค่าที่กรอกไม่ถูกต้อง",
+  INVALID_SUBMISSION_FIELD: "ฟิลด์ไม่ถูกต้อง",
+  DUPLICATE_SUBMISSION_FIELD: "ส่งฟิลด์ซ้ำ",
+  FILE_FIELD_UNSUPPORTED: "ฟิลด์ไฟล์ต้องอัปโหลดแยก ไม่ใช่ส่งมากับ JSON",
+  FILE_TOO_LARGE: "ไฟล์มีขนาดใหญ่เกินกำหนด",
+  FILE_TYPE_NOT_ALLOWED: "ชนิดไฟล์นี้ไม่ได้รับอนุญาต",
+  FILE_ALREADY_EXISTS: "ฟิลด์นี้มีไฟล์แนบอยู่แล้ว",
+  FIELD_NOT_FILE: "ฟิลด์นี้ไม่ใช่ฟิลด์ไฟล์",
+  FILE_FIELD_TOPIC_MISMATCH: "ฟิลด์ไม่ได้อยู่ในหัวข้อนี้",
+  FILE_EMPTY: "ไฟล์ว่างเปล่า",
+  TOPIC_INACTIVE: "หัวข้อนี้ปิดรับข้อมูลแล้ว",
+  SUBMITTER_NOT_FOUND: "ไม่พบผู้ส่ง",
+  SUBMITTER_MUST_BE_TEACHER: "ผู้ส่งต้องมีบทบาทเป็นครูเท่านั้น",
+  SUBMITTER_INACTIVE: "บัญชีผู้ส่งถูกระงับการใช้งาน",
+  SUBMITTED_BY_REQUIRED: "ต้องระบุผู้ส่ง",
+  TOPIC_UID_REQUIRED: "ต้องระบุหัวข้อ",
+};
+
+function thMessage(err) {
+  if (!(err instanceof ApiError)) return err.message || String(err);
+  const raw = err.message || "";
+  const base = ERR_TH[raw] || CODE_TH[err.code] || raw || "เกิดข้อผิดพลาด";
+  return err.fieldLabel ? `${base} (ฟิลด์: ${err.fieldLabel})` : base;
+}
+
+const fmtDate = (iso) => {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
+};
+const fmtDateOnly = (iso) => {
+  if (!iso) return "-";
+  const d = new Date(iso + (iso.length === 10 ? "T00:00:00" : ""));
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString("th-TH", { dateStyle: "medium" });
+};
+const fmtSize = (b) => {
+  if (!b && b !== 0) return "-";
+  const u = ["B", "KB", "MB", "GB"];
+  let i = 0, n = b;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return `${n.toFixed(i === 0 ? 0 : 1)} ${u[i]}`;
+};
+const fullName = (u) => (u ? `${u.prefix || ""}${u.first_name} ${u.last_name}`.trim() : "-");
+const initials = (u) => (u ? (u.first_name || "?").charAt(0) + (u.last_name || "").charAt(0) : "?");
+const originOf = (base) => base.replace(/\/api\/v1\/?$/, "");
+
+/* -------------------------------------------------------------- API layer */
+class ApiError extends Error {
+  constructor(status, body) {
+    const msg = (body && (body.message || body.error)) || `HTTP ${status}`;
+    super(msg);
+    this.status = status;
+    this.code = body && body.code;
+    this.fieldUid = body && body.field_uid;
+    this.fieldLabel = body && body.field_label;
+    this.body = body;
+  }
+}
+
+async function api(path, opts = {}) {
+  let res;
+  try {
+    res = await fetch(state.baseUrl + path, opts);
+  } catch (e) {
+    state.online = false;
+    throw new Error("เชื่อมต่อ API ไม่ได้ — ตรวจสอบว่า backend รันอยู่ที่ " + state.baseUrl + " และเปิด CORS แล้ว");
+  }
+  state.online = true;
+  if (res.status === 204) return null;
+  const text = await res.text();
+  let body = null;
+  if (text) { try { body = JSON.parse(text); } catch { body = { message: text }; } }
+  if (!res.ok) throw new ApiError(res.status, body);
+  return body;
+}
+const apiJson = (path, method, payload) =>
+  api(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+
+const API = {
+  health:            ()               => api("/health"),
+  listUsers:         ()               => api("/users"),
+  getUser:           (id)             => api(`/users/${id}`),
+  createUser:        (b)              => apiJson("/users/", "POST", b),
+  updateUser:        (id, b)          => apiJson(`/users/${id}`, "PUT", b),
+  updateUserStatus:  (id, status)     => apiJson(`/users/${id}/status`, "PATCH", { status }),
+  deleteUser:        (id)             => api(`/users/${id}`, { method: "DELETE" }),
+
+  listTopics:        ()               => api("/topics"),
+  getTopic:          (id)             => api(`/topics/${id}`),          // มี fields มาด้วย
+  createTopic:       (b)              => apiJson("/topics/", "POST", b),
+  updateTopic:       (id, b)          => apiJson(`/topics/${id}`, "PUT", b),
+  deleteTopic:       (id)             => api(`/topics/${id}`, { method: "DELETE" }),
+
+  listFields:        (tid)            => api(`/topics/${tid}/fields`),
+  createField:       (tid, b)         => apiJson(`/topics/${tid}/fields`, "POST", b),
+  updateField:       (tid, fid, b)    => apiJson(`/topics/${tid}/fields/${fid}`, "PUT", b),
+  deleteField:       (tid, fid)       => api(`/topics/${tid}/fields/${fid}`, { method: "DELETE" }),
+
+  listSubmissions:   (tid, by)        => api(`/topics/${tid}/submissions/` + (by ? `?submitted_by=${by}` : "")),
+  getSubmission:     (tid, sid)       => api(`/topics/${tid}/submissions/${sid}`),
+  createSubmission:  (tid, b)         => apiJson(`/topics/${tid}/submissions/`, "POST", b),
+
+  listFiles:         (tid, sid)       => api(`/topics/${tid}/submissions/${sid}/files`),
+  uploadFile:        (tid, sid, fd)   => api(`/topics/${tid}/submissions/${sid}/files`, { method: "POST", body: fd }),
+  deleteFile:        (fid)            => api(`/submission-files/${fid}`, { method: "DELETE" }),
+};
+
+/* ---------------------------------------------------------------- modal */
+function openModal({ title, body, footer, wide }) {
+  const root = $("#modal-root");
+  const close = () => { root.innerHTML = ""; document.removeEventListener("keydown", onKey); };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  document.addEventListener("keydown", onKey);
+
+  const modal = el("div", { class: "modal" + (wide ? " wide" : "") },
+    el("div", { class: "modal-head" },
+      el("h2", {}, title),
+      el("div", { class: "spacer" }),
+      el("button", { class: "x", onClick: close, title: "ปิด" }, "×")),
+    el("div", { class: "modal-body" }, body),
+    footer ? el("div", { class: "modal-foot" }, footer) : null);
+
+  const backdrop = el("div", { class: "backdrop" }, modal);
+  root.innerHTML = "";
+  root.appendChild(backdrop);
+  const firstInput = modal.querySelector("input, select, textarea");
+  if (firstInput) firstInput.focus();
+  return { close, modal };
+}
+
+function confirmDialog(message, onYes, { danger = true, yesLabel = "ยืนยัน" } = {}) {
+  const yes = el("button", { class: "btn " + (danger ? "danger" : "primary") }, yesLabel);
+  const no = el("button", { class: "btn" }, "ยกเลิก");
+  const m = openModal({ title: "ยืนยันการทำงาน", body: el("p", {}, message), footer: [no, yes] });
+  no.onclick = m.close;
+  yes.onclick = async () => { m.close(); await onYes(); };
+}
+
+/* ---------------------------------------------------------------- router */
+const VIEW_DATA_KEY = {
+  topics: "topics", users: "users", fields: "topic", submit: "topic",
+  submissions: "topic", submissionDetail: "sub", mySubmissions: "rows",
+};
+
+function go(view, params = {}) {
+  state.view = view;
+  state.params = params;
+  state.data = {};
+  state.error = null;
+  state.loading = true;   // กัน render รอบแรกไม่ให้อ่าน state.data ที่ยังว่าง
+  render();
+  loadView();
+}
+function reload() { loadView(); }
+
+async function loadView() {
+  const loaders = {
+    topics: async () => ({ topics: await API.listTopics() }),
+    users: async () => ({ users: await refreshUsers() }),
+    fields: async () => ({ topic: await API.getTopic(state.params.topicId) }),
+    submit: async () => ({ topic: await API.getTopic(state.params.topicId) }),
+    submissions: async () => {
+      const [topic, subs] = await Promise.all([
+        API.getTopic(state.params.topicId),
+        API.listSubmissions(state.params.topicId, state.params.mineOnly ? state.me.uid : null),
+      ]);
+      await refreshUsers().catch(() => {});
+      return { topic, subs };
+    },
+    submissionDetail: async () => {
+      const [topic, sub] = await Promise.all([
+        API.getTopic(state.params.topicId),
+        API.getSubmission(state.params.topicId, state.params.submissionId),
+      ]);
+      await refreshUsers().catch(() => {});
+      return { topic, sub };
+    },
+    mySubmissions: async () => {
+      const topics = await API.listTopics();
+      const rows = [];
+      for (const t of topics) {
+        try {
+          const subs = await API.listSubmissions(t.uid, state.me.uid);
+          subs.forEach((s) => rows.push({ topic: t, sub: s }));
+        } catch (_) { /* ข้ามหัวข้อที่ดึงไม่ได้ */ }
+      }
+      rows.sort((a, b) => new Date(b.sub.created_at) - new Date(a.sub.created_at));
+      return { rows };
+    },
+  };
+  const fn = loaders[state.view];
+  if (!fn) return;
+  state.loading = true; state.error = null; render();
+  try {
+    state.data = await fn();
+  } catch (e) {
+    state.error = thMessage(e);
+  } finally {
+    state.loading = false;
+    render();
+  }
+}
+
+async function refreshUsers() {
+  state.users = await API.listUsers();
+  return state.users;
+}
+const userById = (id) => state.users.find((u) => u.uid === id);
+
+/* =========================================================================
+   RENDER
+   ========================================================================= */
+function render() {
+  const app = $("#app");
+  app.innerHTML = "";
+  app.appendChild(state.me ? renderShell() : renderLogin());
+}
+
+/* ------------------------------------------------------------ login view */
+function renderLogin() {
+  const wrap = el("div", { class: "login-wrap" });
+  const box = el("div", { class: "login" });
+
+  box.appendChild(el("div", { class: "login-head" },
+    el("div", { class: "logo" }, "SD"),
+    el("h1", {}, "SDMS — ระบบจัดการเอกสารโรงเรียน"),
+    el("p", { class: "sub", style: "color:var(--muted);margin-top:4px" }, "Frontend Prototype • เชื่อมต่อกับ SDMS-Backend (Go + Fiber)")));
+
+  // ตั้งค่า API
+  const baseInput = el("input", { type: "text", value: state.baseUrl, placeholder: DEFAULT_BASE });
+  const statusEl = el("span", { class: "conn" },
+    el("span", { class: "dot " + (state.online === true ? "on" : state.online === false ? "off" : "") }),
+    state.online === true ? "เชื่อมต่อสำเร็จ" : state.online === false ? "เชื่อมต่อไม่ได้" : "ยังไม่ได้ตรวจสอบ");
+
+  const testBtn = el("button", { class: "btn" }, "ทดสอบการเชื่อมต่อ");
+  testBtn.onclick = async () => {
+    state.baseUrl = baseInput.value.trim().replace(/\/$/, "") || DEFAULT_BASE;
+    testBtn.disabled = true;
+    try { await API.health(); toast("เชื่อมต่อ API สำเร็จ", "ok"); await loadUsersForLogin(); }
+    catch (e) { toast(thMessage(e), "err"); }
+    finally { testBtn.disabled = false; render(); }
+  };
+
+  const cfgCard = el("div", { class: "card", style: "margin-bottom:18px" },
+    el("div", { class: "card-body" },
+      el("label", { class: "field" },
+        el("span", { class: "lbl" }, "ที่อยู่ API"),
+        baseInput,
+        el("span", { class: "hint" }, "ค่าเริ่มต้นของ backend คือ http://localhost:8080/api/v1")),
+      el("div", { class: "btn-row", style: "align-items:center" }, testBtn, statusEl)));
+  box.appendChild(cfgCard);
+
+  // เลือกผู้ใช้
+  const listBox = el("div", {});
+  const card = el("div", { class: "card" },
+    el("div", { class: "card-head" },
+      el("h2", {}, "เลือกผู้ใช้เพื่อเข้าใช้งาน"),
+      el("div", { class: "spacer" }),
+      el("button", { class: "btn sm", onClick: () => loadUsersForLogin().then(render) }, "รีเฟรช")),
+    el("div", { class: "card-body" },
+      el("div", { class: "alert info" },
+        "Backend ยังไม่มีระบบ authentication — หน้านี้จำลองการล็อกอินด้วยการเลือกผู้ใช้ ",
+        "และจะใช้ uid ของผู้ใช้ที่เลือกเป็นค่า submitted_by เมื่อส่งเอกสาร"),
+      listBox));
+  box.appendChild(card);
+
+  if (state.loading) {
+    listBox.appendChild(el("div", { class: "empty" }, "กำลังโหลด..."));
+  } else if (state.error) {
+    listBox.appendChild(el("div", { class: "alert err" }, state.error));
+  } else if (!state.users.length) {
+    listBox.appendChild(el("div", { class: "empty" },
+      el("div", { class: "big" }, "👤"),
+      el("p", {}, "ยังไม่มีผู้ใช้ในระบบ"),
+      el("p", { style: "margin-top:4px" }, "สร้างผู้ใช้คนแรก หรือสร้างชุดข้อมูลตัวอย่างเพื่อทดลองใช้งาน"),
+      el("div", { class: "btn-row", style: "justify-content:center;margin-top:14px" },
+        el("button", { class: "btn primary", onClick: () => userModal(null, () => loadUsersForLogin().then(render)) }, "+ สร้างผู้ใช้"),
+        el("button", { class: "btn", onClick: seedDemoData }, "สร้างข้อมูลตัวอย่าง"))));
+  } else {
+    for (const u of state.users) {
+      const btn = el("button", { class: "user-pick", onClick: () => { state.me = u; go(u.role === "DIRECTOR" ? "topics" : "topics"); } },
+        el("span", { class: "avatar" }, initials(u)),
+        el("span", {},
+          el("span", { class: "nm" }, fullName(u)),
+          el("span", { class: "mt" }, `@${u.username} • ${u.employee_code}`)),
+        el("span", { class: "spacer" }),
+        el("span", { class: "badge " + (u.role === "DIRECTOR" ? "brand" : "") }, ROLE_LABEL[u.role] || u.role),
+        el("span", { class: "badge " + (u.status === "ACTIVE" ? "ok" : "err") }, STATUS_LABEL[u.status] || u.status));
+      listBox.appendChild(btn);
+    }
+    listBox.appendChild(el("div", { class: "btn-row", style: "margin-top:12px" },
+      el("button", { class: "btn", onClick: () => userModal(null, () => loadUsersForLogin().then(render)) }, "+ สร้างผู้ใช้ใหม่"),
+      el("button", { class: "btn", onClick: seedDemoData }, "สร้างข้อมูลตัวอย่าง")));
+  }
+
+  wrap.appendChild(box);
+  return wrap;
+}
+
+async function loadUsersForLogin() {
+  state.loading = true; state.error = null; render();
+  try { await refreshUsers(); }
+  catch (e) { state.error = thMessage(e); state.users = []; }
+  finally { state.loading = false; }
+}
+
+/* ------------------------------------------------------------ app shell */
+function renderShell() {
+  const isDirector = state.me.role === "DIRECTOR";
+
+  const navItems = isDirector
+    ? [["topics", "📄", "หัวข้อเอกสาร"], ["users", "👥", "ผู้ใช้งาน"]]
+    : [["topics", "📄", "หัวข้อเอกสาร"], ["mySubmissions", "📥", "เอกสารของฉัน"]];
+
+  const sidebar = el("aside", { class: "sidebar" },
+    el("div", { class: "nav-label" }, "เมนู"),
+    ...navItems.map(([v, ico, label]) =>
+      el("button", {
+        class: "nav-item" + (state.view === v || (v === "topics" && ["fields", "submit", "submissions", "submissionDetail"].includes(state.view)) ? " active" : ""),
+        onClick: () => go(v),
+      }, el("span", { class: "ico" }, ico), label)));
+
+  const topbar = el("header", { class: "topbar" },
+    el("div", { class: "brand" },
+      el("div", { class: "logo" }, "SD"),
+      el("div", {}, "SDMS", el("small", {}, "ระบบจัดการเอกสารโรงเรียน"))),
+    el("div", { class: "spacer" }),
+    el("div", { class: "conn" },
+      el("span", { class: "dot " + (state.online === true ? "on" : state.online === false ? "off" : "") }),
+      el("span", { class: "mono" }, state.baseUrl)),
+    el("div", { class: "whoami" },
+      el("div", { class: "avatar" }, initials(state.me)),
+      el("div", {},
+        el("div", { class: "name" }, fullName(state.me)),
+        el("div", { class: "sub" }, ROLE_LABEL[state.me.role] || state.me.role))),
+    el("button", { class: "btn sm", onClick: () => { state.me = null; state.view = "topics"; state.data = {}; loadUsersForLogin().then(render); } }, "ออกจากระบบ"));
+
+  const main = el("main", { class: "main" }, renderView());
+  return el("div", {}, topbar, el("div", { class: "shell" }, sidebar, main));
+}
+
+function renderView() {
+  if (state.loading) return el("div", { class: "card" }, el("div", { class: "empty" }, "กำลังโหลด..."));
+  if (state.error) {
+    return el("div", {},
+      el("div", { class: "alert err" }, state.error),
+      el("button", { class: "btn", onClick: reload }, "ลองใหม่"));
+  }
+  // ข้อมูลของ view ยังมาไม่ครบ (เช่นเพิ่งเปลี่ยนหน้า) — แสดงสถานะกำลังโหลดแทนที่จะพัง
+  const need = VIEW_DATA_KEY[state.view];
+  if (need && state.data[need] === undefined) {
+    return el("div", { class: "card" }, el("div", { class: "empty" }, "กำลังโหลด..."));
+  }
+  switch (state.view) {
+    case "topics": return viewTopics();
+    case "users": return viewUsers();
+    case "fields": return viewFields();
+    case "submit": return viewSubmit();
+    case "submissions": return viewSubmissions();
+    case "submissionDetail": return viewSubmissionDetail();
+    case "mySubmissions": return viewMySubmissions();
+    default: return el("div", { class: "empty" }, "ไม่พบหน้านี้");
+  }
+}
+
+/* --------------------------------------------------------- view: topics */
+function viewTopics() {
+  const isDirector = state.me.role === "DIRECTOR";
+  const topics = state.data.topics || [];
+
+  const head = el("div", { class: "page-head" },
+    el("div", {},
+      el("h1", {}, "หัวข้อเอกสาร"),
+      el("p", { class: "sub" }, isDirector
+        ? "สร้างหัวข้อและออกแบบฟอร์มที่ครูต้องกรอก"
+        : "เลือกหัวข้อที่ต้องการส่งเอกสาร")),
+    el("div", { class: "spacer" }),
+    isDirector ? el("button", { class: "btn primary", onClick: () => topicModal(null) }, "+ สร้างหัวข้อ") : null);
+
+  if (!topics.length) {
+    return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "empty" },
+      el("div", { class: "big" }, "📄"),
+      el("p", {}, "ยังไม่มีหัวข้อเอกสาร"),
+      isDirector ? el("div", { style: "margin-top:12px" }, el("button", { class: "btn primary", onClick: () => topicModal(null) }, "+ สร้างหัวข้อแรก")) : null)));
+  }
+
+  const rows = topics.map((t) => {
+    const actions = el("td", { class: "actions" });
+    const btns = el("div", { class: "btn-row", style: "justify-content:flex-end" });
+    if (isDirector) {
+      btns.appendChild(el("button", { class: "btn sm", onClick: () => go("fields", { topicId: t.uid }) }, "ออกแบบฟอร์ม"));
+      btns.appendChild(el("button", { class: "btn sm", onClick: () => go("submissions", { topicId: t.uid }) }, "รายการที่ส่ง"));
+      btns.appendChild(el("button", { class: "btn sm", onClick: () => topicModal(t) }, "แก้ไข"));
+      btns.appendChild(el("button", {
+        class: "btn sm danger",
+        onClick: () => confirmDialog(`ลบหัวข้อ "${t.name}" ใช่หรือไม่?`, async () => {
+          try { await API.deleteTopic(t.uid); toast("ลบหัวข้อแล้ว", "ok"); reload(); }
+          catch (e) { toast(thMessage(e), "err"); }
+        }),
+      }, "ลบ"));
+    } else {
+      btns.appendChild(el("button", {
+        class: "btn sm primary", disabled: !t.is_active,
+        title: t.is_active ? "" : "หัวข้อนี้ปิดรับข้อมูลแล้ว",
+        onClick: () => go("submit", { topicId: t.uid }),
+      }, "ส่งเอกสาร"));
+      btns.appendChild(el("button", { class: "btn sm", onClick: () => go("submissions", { topicId: t.uid, mineOnly: true }) }, "รายการของฉัน"));
+    }
+    actions.appendChild(btns);
+
+    return el("tr", {},
+      el("td", {}, el("div", { style: "font-weight:600" }, t.name), el("div", { class: "mono" }, t.uid)),
+      el("td", {}, t.description || el("span", { style: "color:var(--muted)" }, "—")),
+      el("td", {}, el("span", { class: "badge " + (t.is_active ? "ok" : "warn") }, t.is_active ? "เปิดรับ" : "ปิดรับ")),
+      el("td", {}, fmtDate(t.created_at)),
+      actions);
+  });
+
+  return el("div", {}, head,
+    el("div", { class: "card" }, el("div", { class: "table-wrap" },
+      el("table", {},
+        el("thead", {}, el("tr", {},
+          el("th", {}, "ชื่อหัวข้อ"), el("th", {}, "คำอธิบาย"), el("th", {}, "สถานะ"),
+          el("th", {}, "สร้างเมื่อ"), el("th", { style: "text-align:right" }, "จัดการ"))),
+        el("tbody", {}, ...rows)))));
+}
+
+function topicModal(topic) {
+  const isEdit = !!topic;
+  const name = el("input", { type: "text", value: topic ? topic.name : "", placeholder: "เช่น แผนการสอน ภาคเรียนที่ 1" });
+  const desc = el("textarea", { placeholder: "คำอธิบายเพิ่มเติม (ไม่บังคับ)" }, topic ? topic.description : "");
+  if (topic) desc.value = topic.description || "";
+  const active = el("input", { type: "checkbox" });
+  active.checked = topic ? topic.is_active : true;
+  const errBox = el("div", {});
+
+  const body = el("div", {}, errBox,
+    el("label", { class: "field" }, el("span", { class: "lbl" }, "ชื่อหัวข้อ ", el("span", { class: "req" }, "*")), name),
+    el("label", { class: "field" }, el("span", { class: "lbl" }, "คำอธิบาย"), desc),
+    isEdit ? el("label", { class: "check" }, active, "เปิดรับการส่งเอกสาร") : null);
+
+  const save = el("button", { class: "btn primary" }, isEdit ? "บันทึก" : "สร้างหัวข้อ");
+  const cancel = el("button", { class: "btn" }, "ยกเลิก");
+  const m = openModal({ title: isEdit ? "แก้ไขหัวข้อ" : "สร้างหัวข้อใหม่", body, footer: [cancel, save] });
+  cancel.onclick = m.close;
+  save.onclick = async () => {
+    errBox.innerHTML = "";
+    save.disabled = true;
+    try {
+      if (isEdit) await API.updateTopic(topic.uid, { name: name.value, description: desc.value, is_active: active.checked });
+      else await API.createTopic({ name: name.value, description: desc.value });
+      m.close(); toast(isEdit ? "บันทึกแล้ว" : "สร้างหัวข้อแล้ว", "ok"); reload();
+    } catch (e) {
+      errBox.appendChild(el("div", { class: "alert err" }, thMessage(e)));
+      save.disabled = false;
+    }
+  };
+}
+
+/* ------------------------------------------- view: form builder (fields) */
+function viewFields() {
+  const topic = state.data.topic;
+  const fields = [...(topic.fields || [])].sort((a, b) => a.position - b.position);
+  const previewCount = fields.filter((f) => f.is_preview).length;
+
+  const head = el("div", { class: "page-head" },
+    el("div", {},
+      el("button", { class: "crumb", onClick: () => go("topics") }, "← กลับไปหัวข้อเอกสาร"),
+      el("h1", {}, topic.name),
+      el("p", { class: "sub" }, "ออกแบบฟิลด์ที่ครูต้องกรอกในหัวข้อนี้")),
+    el("div", { class: "spacer" }),
+    el("div", { class: "btn-row" },
+      el("button", { class: "btn", onClick: () => go("submissions", { topicId: topic.uid }) }, "ดูรายการที่ส่ง"),
+      el("button", { class: "btn primary", onClick: () => fieldModal(topic, null, fields) }, "+ เพิ่มฟิลด์")));
+
+  const rows = fields.map((f) =>
+    el("tr", {},
+      el("td", {}, el("span", { class: "badge" }, f.position)),
+      el("td", {}, el("div", { style: "font-weight:600" }, f.label),
+        f.type === "select" && f.options && f.options.length
+          ? el("div", { class: "mono" }, f.options.map((o) => o.label).join(" / ")) : null),
+      el("td", {}, el("span", { class: "badge brand" }, typeLabel(f.type))),
+      el("td", {}, f.required ? el("span", { class: "badge err" }, "จำเป็น") : el("span", { style: "color:var(--muted)" }, "ไม่บังคับ")),
+      el("td", {}, f.is_preview ? el("span", { class: "badge ok" }, "แสดง") : el("span", { style: "color:var(--muted)" }, "—")),
+      el("td", { class: "actions" }, el("div", { class: "btn-row", style: "justify-content:flex-end" },
+        el("button", { class: "btn sm", onClick: () => fieldModal(topic, f, fields) }, "แก้ไข"),
+        el("button", {
+          class: "btn sm danger",
+          onClick: () => confirmDialog(`ลบฟิลด์ "${f.label}" ใช่หรือไม่?`, async () => {
+            try { await API.deleteField(topic.uid, f.uid); toast("ลบฟิลด์แล้ว", "ok"); reload(); }
+            catch (e) { toast(thMessage(e), "err"); }
+          }),
+        }, "ลบ")))));
+
+  const table = fields.length
+    ? el("div", { class: "table-wrap" }, el("table", {},
+        el("thead", {}, el("tr", {},
+          el("th", {}, "ลำดับ"), el("th", {}, "ป้ายกำกับ"), el("th", {}, "ชนิด"),
+          el("th", {}, "บังคับกรอก"), el("th", {}, "แสดงในตาราง"), el("th", { style: "text-align:right" }, "จัดการ"))),
+        el("tbody", {}, ...rows)))
+    : el("div", { class: "empty" },
+        el("div", { class: "big" }, "🧩"),
+        el("p", {}, "ยังไม่มีฟิลด์ในหัวข้อนี้"),
+        el("div", { style: "margin-top:12px" }, el("button", { class: "btn primary", onClick: () => fieldModal(topic, null, fields) }, "+ เพิ่มฟิลด์แรก")));
+
+  const left = el("div", { class: "card" },
+    el("div", { class: "card-head" },
+      el("h2", {}, "ฟิลด์ทั้งหมด"),
+      el("div", { class: "spacer" }),
+      el("span", { class: "badge " + (previewCount >= 3 ? "warn" : "") }, `ฟิลด์แสดงในตาราง ${previewCount}/3`)),
+    table);
+
+  const right = el("div", { class: "card" },
+    el("div", { class: "card-head" }, el("h2", {}, "ตัวอย่างฟอร์มที่ครูจะเห็น")),
+    el("div", { class: "card-body" },
+      fields.length
+        ? el("div", { class: "preview-form" }, ...fields.map((f) => renderFieldInput(f, { disabled: true })))
+        : el("p", { style: "color:var(--muted)" }, "เพิ่มฟิลด์เพื่อดูตัวอย่าง")));
+
+  return el("div", {}, head, el("div", { class: "grid2" }, left, right));
+}
+
+function fieldModal(topic, field, allFields) {
+  const isEdit = !!field;
+  const usedPreview = allFields.filter((f) => f.is_preview && (!field || f.uid !== field.uid)).length;
+  const previewFull = usedPreview >= 3;
+
+  const label = el("input", { type: "text", value: field ? field.label : "", placeholder: "เช่น ชื่อรายวิชา" });
+  const type = el("select", {}, ...FIELD_TYPES.map((t) => el("option", { value: t.value }, t.label)));
+  type.value = field ? field.type : "text";
+  const position = el("input", { type: "number", min: "0", value: field ? field.position : (allFields.length ? Math.max(...allFields.map((f) => f.position)) + 1 : 0) });
+  const required = el("input", { type: "checkbox" }); required.checked = field ? field.required : false;
+  const isPreview = el("input", { type: "checkbox" }); isPreview.checked = field ? field.is_preview : false;
+  if (previewFull && !isPreview.checked) isPreview.disabled = true;
+
+  const optsBox = el("div", {});
+  const optsWrap = el("div", { class: "field", style: "display:none" },
+    el("span", { class: "lbl" }, "ตัวเลือก ", el("span", { class: "req" }, "*")),
+    optsBox,
+    el("button", { class: "btn sm", onClick: () => addOpt() }, "+ เพิ่มตัวเลือก"),
+    el("span", { class: "hint" }, "ค่า (value) คือสิ่งที่บันทึกลงฐานข้อมูล และต้องไม่ซ้ำกัน"));
+
+  function addOpt(o) {
+    const l = el("input", { type: "text", value: o ? o.label : "", placeholder: "ป้ายกำกับ" });
+    const v = el("input", { type: "text", value: o ? o.value : "", placeholder: "ค่า" });
+    const row = el("div", { class: "opt-row" }, l, v,
+      el("button", { class: "btn sm danger", onClick: () => row.remove() }, "ลบ"));
+    row._get = () => ({ label: l.value.trim(), value: v.value.trim() });
+    optsBox.appendChild(row);
+  }
+  (field && field.options ? field.options : []).forEach(addOpt);
+
+  const syncType = () => {
+    const isSelect = type.value === "select";
+    optsWrap.style.display = isSelect ? "block" : "none";
+    if (isSelect && !optsBox.children.length) { addOpt(); addOpt(); }
+    fileHint.style.display = type.value === "file" ? "block" : "none";
+  };
+  const fileHint = el("div", { class: "alert info", style: "display:none" },
+    "ฟิลด์ไฟล์: ครูจะกรอกฟอร์มก่อน ระบบจะสร้างรายการแล้วค่อยอัปโหลดไฟล์ตามหลัง (multipart) — ",
+    "นามสกุลที่อนุญาต: " + ALLOWED_EXT.join(", "));
+  type.onchange = syncType;
+
+  const errBox = el("div", {});
+  const body = el("div", {}, errBox,
+    el("label", { class: "field" }, el("span", { class: "lbl" }, "ป้ายกำกับ ", el("span", { class: "req" }, "*")), label),
+    el("label", { class: "field" }, el("span", { class: "lbl" }, "ชนิดข้อมูล"), type,
+      isEdit ? el("span", { class: "hint" }, "เปลี่ยนชนิดไม่ได้ถ้าหัวข้อนี้มีการส่งข้อมูลแล้ว") : null),
+    fileHint,
+    optsWrap,
+    el("label", { class: "field" }, el("span", { class: "lbl" }, "ลำดับการแสดงผล"), position),
+    el("label", { class: "check" }, required, "บังคับกรอก"),
+    el("label", { class: "check" }, isPreview, "แสดงคอลัมน์นี้ในตารางรายการที่ส่ง",
+      previewFull && !isPreview.checked ? el("span", { class: "badge warn" }, "ครบ 3 ฟิลด์แล้ว") : null));
+  syncType();
+
+  const save = el("button", { class: "btn primary" }, isEdit ? "บันทึก" : "เพิ่มฟิลด์");
+  const cancel = el("button", { class: "btn" }, "ยกเลิก");
+  const m = openModal({ title: isEdit ? "แก้ไขฟิลด์" : "เพิ่มฟิลด์ใหม่", body, footer: [cancel, save] });
+  cancel.onclick = m.close;
+  save.onclick = async () => {
+    errBox.innerHTML = "";
+    const payload = {
+      label: label.value.trim(),
+      type: type.value,
+      required: required.checked,
+      is_preview: isPreview.checked,
+      position: Number(position.value) || 0,
+      options: type.value === "select" ? [...optsBox.children].map((r) => r._get()).filter((o) => o.label || o.value) : [],
+    };
+    save.disabled = true;
+    try {
+      if (isEdit) await API.updateField(topic.uid, field.uid, payload);
+      else await API.createField(topic.uid, payload);
+      m.close(); toast(isEdit ? "บันทึกฟิลด์แล้ว" : "เพิ่มฟิลด์แล้ว", "ok"); reload();
+    } catch (e) {
+      errBox.appendChild(el("div", { class: "alert err" }, thMessage(e)));
+      save.disabled = false;
+    }
+  };
+}
+
+/* --------------------------------------------- dynamic field input render */
+function renderFieldInput(field, { disabled = false } = {}) {
+  const id = "f_" + field.uid;
+  let input;
+  switch (field.type) {
+    case "textarea":
+      input = el("textarea", { id, disabled, placeholder: disabled ? "" : "กรอกข้อความ" });
+      break;
+    case "number":
+      input = el("input", { type: "number", id, disabled, step: "any", placeholder: disabled ? "" : "0" });
+      break;
+    case "date":
+      input = el("input", { type: "date", id, disabled });
+      break;
+    case "select":
+      input = el("select", { id, disabled },
+        el("option", { value: "" }, "— เลือก —"),
+        ...(field.options || []).map((o) => el("option", { value: o.value }, o.label)));
+      break;
+    case "file":
+      input = el("input", { type: "file", id, disabled, accept: ALLOWED_EXT.join(",") });
+      break;
+    default:
+      input = el("input", { type: "text", id, disabled, placeholder: disabled ? "" : "กรอกข้อความ" });
+  }
+  input.dataset.fieldUid = field.uid;
+  input.dataset.fieldType = field.type;
+
+  const wrap = el("label", { class: "field", for: id },
+    el("span", { class: "lbl" }, field.label, field.required ? el("span", { class: "req" }, " *") : null,
+      el("span", { class: "badge", style: "margin-left:8px;font-weight:500" }, typeLabel(field.type))),
+    input,
+    field.type === "file" ? el("span", { class: "hint" }, "รองรับ: " + ALLOWED_EXT.join(", ")) : null);
+  wrap._input = input;
+  return wrap;
+}
+
+/* --------------------------------------------------- view: submit (ครู) */
+function viewSubmit() {
+  const topic = state.data.topic;
+  const fields = [...(topic.fields || [])].sort((a, b) => a.position - b.position);
+  const dataFields = fields.filter((f) => f.type !== "file");
+  const fileFields = fields.filter((f) => f.type === "file");
+
+  const head = el("div", { class: "page-head" },
+    el("div", {},
+      el("button", { class: "crumb", onClick: () => go("topics") }, "← กลับไปหัวข้อเอกสาร"),
+      el("h1", {}, "ส่งเอกสาร: " + topic.name),
+      el("p", { class: "sub" }, topic.description || "กรอกข้อมูลตามฟอร์มด้านล่าง")));
+
+  if (!fields.length) {
+    return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "empty" },
+      el("div", { class: "big" }, "🧩"), el("p", {}, "หัวข้อนี้ยังไม่ได้กำหนดฟิลด์ ติดต่อผู้อำนวยการเพื่อออกแบบฟอร์ม"))));
+  }
+
+  const errBox = el("div", {});
+  const stepsBox = el("div", { class: "steps" });
+  const inputs = [];
+  const form = el("div", {});
+
+  for (const f of fields) {
+    const w = renderFieldInput(f);
+    inputs.push({ field: f, input: w._input });
+    form.appendChild(w);
+  }
+
+  const submitBtn = el("button", { class: "btn primary" }, "ส่งเอกสาร");
+  const resetBtn = el("button", { class: "btn" }, "ล้างฟอร์ม");
+  resetBtn.onclick = () => { inputs.forEach(({ input }) => { input.value = ""; }); errBox.innerHTML = ""; stepsBox.innerHTML = ""; };
+
+  submitBtn.onclick = async () => {
+    errBox.innerHTML = "";
+    stepsBox.innerHTML = "";
+
+    // 1) ตรวจฝั่ง client ก่อน — ฟิลด์ไฟล์ backend ไม่ได้บังคับตอนสร้าง จึงตรวจที่นี่
+    const missing = [];
+    for (const { field, input } of inputs) {
+      if (!field.required) continue;
+      const empty = field.type === "file" ? !input.files.length : !String(input.value).trim();
+      if (empty) missing.push(field.label);
+    }
+    if (missing.length) {
+      errBox.appendChild(el("div", { class: "alert err" }, "กรุณากรอกข้อมูลที่จำเป็น: " + missing.join(", ")));
+      return;
+    }
+
+    const values = [];
+    for (const { field, input } of inputs) {
+      if (field.type === "file") continue;
+      const raw = String(input.value).trim();
+      if (!raw) continue; // ฟิลด์ไม่บังคับที่ปล่อยว่างไว้ ไม่ต้องส่ง
+      values.push({ field_uid: field.uid, value: field.type === "number" ? Number(raw) : raw });
+    }
+
+    const stepCreate = el("span", { class: "step active" }, "1. บันทึกข้อมูล");
+    stepsBox.appendChild(stepCreate);
+    const fileSteps = fileFields.map((f, i) => {
+      const s = el("span", { class: "step" }, `${i + 2}. อัปโหลด ${f.label}`);
+      stepsBox.appendChild(s);
+      return { field: f, step: s };
+    });
+
+    submitBtn.disabled = true; resetBtn.disabled = true;
+    let submission;
+    try {
+      submission = await API.createSubmission(topic.uid, { submitted_by: state.me.uid, values });
+      stepCreate.className = "step done";
+    } catch (e) {
+      stepCreate.className = "step fail";
+      errBox.appendChild(el("div", { class: "alert err" }, thMessage(e),
+        e.code ? el("div", {}, el("code", {}, "code: " + e.code)) : null));
+      submitBtn.disabled = false; resetBtn.disabled = false;
+      return;
+    }
+
+    // 2) อัปโหลดไฟล์ทีละฟิลด์ (multipart) หลังจากมี submission แล้ว
+    const failed = [];
+    for (const { field, step } of fileSteps) {
+      const entry = inputs.find((i) => i.field.uid === field.uid);
+      if (!entry.input.files.length) { step.className = "step"; step.textContent += " (ไม่มีไฟล์)"; continue; }
+      step.className = "step active";
+      const fd = new FormData();
+      fd.append("field_uid", field.uid);
+      fd.append("file", entry.input.files[0]);
+      try { await API.uploadFile(topic.uid, submission.uid, fd); step.className = "step done"; }
+      catch (e) { step.className = "step fail"; failed.push(`${field.label}: ${thMessage(e)}`); }
+    }
+
+    if (failed.length) {
+      errBox.appendChild(el("div", { class: "alert warn" },
+        el("div", { style: "font-weight:600;margin-bottom:4px" }, "บันทึกข้อมูลสำเร็จ แต่อัปโหลดไฟล์บางรายการไม่สำเร็จ"),
+        ...failed.map((f) => el("div", {}, "• " + f)),
+        el("div", { style: "margin-top:6px" }, "อัปโหลดซ้ำได้ที่หน้ารายละเอียดรายการ")));
+      toast("บันทึกแล้ว แต่มีไฟล์ที่อัปโหลดไม่สำเร็จ", "err");
+    } else {
+      toast("ส่งเอกสารสำเร็จ", "ok");
+    }
+    go("submissionDetail", { topicId: topic.uid, submissionId: submission.uid, mineOnly: true });
+  };
+
+  const left = el("div", { class: "card" },
+    el("div", { class: "card-head" }, el("h2", {}, "แบบฟอร์ม"),
+      el("div", { class: "spacer" }),
+      el("span", { class: "badge" }, `${dataFields.length} ฟิลด์ข้อมูล`),
+      fileFields.length ? el("span", { class: "badge brand" }, `${fileFields.length} ไฟล์แนบ`) : null),
+    el("div", { class: "card-body" }, errBox, stepsBox, form,
+      el("div", { class: "btn-row", style: "margin-top:6px" }, submitBtn, resetBtn)));
+
+  const right = el("div", { class: "card" },
+    el("div", { class: "card-head" }, el("h2", {}, "ข้อมูลผู้ส่ง")),
+    el("div", { class: "card-body" },
+      el("dl", { class: "kv" },
+        el("dt", {}, "ชื่อ-สกุล"), el("dd", {}, fullName(state.me)),
+        el("dt", {}, "บทบาท"), el("dd", {}, ROLE_LABEL[state.me.role] || state.me.role),
+        el("dt", {}, "รหัสพนักงาน"), el("dd", {}, state.me.employee_code),
+        el("dt", {}, "submitted_by"), el("dd", { class: "mono" }, state.me.uid)),
+      state.me.role !== "TEACHER"
+        ? el("div", { class: "alert warn", style: "margin-top:14px" }, "backend อนุญาตให้เฉพาะผู้ใช้บทบาท “ครู” เป็นผู้ส่งเท่านั้น การส่งด้วยบัญชีนี้จะถูกปฏิเสธ")
+        : null,
+      state.me.status !== "ACTIVE"
+        ? el("div", { class: "alert err", style: "margin-top:14px" }, "บัญชีนี้ถูกระงับ จึงส่งเอกสารไม่ได้")
+        : null,
+      el("div", { class: "alert info", style: "margin-top:14px" },
+        "ลำดับการทำงาน: สร้างรายการ (JSON) → อัปโหลดไฟล์แนบทีละฟิลด์ (multipart/form-data) ตามที่ backend กำหนด")));
+
+  return el("div", {}, head, el("div", { class: "grid2" }, left, right));
+}
+
+/* ------------------------------------------------- view: submissions list */
+function viewSubmissions() {
+  const topic = state.data.topic;
+  const subs = state.data.subs || [];
+  const mineOnly = !!state.params.mineOnly;
+
+  // คอลัมน์ preview มาจากฟิลด์ที่ตั้ง is_preview ไว้ (สูงสุด 3)
+  const previewFields = [...(topic.fields || [])].filter((f) => f.is_preview).sort((a, b) => a.position - b.position).slice(0, 3);
+
+  const head = el("div", { class: "page-head" },
+    el("div", {},
+      el("button", { class: "crumb", onClick: () => go("topics") }, "← กลับไปหัวข้อเอกสาร"),
+      el("h1", {}, (mineOnly ? "รายการของฉัน: " : "รายการที่ส่ง: ") + topic.name),
+      el("p", { class: "sub" }, `ทั้งหมด ${subs.length} รายการ`)),
+    el("div", { class: "spacer" }),
+    el("div", { class: "btn-row" },
+      state.me.role === "DIRECTOR"
+        ? el("button", { class: "btn", onClick: () => go("fields", { topicId: topic.uid }) }, "ออกแบบฟอร์ม")
+        : el("button", { class: "btn primary", disabled: !topic.is_active, onClick: () => go("submit", { topicId: topic.uid }) }, "+ ส่งเอกสาร"),
+      el("button", { class: "btn", onClick: reload }, "รีเฟรช")));
+
+  if (!subs.length) {
+    return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "empty" },
+      el("div", { class: "big" }, "📭"), el("p", {}, "ยังไม่มีรายการที่ส่ง"))));
+  }
+
+  const rows = subs.map((s) => {
+    const cells = previewFields.map((pf) => {
+      const pv = (s.preview_values || []).find((v) => v.field_uid === pf.uid);
+      return el("td", {}, pv ? formatValue(pv.value, pf) : el("span", { style: "color:var(--muted)" }, "—"));
+    });
+    const submitter = userById(s.submitted_by);
+    return el("tr", {},
+      ...cells,
+      el("td", {}, submitter ? fullName(submitter) : el("span", { class: "mono" }, s.submitted_by)),
+      el("td", {}, fmtDate(s.created_at)),
+      el("td", { class: "actions" },
+        el("button", { class: "btn sm", onClick: () => go("submissionDetail", { topicId: topic.uid, submissionId: s.uid, mineOnly }) }, "ดูรายละเอียด")));
+  });
+
+  const headerCells = previewFields.length
+    ? previewFields.map((f) => el("th", {}, f.label))
+    : [el("th", {}, "รายการ")];
+  if (!previewFields.length) {
+    // ไม่มีฟิลด์ preview — แสดง uid แทน
+    rows.forEach((tr, i) => tr.insertBefore(el("td", { class: "mono" }, subs[i].uid), tr.firstChild));
+  }
+
+  return el("div", {},
+    head,
+    !previewFields.length
+      ? el("div", { class: "alert info" }, "หัวข้อนี้ยังไม่ได้เลือกฟิลด์ “แสดงในตาราง” — กำหนดได้สูงสุด 3 ฟิลด์ในหน้าออกแบบฟอร์ม เพื่อให้ตารางนี้อ่านง่ายขึ้น")
+      : null,
+    el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", {},
+      el("thead", {}, el("tr", {}, ...headerCells, el("th", {}, "ผู้ส่ง"), el("th", {}, "ส่งเมื่อ"), el("th", { style: "text-align:right" }, "จัดการ"))),
+      el("tbody", {}, ...rows)))));
+}
+
+function formatValue(value, field) {
+  if (value === null || value === undefined || value === "") return "—";
+  if (!field) return String(value);
+  if (field.type === "date") return fmtDateOnly(String(value));
+  if (field.type === "number") return Number(value).toLocaleString("th-TH");
+  if (field.type === "select") {
+    const o = (field.options || []).find((x) => x.value === value);
+    return o ? o.label : String(value);
+  }
+  return String(value);
+}
+
+/* ------------------------------------------------ view: submission detail */
+function viewSubmissionDetail() {
+  const topic = state.data.topic;
+  const sub = state.data.sub;
+  const fields = [...(topic.fields || [])].sort((a, b) => a.position - b.position);
+  const fieldMap = Object.fromEntries(fields.map((f) => [f.uid, f]));
+  const submitter = userById(sub.submitted_by);
+  const origin = originOf(state.baseUrl);
+  const canEdit = state.me.role === "DIRECTOR" || state.me.uid === sub.submitted_by;
+
+  const head = el("div", { class: "page-head" },
+    el("div", {},
+      el("button", { class: "crumb", onClick: () => go("submissions", { topicId: topic.uid, mineOnly: state.params.mineOnly }) }, "← กลับไปรายการ"),
+      el("h1", {}, "รายละเอียดการส่ง"),
+      el("p", { class: "sub" }, topic.name)),
+    el("div", { class: "spacer" }),
+    el("button", { class: "btn", onClick: reload }, "รีเฟรช"));
+
+  // ---- ค่าที่กรอก
+  const valueRows = [];
+  for (const f of fields) {
+    if (f.type === "file") continue;
+    const v = (sub.values || []).find((x) => x.field_uid === f.uid);
+    valueRows.push(el("dt", {}, f.label, f.required ? el("span", { class: "req" }, " *") : null));
+    valueRows.push(el("dd", {}, v ? formatValue(v.value, f) : el("span", { style: "color:var(--muted)" }, "— ไม่ได้กรอก —")));
+  }
+
+  const infoCard = el("div", { class: "card" },
+    el("div", { class: "card-head" }, el("h2", {}, "ข้อมูลที่กรอก")),
+    el("div", { class: "card-body" },
+      valueRows.length ? el("dl", { class: "kv" }, ...valueRows) : el("p", { style: "color:var(--muted)" }, "ไม่มีฟิลด์ข้อมูล")));
+
+  // ---- ไฟล์แนบ
+  const files = sub.files || [];
+  const fileFields = fields.filter((f) => f.type === "file");
+  const filesBox = el("div", {});
+
+  for (const f of fileFields) {
+    const file = files.find((x) => x.field_uid === f.uid);
+    if (file) {
+      filesBox.appendChild(el("div", { class: "file-row" },
+        el("div", { class: "file-ico" }, fileIcon(file.original_filename)),
+        el("div", {},
+          el("div", { style: "font-weight:600" }, file.original_filename),
+          el("div", { class: "mono" }, `${f.label} • ${fmtSize(file.size)} • ${file.content_type}`)),
+        el("div", { class: "spacer" }),
+        el("div", { class: "btn-row" },
+          el("a", { class: "btn sm", href: origin + file.view_url, target: "_blank", rel: "noopener" }, "ดู"),
+          el("a", { class: "btn sm", href: origin + file.download_url }, "ดาวน์โหลด"),
+          canEdit ? el("button", {
+            class: "btn sm danger",
+            onClick: () => confirmDialog(`ลบไฟล์ "${file.original_filename}" ใช่หรือไม่?`, async () => {
+              try { await API.deleteFile(file.uid); toast("ลบไฟล์แล้ว", "ok"); reload(); }
+              catch (e) { toast(thMessage(e), "err"); }
+            }),
+          }, "ลบ") : null)));
+    } else {
+      // ยังไม่มีไฟล์ในฟิลด์นี้ — เปิดให้อัปโหลดเพิ่ม
+      const picker = el("input", { type: "file", accept: ALLOWED_EXT.join(",") });
+      const btn = el("button", { class: "btn sm primary" }, "อัปโหลด");
+      btn.onclick = async () => {
+        if (!picker.files.length) { toast("เลือกไฟล์ก่อน", "err"); return; }
+        btn.disabled = true;
+        const fd = new FormData();
+        fd.append("field_uid", f.uid);
+        fd.append("file", picker.files[0]);
+        try { await API.uploadFile(topic.uid, sub.uid, fd); toast("อัปโหลดสำเร็จ", "ok"); reload(); }
+        catch (e) { toast(thMessage(e), "err"); btn.disabled = false; }
+      };
+      filesBox.appendChild(el("div", { class: "file-row" },
+        el("div", { class: "file-ico" }, "＋"),
+        el("div", { style: "min-width:0;flex:1" },
+          el("div", { style: "font-weight:600" }, f.label,
+            f.required ? el("span", { class: "badge err", style: "margin-left:8px" }, "จำเป็น") : null),
+          el("div", { style: "display:flex;gap:8px;margin-top:6px;align-items:center" },
+            canEdit ? picker : el("span", { class: "mono" }, "ยังไม่มีไฟล์"),
+            canEdit ? btn : null))));
+    }
+  }
+
+  // ไฟล์ที่ไม่ผูกกับฟิลด์ที่รู้จัก (เผื่อฟิลด์ถูกลบไปแล้ว)
+  for (const file of files) {
+    if (fileFields.some((f) => f.uid === file.field_uid)) continue;
+    filesBox.appendChild(el("div", { class: "file-row" },
+      el("div", { class: "file-ico" }, fileIcon(file.original_filename)),
+      el("div", {},
+        el("div", { style: "font-weight:600" }, file.original_filename),
+        el("div", { class: "mono" }, "ฟิลด์ที่ถูกลบไปแล้ว • " + fmtSize(file.size))),
+      el("div", { class: "spacer" }),
+      el("a", { class: "btn sm", href: origin + file.download_url }, "ดาวน์โหลด")));
+  }
+
+  const filesCard = el("div", { class: "card" },
+    el("div", { class: "card-head" }, el("h2", {}, "ไฟล์แนบ"),
+      el("div", { class: "spacer" }), el("span", { class: "badge" }, `${files.length} ไฟล์`)),
+    el("div", { class: "card-body" },
+      fileFields.length || files.length ? filesBox : el("p", { style: "color:var(--muted)" }, "หัวข้อนี้ไม่มีฟิลด์ไฟล์แนบ")));
+
+  const metaCard = el("div", { class: "card" },
+    el("div", { class: "card-head" }, el("h2", {}, "ข้อมูลรายการ")),
+    el("div", { class: "card-body" },
+      el("dl", { class: "kv" },
+        el("dt", {}, "ผู้ส่ง"), el("dd", {}, submitter ? `${fullName(submitter)} (@${submitter.username})` : el("span", { class: "mono" }, sub.submitted_by)),
+        el("dt", {}, "ส่งเมื่อ"), el("dd", {}, fmtDate(sub.created_at)),
+        el("dt", {}, "แก้ไขล่าสุด"), el("dd", {}, fmtDate(sub.updated_at)),
+        el("dt", {}, "รหัสรายการ"), el("dd", { class: "mono" }, sub.uid))));
+
+  return el("div", {}, head, el("div", { class: "grid2" }, el("div", {}, infoCard, el("div", { style: "height:18px" }), filesCard), metaCard));
+}
+
+function fileIcon(name) {
+  const ext = (name || "").toLowerCase().split(".").pop();
+  if (["png", "jpg", "jpeg"].includes(ext)) return "🖼";
+  if (ext === "pdf") return "📕";
+  if (["xls", "xlsx"].includes(ext)) return "📊";
+  if (["mp4", "mov"].includes(ext)) return "🎬";
+  return "📎";
+}
+
+/* ---------------------------------------------- view: เอกสารของฉัน (ครู) */
+function viewMySubmissions() {
+  const rows = state.data.rows || [];
+  const head = el("div", { class: "page-head" },
+    el("div", {}, el("h1", {}, "เอกสารของฉัน"), el("p", { class: "sub" }, `ทั้งหมด ${rows.length} รายการจากทุกหัวข้อ`)),
+    el("div", { class: "spacer" }),
+    el("button", { class: "btn", onClick: reload }, "รีเฟรช"));
+
+  if (!rows.length) {
+    return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "empty" },
+      el("div", { class: "big" }, "📭"), el("p", {}, "ยังไม่ได้ส่งเอกสารใดๆ"),
+      el("div", { style: "margin-top:12px" }, el("button", { class: "btn primary", onClick: () => go("topics") }, "ไปที่หัวข้อเอกสาร")))));
+  }
+
+  const trs = rows.map(({ topic, sub }) =>
+    el("tr", {},
+      el("td", {}, el("div", { style: "font-weight:600" }, topic.name)),
+      el("td", {}, (sub.preview_values || []).length
+        ? el("div", {}, ...sub.preview_values.map((pv) => el("div", {}, el("span", { class: "mono" }, pv.label + ": "), formatValue(pv.value, { type: pv.type }))))
+        : el("span", { style: "color:var(--muted)" }, "—")),
+      el("td", {}, fmtDate(sub.created_at)),
+      el("td", { class: "actions" },
+        el("button", { class: "btn sm", onClick: () => go("submissionDetail", { topicId: topic.uid, submissionId: sub.uid, mineOnly: true }) }, "ดูรายละเอียด"))));
+
+  return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", {},
+    el("thead", {}, el("tr", {}, el("th", {}, "หัวข้อ"), el("th", {}, "ข้อมูลย่อ"), el("th", {}, "ส่งเมื่อ"), el("th", { style: "text-align:right" }, "จัดการ"))),
+    el("tbody", {}, ...trs)))));
+}
+
+/* ---------------------------------------------------------- view: users */
+function viewUsers() {
+  const users = state.data.users || [];
+  const head = el("div", { class: "page-head" },
+    el("div", {}, el("h1", {}, "ผู้ใช้งาน"), el("p", { class: "sub" }, "จัดการบัญชีผู้อำนวยการและครู")),
+    el("div", { class: "spacer" }),
+    el("button", { class: "btn primary", onClick: () => userModal(null, reload) }, "+ เพิ่มผู้ใช้"));
+
+  if (!users.length) {
+    return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "empty" },
+      el("div", { class: "big" }, "👥"), el("p", {}, "ยังไม่มีผู้ใช้"))));
+  }
+
+  const rows = users.map((u) =>
+    el("tr", {},
+      el("td", {}, el("div", { style: "display:flex;align-items:center;gap:10px" },
+        el("span", { class: "avatar" }, initials(u)),
+        el("span", {}, el("div", { style: "font-weight:600" }, fullName(u)), el("div", { class: "mono" }, "@" + u.username)))),
+      el("td", {}, u.employee_code),
+      el("td", {}, el("span", { class: "badge " + (u.role === "DIRECTOR" ? "brand" : "") }, ROLE_LABEL[u.role] || u.role)),
+      el("td", {}, el("span", { class: "badge " + (u.status === "ACTIVE" ? "ok" : "err") }, STATUS_LABEL[u.status] || u.status)),
+      el("td", {}, fmtDate(u.created_at)),
+      el("td", { class: "actions" }, el("div", { class: "btn-row", style: "justify-content:flex-end" },
+        el("button", { class: "btn sm", onClick: () => userModal(u, reload) }, "แก้ไข"),
+        el("button", {
+          class: "btn sm",
+          onClick: async () => {
+            const next = u.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+            try {
+              const updated = await API.updateUserStatus(u.uid, next);
+              if (state.me.uid === u.uid) state.me = updated;
+              toast("อัปเดตสถานะแล้ว", "ok"); reload();
+            } catch (e) { toast(thMessage(e), "err"); }
+          },
+        }, u.status === "ACTIVE" ? "ระงับ" : "เปิดใช้"),
+        el("button", {
+          class: "btn sm danger", disabled: u.uid === state.me.uid,
+          title: u.uid === state.me.uid ? "ลบบัญชีที่กำลังใช้งานอยู่ไม่ได้" : "",
+          onClick: () => confirmDialog(`ลบผู้ใช้ "${fullName(u)}" ใช่หรือไม่?`, async () => {
+            try { await API.deleteUser(u.uid); toast("ลบผู้ใช้แล้ว", "ok"); reload(); }
+            catch (e) { toast(thMessage(e), "err"); }
+          }),
+        }, "ลบ")))));
+
+  return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", {},
+    el("thead", {}, el("tr", {},
+      el("th", {}, "ผู้ใช้"), el("th", {}, "รหัสพนักงาน"), el("th", {}, "บทบาท"),
+      el("th", {}, "สถานะ"), el("th", {}, "สร้างเมื่อ"), el("th", { style: "text-align:right" }, "จัดการ"))),
+    el("tbody", {}, ...rows)))));
+}
+
+function userModal(user, onDone) {
+  const isEdit = !!user;
+  const username = el("input", { type: "text", value: user ? user.username : "", placeholder: "เช่น somchai.k" });
+  const code = el("input", { type: "text", value: user ? user.employee_code : "", placeholder: "เช่น EMP-001" });
+  const prefix = el("input", { type: "text", value: user ? user.prefix : "", placeholder: "นาย / นาง / นางสาว" });
+  const first = el("input", { type: "text", value: user ? user.first_name : "", placeholder: "ชื่อ" });
+  const last = el("input", { type: "text", value: user ? user.last_name : "", placeholder: "นามสกุล" });
+  const role = el("select", {}, el("option", { value: "TEACHER" }, "ครู"), el("option", { value: "DIRECTOR" }, "ผู้อำนวยการ"));
+  role.value = user ? user.role : "TEACHER";
+  const errBox = el("div", {});
+
+  const body = el("div", {}, errBox,
+    el("label", { class: "field" }, el("span", { class: "lbl" }, "ชื่อผู้ใช้ ", el("span", { class: "req" }, "*")), username),
+    el("label", { class: "field" }, el("span", { class: "lbl" }, "รหัสพนักงาน ", el("span", { class: "req" }, "*")), code),
+    el("div", { style: "display:grid;grid-template-columns:110px 1fr 1fr;gap:10px" },
+      el("label", { class: "field" }, el("span", { class: "lbl" }, "คำนำหน้า ", el("span", { class: "req" }, "*")), prefix),
+      el("label", { class: "field" }, el("span", { class: "lbl" }, "ชื่อ ", el("span", { class: "req" }, "*")), first),
+      el("label", { class: "field" }, el("span", { class: "lbl" }, "นามสกุล ", el("span", { class: "req" }, "*")), last)),
+    el("label", { class: "field" }, el("span", { class: "lbl" }, "บทบาท"), role,
+      el("span", { class: "hint" }, "เฉพาะบทบาท “ครู” เท่านั้นที่ส่งเอกสารได้")));
+
+  const save = el("button", { class: "btn primary" }, isEdit ? "บันทึก" : "สร้างผู้ใช้");
+  const cancel = el("button", { class: "btn" }, "ยกเลิก");
+  const m = openModal({ title: isEdit ? "แก้ไขผู้ใช้" : "เพิ่มผู้ใช้ใหม่", body, footer: [cancel, save] });
+  cancel.onclick = m.close;
+  save.onclick = async () => {
+    errBox.innerHTML = "";
+    const payload = {
+      username: username.value.trim(),
+      employee_code: code.value.trim(),
+      prefix: prefix.value.trim(),
+      first_name: first.value.trim(),
+      last_name: last.value.trim(),
+      role: role.value,
+    };
+    save.disabled = true;
+    try {
+      let saved;
+      if (isEdit) { saved = await API.updateUser(user.uid, payload); if (state.me && state.me.uid === user.uid) state.me = saved; }
+      else saved = await API.createUser(payload);
+      m.close(); toast(isEdit ? "บันทึกแล้ว" : "สร้างผู้ใช้แล้ว", "ok");
+      if (onDone) onDone();
+    } catch (e) {
+      errBox.appendChild(el("div", { class: "alert err" }, thMessage(e)));
+      save.disabled = false;
+    }
+  };
+}
+
+/* ------------------------------------------------------------ demo seed */
+async function seedDemoData() {
+  const stamp = Date.now().toString().slice(-5);
+  try {
+    toast("กำลังสร้างข้อมูลตัวอย่าง...");
+    const director = await API.createUser({
+      username: "director" + stamp, employee_code: "DIR-" + stamp,
+      prefix: "นาย", first_name: "สมชาย", last_name: "ผู้บริหาร", role: "DIRECTOR",
+    });
+    await API.createUser({
+      username: "teacher" + stamp, employee_code: "TCH-" + stamp,
+      prefix: "นางสาว", first_name: "สมหญิง", last_name: "ใจดี", role: "TEACHER",
+    });
+
+    const topic = await API.createTopic({
+      name: "แผนการสอน ภาคเรียนที่ 1/" + (new Date().getFullYear() + 543),
+      description: "ส่งแผนการสอนรายวิชาพร้อมไฟล์แนบ",
+    });
+    const fields = [
+      { label: "ชื่อรายวิชา", type: "text", required: true, is_preview: true, position: 0, options: [] },
+      { label: "ระดับชั้น", type: "select", required: true, is_preview: true, position: 1,
+        options: [{ label: "ม.1", value: "m1" }, { label: "ม.2", value: "m2" }, { label: "ม.3", value: "m3" }] },
+      { label: "จำนวนคาบต่อสัปดาห์", type: "number", required: false, is_preview: true, position: 2, options: [] },
+      { label: "วันที่เริ่มใช้แผน", type: "date", required: true, is_preview: false, position: 3, options: [] },
+      { label: "หมายเหตุ", type: "textarea", required: false, is_preview: false, position: 4, options: [] },
+      { label: "ไฟล์แผนการสอน (PDF)", type: "file", required: true, is_preview: false, position: 5, options: [] },
+    ];
+    for (const f of fields) await API.createField(topic.uid, f);
+
+    toast("สร้างข้อมูลตัวอย่างสำเร็จ", "ok");
+    await loadUsersForLogin();
+    render();
+  } catch (e) {
+    toast("สร้างข้อมูลตัวอย่างไม่สำเร็จ: " + thMessage(e), "err");
+  }
+}
+
+/* ------------------------------------------------------------- bootstrap */
+(async function init() {
+  render();
+  try { await API.health(); } catch (_) { /* แสดงสถานะไม่เชื่อมต่อในหน้าล็อกอิน */ }
+  await loadUsersForLogin();
+  render();
+})();
+</script>
+</body>
+</html>
