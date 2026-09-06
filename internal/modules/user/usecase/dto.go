@@ -9,6 +9,7 @@ type CreateUserInput struct {
 	FirstName    string
 	LastName     string
 	Role         domain.Role
+	Password     string
 }
 
 type UpdateUserInput struct {
@@ -22,4 +23,8 @@ type UpdateUserInput struct {
 
 type UpdateUserStatusInput struct {
 	Status domain.Status
+}
+
+type ResetPasswordInput struct {
+	Password string
 }

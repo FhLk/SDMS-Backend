@@ -7,8 +7,7 @@ import (
 )
 
 type CreateSubmissionRequest struct {
-	SubmittedBy uuid.UUID                      `json:"submitted_by"`
-	Values      []CreateSubmissionValueRequest `json:"values"`
+	Values []CreateSubmissionValueRequest `json:"values"`
 }
 
 type CreateSubmissionValueRequest struct {

@@ -6,13 +6,14 @@ func RegisterRoutes(
 	router fiber.Router,
 	handler *SubmissionHandler,
 	fileHandler *SubmissionFileHandler,
+	teacherOnly fiber.Handler,
 ) {
 	submissions := router.Group("/topics/:id/submissions")
 
-	submissions.Post("/", handler.Create)
+	submissions.Post("/", teacherOnly, handler.Create)
 	submissions.Get("/", handler.FindAll)
 
-	submissions.Post("/:submissionID/files", fileHandler.Upload)
+	submissions.Post("/:submissionID/files", teacherOnly, fileHandler.Upload)
 	submissions.Get("/:submissionID/files", fileHandler.FindAll)
 	submissions.Get("/:submissionID", handler.FindByID)
 

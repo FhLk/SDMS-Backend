@@ -174,6 +174,70 @@ func (s *SubmissionFileService) FindByID(
 	return s.fileRepo.FindByID(ctx, fileUID)
 }
 
+func (s *SubmissionFileService) FindByIDForSubmitter(
+	ctx context.Context,
+	fileUID uuid.UUID,
+	submittedBy uuid.UUID,
+) (*submissiondomain.SubmissionFile, error) {
+	file, err := s.fileRepo.FindByID(ctx, fileUID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureFileOwnedBySubmitter(ctx, file, submittedBy); err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+func (s *SubmissionFileService) OpenForSubmitter(
+	ctx context.Context,
+	fileUID uuid.UUID,
+	submittedBy uuid.UUID,
+) (*submissiondomain.SubmissionFile, io.ReadCloser, error) {
+	file, err := s.FindByIDForSubmitter(ctx, fileUID, submittedBy)
+	if err != nil {
+		return nil, nil, err
+	}
+	reader, err := s.storage.Open(ctx, file.StoragePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	return file, reader, nil
+}
+
+func (s *SubmissionFileService) DeleteForSubmitter(
+	ctx context.Context,
+	fileUID uuid.UUID,
+	submittedBy uuid.UUID,
+) error {
+	file, err := s.FindByIDForSubmitter(ctx, fileUID, submittedBy)
+	if err != nil {
+		return err
+	}
+	if err := s.fileRepo.Delete(ctx, fileUID); err != nil {
+		return err
+	}
+	return s.storage.Delete(ctx, file.StoragePath)
+}
+
+func (s *SubmissionFileService) ensureFileOwnedBySubmitter(
+	ctx context.Context,
+	file *submissiondomain.SubmissionFile,
+	submittedBy uuid.UUID,
+) error {
+	field, err := s.fieldRepo.FindByID(ctx, file.FieldUID)
+	if err != nil {
+		return err
+	}
+	_, err = s.submissionRepo.FindByIDAndTopicIDAndSubmittedBy(
+		ctx,
+		file.SubmissionUID,
+		field.TopicUID,
+		submittedBy,
+	)
+	return err
+}
+
 func (s *SubmissionFileService) Open(
 	ctx context.Context,
 	fileUID uuid.UUID,
@@ -207,7 +271,7 @@ func (s *SubmissionFileService) Delete(
 
 func isAllowedUploadExtension(ext string) bool {
 	switch strings.ToLower(ext) {
-	case ".pdf", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".mp4", "mov":
+	case ".pdf", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm", ".mov", ".m4v":
 		return true
 	default:
 		return false

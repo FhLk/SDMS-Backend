@@ -1,8 +1,14 @@
 package http
 
 import (
+	"time"
+
 	"sdms/internal/config"
 	healthhttp "sdms/internal/modules/health/delivery/http"
+	userdomain "sdms/internal/modules/user/domain"
+	userpostgres "sdms/internal/modules/user/repository/postgres"
+	platformauth "sdms/internal/platform/auth"
+	platformmiddleware "sdms/internal/platform/http/middleware"
 	"sdms/internal/platform/http/routes"
 
 	"github.com/gofiber/fiber/v3"
@@ -37,6 +43,7 @@ func NewRouter(db *gorm.DB, configs ...*config.Config) *fiber.App {
 			"Origin",
 			"Content-Type",
 			"Accept",
+			"Authorization",
 			"Range",
 		},
 		ExposeHeaders: []string{
@@ -55,9 +62,23 @@ func NewRouter(db *gorm.DB, configs ...*config.Config) *fiber.App {
 
 	v1.Get("/health", healthHandler.Health)
 
-	routes.NewRouteTopic(v1, db)
-	routes.NewRouteUser(v1, db)
-	routes.NewRouteSubmission(v1, db, cfg.Upload)
+	userRepository := userpostgres.NewUserRepository(db)
+	tokens := platformauth.NewTokenManager(
+		cfg.Auth.JWTSecret,
+		time.Duration(cfg.Auth.TokenTTLHours)*time.Hour,
+	)
+	authMiddleware := platformmiddleware.NewAuth(userRepository, tokens)
+	directorOnly := authMiddleware.RequireRoles(userdomain.RoleDirector)
+	teacherOnly := authMiddleware.RequireRoles(userdomain.RoleTeacher)
+
+	// Register public auth endpoints before the protected group. Fiber executes
+	// middleware/routes in registration order.
+	routes.NewRouteAuth(v1, db, tokens, authMiddleware.RequireAuth)
+	protected := v1.Group("", authMiddleware.RequireAuth)
+
+	routes.NewRouteTopic(protected, db, directorOnly)
+	routes.NewRouteUser(protected, db, directorOnly)
+	routes.NewRouteSubmission(protected, db, cfg.Upload, teacherOnly)
 
 	return app
 }

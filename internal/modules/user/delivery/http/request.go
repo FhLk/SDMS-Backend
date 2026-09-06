@@ -7,6 +7,7 @@ type CreateUserRequest struct {
 	FirstName    string `json:"first_name"`
 	LastName     string `json:"last_name"`
 	Role         string `json:"role"`
+	Password     string `json:"password"`
 }
 
 type UpdateUserRequest struct {
@@ -20,4 +21,8 @@ type UpdateUserRequest struct {
 
 type UpdateUserStatusRequest struct {
 	Status string `json:"status"`
+}
+
+type ResetUserPasswordRequest struct {
+	Password string `json:"password"`
 }

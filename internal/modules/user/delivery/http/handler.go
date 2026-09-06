@@ -18,6 +18,7 @@ type UserUsecase interface {
 	GetByUsername(ctx context.Context, username string) (*domain.User, error)
 	Update(ctx context.Context, id uuid.UUID, input usecase.UpdateUserInput) (*domain.User, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status usecase.UpdateUserStatusInput) (*domain.User, error)
+	ResetPassword(ctx context.Context, id uuid.UUID, input usecase.ResetPasswordInput) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -48,6 +49,7 @@ func (h *userHandler) Create(c fiber.Ctx) error {
 		LastName:     req.LastName,
 		EmployeeCode: req.EmployeeCode,
 		Role:         domain.Role(req.Role),
+		Password:     req.Password,
 	}
 
 	user, err := h.userUsecase.Create(c.Context(), input)
@@ -158,6 +160,24 @@ func (h *userHandler) UpdateStatus(c fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(newUserResponse(user))
 }
 
+func (h *userHandler) ResetPassword(c fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: "invalid user id"})
+	}
+
+	var req ResetUserPasswordRequest
+	if err := c.Bind().Body(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: "invalid request body"})
+	}
+
+	if err := h.userUsecase.ResetPassword(c.Context(), id, usecase.ResetPasswordInput{Password: req.Password}); err != nil {
+		return handleError(c, err)
+	}
+
+	return c.JSON(MessageResponse{Message: "password reset successfully"})
+}
+
 func (h *userHandler) Delete(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -213,7 +233,9 @@ func handleError(c fiber.Ctx, err error) error {
 		errors.Is(err, domain.ErrEmployeeCodeRequired),
 		errors.Is(err, domain.ErrPrefixRequired),
 		errors.Is(err, domain.ErrFirstNameRequired),
-		errors.Is(err, domain.ErrLastNameRequired):
+		errors.Is(err, domain.ErrLastNameRequired),
+		errors.Is(err, domain.ErrPasswordRequired),
+		errors.Is(err, domain.ErrPasswordTooShort):
 		return c.Status(fiber.StatusBadRequest).JSON(
 			ErrorResponse{
 				Message: err.Error(),

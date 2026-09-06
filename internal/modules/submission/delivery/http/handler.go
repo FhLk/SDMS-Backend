@@ -7,6 +7,8 @@ import (
 	submissiondomain "sdms/internal/modules/submission/domain"
 	"sdms/internal/modules/submission/usecase"
 	topicdomain "sdms/internal/modules/topic/domain"
+	userdomain "sdms/internal/modules/user/domain"
+	platformmiddleware "sdms/internal/platform/http/middleware"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
@@ -92,11 +94,19 @@ func (h *SubmissionHandler) Create(c fiber.Ctx) error {
 		)
 	}
 
+	currentUser, ok := platformmiddleware.CurrentUser(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "authentication required"})
+	}
+	if currentUser.Role != userdomain.RoleTeacher {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "forbidden"})
+	}
+
 	submission, err := h.service.Create(
 		c.Context(),
 		topicUID,
 		usecase.CreateSubmissionInput{
-			SubmittedBy: req.SubmittedBy,
+			SubmittedBy: currentUser.UID,
 			Values:      values,
 		},
 	)
@@ -120,30 +130,27 @@ func (h *SubmissionHandler) FindAll(c fiber.Ctx) error {
 		)
 	}
 
+	currentUser, ok := platformmiddleware.CurrentUser(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "authentication required"})
+	}
+
 	var submissions []submissiondomain.Submission
-
-	// Temporary ownership filter until authentication can provide the current user.
-	submittedByParam := c.Query("submitted_by")
-	if submittedByParam == "" {
-		submissions, err = h.service.FindAllByTopicID(
-			c.Context(),
-			topicUID,
-		)
-	} else {
-		submittedBy, parseErr := uuid.Parse(submittedByParam)
-		if parseErr != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(
-				fiber.Map{
-					"message": "invalid submitted_by",
-				},
-			)
+	switch currentUser.Role {
+	case userdomain.RoleTeacher:
+		submissions, err = h.service.FindAllByTopicIDAndSubmittedBy(c.Context(), topicUID, currentUser.UID)
+	case userdomain.RoleDirector:
+		if submittedByParam := c.Query("submitted_by"); submittedByParam != "" {
+			submittedBy, parseErr := uuid.Parse(submittedByParam)
+			if parseErr != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "invalid submitted_by"})
+			}
+			submissions, err = h.service.FindAllByTopicIDAndSubmittedBy(c.Context(), topicUID, submittedBy)
+		} else {
+			submissions, err = h.service.FindAllByTopicID(c.Context(), topicUID)
 		}
-
-		submissions, err = h.service.FindAllByTopicIDAndSubmittedBy(
-			c.Context(),
-			topicUID,
-			submittedBy,
-		)
+	default:
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "forbidden"})
 	}
 
 	if err != nil {
@@ -176,33 +183,21 @@ func (h *SubmissionHandler) FindByID(c fiber.Ctx) error {
 		)
 	}
 
-	var submission *submissiondomain.Submission
-
-	// Temporary ownership check until authentication can provide the current user.
-	submittedByParam := c.Query("submitted_by")
-	if submittedByParam == "" {
-		submission, err = h.service.FindByID(
-			c.Context(),
-			topicUID,
-			submissionUID,
-		)
-	} else {
-		submittedBy, parseErr := uuid.Parse(submittedByParam)
-		if parseErr != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(
-				fiber.Map{
-					"message": "invalid submitted_by",
-				},
-			)
-		}
-
-		submission, err = h.service.FindByIDForSubmitter(
-			c.Context(),
-			topicUID,
-			submissionUID,
-			submittedBy,
-		)
+	currentUser, ok := platformmiddleware.CurrentUser(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "authentication required"})
 	}
+
+	var submission *submissiondomain.Submission
+	switch currentUser.Role {
+	case userdomain.RoleTeacher:
+		submission, err = h.service.FindByIDForSubmitter(c.Context(), topicUID, submissionUID, currentUser.UID)
+	case userdomain.RoleDirector:
+		submission, err = h.service.FindByID(c.Context(), topicUID, submissionUID)
+	default:
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "forbidden"})
+	}
+
 	if err != nil {
 		return handleError(c, err)
 	}
@@ -228,6 +223,10 @@ func handleError(c fiber.Ctx, err error) error {
 	}
 
 	switch {
+	case errors.Is(err, errAuthenticationRequired):
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "authentication required"})
+	case errors.Is(err, errForbidden):
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "forbidden"})
 	case errors.Is(err, topicdomain.ErrTopicNotFound),
 		errors.Is(err, topicdomain.ErrTopicFieldNotFound),
 		errors.Is(err, submissiondomain.ErrSubmissionNotFound),

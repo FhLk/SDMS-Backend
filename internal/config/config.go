@@ -10,6 +10,7 @@ type Config struct {
 	App      AppConfig
 	Database DatabaseConfig
 	Upload   UploadConfig
+	Auth     AuthConfig
 }
 
 type AppConfig struct {
@@ -20,6 +21,11 @@ type AppConfig struct {
 type UploadConfig struct {
 	Dir          string
 	MaxSizeBytes int64
+}
+
+type AuthConfig struct {
+	JWTSecret     string
+	TokenTTLHours int64
 }
 
 type DatabaseConfig struct {
@@ -41,6 +47,10 @@ func Load() *Config {
 		Upload: UploadConfig{
 			Dir:          getEnv("UPLOAD_DIR", "uploads"),
 			MaxSizeBytes: getEnvInt64("UPLOAD_MAX_SIZE_MB", 100) * 1024 * 1024,
+		},
+		Auth: AuthConfig{
+			JWTSecret:     getEnv("AUTH_JWT_SECRET", "dev-only-change-this-secret"),
+			TokenTTLHours: getEnvInt64("AUTH_TOKEN_TTL_HOURS", 24),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),

@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func NewRouteTopic(v1 fiber.Router, db *gorm.DB) {
+func NewRouteTopic(v1 fiber.Router, db *gorm.DB, directorOnly fiber.Handler) {
 	topicRepository := topicpostgres.NewTopicRepository(db)
 	topicFieldRepository := topicpostgres.NewFieldRepository(db)
 	submissionRepository := submissionpostgres.NewSubmissionRepository(db)
@@ -23,5 +23,5 @@ func NewRouteTopic(v1 fiber.Router, db *gorm.DB) {
 
 	topicHandler := topichttp.NewTopicHandler(topicService)
 
-	topichttp.RegisterTopicRoutes(v1, topicHandler)
+	topichttp.RegisterTopicRoutes(v1, topicHandler, directorOnly)
 }

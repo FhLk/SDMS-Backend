@@ -46,4 +46,12 @@ var (
 	ErrEmployeeCodeAlreadyExists = errors.New(
 		"employee code already exists",
 	)
+
+	ErrPasswordRequired = errors.New(
+		"password is required",
+	)
+
+	ErrPasswordTooShort = errors.New(
+		"password must be at least 8 characters",
+	)
 )

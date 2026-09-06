@@ -6,7 +6,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 	keys := []string{
 		"APP_ENV", "APP_PORT", "DB_HOST", "DB_PORT", "DB_USER",
 		"DB_PASSWORD", "DB_NAME", "DB_SSLMODE", "DB_TIMEZONE",
-		"UPLOAD_DIR", "UPLOAD_MAX_SIZE_MB",
+		"UPLOAD_DIR", "UPLOAD_MAX_SIZE_MB", "AUTH_JWT_SECRET", "AUTH_TOKEN_TTL_HOURS",
 	}
 	for _, key := range keys {
 		t.Setenv(key, "")
@@ -29,6 +29,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	if cfg.Upload.Dir != "uploads" || cfg.Upload.MaxSizeBytes != 100*1024*1024 {
 		t.Errorf("upload config = %+v", cfg.Upload)
 	}
+	if cfg.Auth.JWTSecret != "dev-only-change-this-secret" || cfg.Auth.TokenTTLHours != 24 {
+		t.Errorf("auth config = %+v", cfg.Auth)
+	}
 }
 
 func TestLoadUsesEnvironmentValues(t *testing.T) {
@@ -37,6 +40,7 @@ func TestLoadUsesEnvironmentValues(t *testing.T) {
 		"DB_PORT": "6432", "DB_USER": "tester", "DB_PASSWORD": "secret",
 		"DB_NAME": "sdms_test", "DB_SSLMODE": "require", "DB_TIMEZONE": "UTC",
 		"UPLOAD_DIR": "test-uploads", "UPLOAD_MAX_SIZE_MB": "5",
+		"AUTH_JWT_SECRET": "test-jwt-secret", "AUTH_TOKEN_TTL_HOURS": "12",
 	}
 	for key, value := range values {
 		t.Setenv(key, value)
@@ -54,6 +58,9 @@ func TestLoadUsesEnvironmentValues(t *testing.T) {
 	}
 	if cfg.Upload.Dir != "test-uploads" || cfg.Upload.MaxSizeBytes != 5*1024*1024 {
 		t.Errorf("Upload config = %+v", cfg.Upload)
+	}
+	if cfg.Auth.JWTSecret != "test-jwt-secret" || cfg.Auth.TokenTTLHours != 12 {
+		t.Errorf("Auth config = %+v", cfg.Auth)
 	}
 }
 

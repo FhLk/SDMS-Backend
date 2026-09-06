@@ -18,6 +18,7 @@ func NewRouteSubmission(
 	v1 fiber.Router,
 	db *gorm.DB,
 	uploadConfig config.UploadConfig,
+	teacherOnly fiber.Handler,
 ) {
 	submissionRepository := submissionpostgres.NewSubmissionRepository(db)
 	fileRepository := submissionpostgres.NewSubmissionFileRepository(db)
@@ -47,7 +48,7 @@ func NewRouteSubmission(
 	)
 
 	submissionHandler := submissionhttp.NewSubmissionHandler(submissionService)
-	fileHandler := submissionhttp.NewSubmissionFileHandler(fileService)
+	fileHandler := submissionhttp.NewSubmissionFileHandler(fileService, submissionService)
 
-	submissionhttp.RegisterRoutes(v1, submissionHandler, fileHandler)
+	submissionhttp.RegisterRoutes(v1, submissionHandler, fileHandler, teacherOnly)
 }

@@ -10,6 +10,8 @@ import (
 
 	submissiondomain "sdms/internal/modules/submission/domain"
 	"sdms/internal/modules/submission/usecase"
+	userdomain "sdms/internal/modules/user/domain"
+	platformmiddleware "sdms/internal/platform/http/middleware"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
@@ -78,6 +80,30 @@ func (f *fakeSubmissionFileService) FindByID(
 	return nil, nil
 }
 
+func (f *fakeSubmissionFileService) FindByIDForSubmitter(
+	ctx context.Context,
+	fileUID uuid.UUID,
+	_ uuid.UUID,
+) (*submissiondomain.SubmissionFile, error) {
+	return f.FindByID(ctx, fileUID)
+}
+
+func (f *fakeSubmissionFileService) OpenForSubmitter(
+	ctx context.Context,
+	fileUID uuid.UUID,
+	_ uuid.UUID,
+) (*submissiondomain.SubmissionFile, io.ReadCloser, error) {
+	return f.Open(ctx, fileUID)
+}
+
+func (f *fakeSubmissionFileService) DeleteForSubmitter(
+	ctx context.Context,
+	fileUID uuid.UUID,
+	_ uuid.UUID,
+) error {
+	return f.Delete(ctx, fileUID)
+}
+
 func (f *fakeSubmissionFileService) Open(
 	ctx context.Context,
 	fileUID uuid.UUID,
@@ -103,6 +129,10 @@ func newSubmissionFileViewTestApp(
 ) *fiber.App {
 	app := fiber.New()
 	handler := NewSubmissionFileHandler(service)
+	app.Use(func(c fiber.Ctx) error {
+		platformmiddleware.SetCurrentUser(c, &userdomain.User{UID: uuid.New(), Role: userdomain.RoleDirector, Status: userdomain.StatusActive})
+		return c.Next()
+	})
 
 	app.Get(
 		"/api/v1/submission-files/:fileID/view",

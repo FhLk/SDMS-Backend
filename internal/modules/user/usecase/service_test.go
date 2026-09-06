@@ -72,7 +72,7 @@ func (s *userRepositoryStub) Delete(ctx context.Context, id uuid.UUID) error {
 func validCreateInput() CreateUserInput {
 	return CreateUserInput{
 		Username: "somchai", EmployeeCode: "EMP-001", Prefix: "นาย",
-		FirstName: "สมชาย", LastName: "ใจดี", Role: domain.RoleTeacher,
+		FirstName: "สมชาย", LastName: "ใจดี", Role: domain.RoleTeacher, Password: "password123",
 	}
 }
 
@@ -107,7 +107,7 @@ func TestUserServiceCreate(t *testing.T) {
 		service := NewUserService(repo)
 		user, err := service.Create(context.Background(), CreateUserInput{
 			Username: "  somchai  ", EmployeeCode: "  EMP-001  ", Prefix: "  นาย  ",
-			FirstName: "  สมชาย  ", LastName: "  ใจดี  ", Role: " TEACHER ",
+			FirstName: "  สมชาย  ", LastName: "  ใจดี  ", Role: " TEACHER ", Password: "password123",
 		})
 		if err != nil {
 			t.Fatalf("Create() error = %v", err)
@@ -119,6 +119,9 @@ func TestUserServiceCreate(t *testing.T) {
 			user.FirstName != "สมชาย" || user.LastName != "ใจดี" || user.Role != domain.RoleTeacher ||
 			user.Status != domain.StatusActive {
 			t.Errorf("user = %+v", user)
+		}
+		if user.PasswordHash == "" || user.PasswordHash == "password123" {
+			t.Errorf("password was not hashed")
 		}
 	})
 
@@ -133,6 +136,8 @@ func TestUserServiceCreate(t *testing.T) {
 		{"first name required", func(in *CreateUserInput) { in.FirstName = " " }, domain.ErrFirstNameRequired},
 		{"last name required", func(in *CreateUserInput) { in.LastName = " " }, domain.ErrLastNameRequired},
 		{"invalid role", func(in *CreateUserInput) { in.Role = "ADMIN" }, domain.ErrInvalidRole},
+		{"password required", func(in *CreateUserInput) { in.Password = " " }, domain.ErrPasswordRequired},
+		{"password too short", func(in *CreateUserInput) { in.Password = "short" }, domain.ErrPasswordTooShort},
 	}
 	for _, tt := range validationTests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -287,10 +292,10 @@ func TestUserServiceUpdate(t *testing.T) {
 		uniquenessCalled := false
 		updateCalled := false
 		repo := &userRepositoryStub{
-			findByIDFn: func(context.Context, uuid.UUID) (*domain.User, error) { return current, nil },
-			findByUsernameFn: func(context.Context, string) (*domain.User, error) { uniquenessCalled = true; return nil, nil },
+			findByIDFn:           func(context.Context, uuid.UUID) (*domain.User, error) { return current, nil },
+			findByUsernameFn:     func(context.Context, string) (*domain.User, error) { uniquenessCalled = true; return nil, nil },
 			findByEmployeeCodeFn: func(context.Context, string) (*domain.User, error) { uniquenessCalled = true; return nil, nil },
-			updateFn: func(_ context.Context, user *domain.User) error { updateCalled = user == current; return nil },
+			updateFn:             func(_ context.Context, user *domain.User) error { updateCalled = user == current; return nil },
 		}
 		input := validUpdateInput()
 		input.Prefix, input.FirstName, input.LastName, input.Role = " ดร. ", " ใหม่ ", " ทดสอบ ", " DIRECTOR "
@@ -308,11 +313,15 @@ func TestUserServiceUpdate(t *testing.T) {
 		repo := &userRepositoryStub{
 			findByIDFn: func(context.Context, uuid.UUID) (*domain.User, error) { return current, nil },
 			findByUsernameFn: func(_ context.Context, username string) (*domain.User, error) {
-				if username != "newname" { t.Errorf("username = %q", username) }
+				if username != "newname" {
+					t.Errorf("username = %q", username)
+				}
 				return &domain.User{UID: id}, nil
 			},
 			findByEmployeeCodeFn: func(_ context.Context, code string) (*domain.User, error) {
-				if code != "EMP-002" { t.Errorf("code = %q", code) }
+				if code != "EMP-002" {
+					t.Errorf("code = %q", code)
+				}
 				return nil, domain.ErrUserNotFound
 			},
 		}
@@ -340,7 +349,7 @@ func TestUserServiceUpdate(t *testing.T) {
 
 	t.Run("rejects changed duplicate username", func(t *testing.T) {
 		repo := &userRepositoryStub{
-			findByIDFn: func(context.Context, uuid.UUID) (*domain.User, error) { return existing(), nil },
+			findByIDFn:       func(context.Context, uuid.UUID) (*domain.User, error) { return existing(), nil },
 			findByUsernameFn: func(context.Context, string) (*domain.User, error) { return &domain.User{UID: uuid.New()}, nil },
 		}
 		input := validUpdateInput()
@@ -353,7 +362,7 @@ func TestUserServiceUpdate(t *testing.T) {
 
 	t.Run("rejects changed duplicate employee code", func(t *testing.T) {
 		repo := &userRepositoryStub{
-			findByIDFn: func(context.Context, uuid.UUID) (*domain.User, error) { return existing(), nil },
+			findByIDFn:           func(context.Context, uuid.UUID) (*domain.User, error) { return existing(), nil },
 			findByEmployeeCodeFn: func(context.Context, string) (*domain.User, error) { return &domain.User{UID: uuid.New()}, nil },
 		}
 		input := validUpdateInput()
@@ -365,8 +374,8 @@ func TestUserServiceUpdate(t *testing.T) {
 	})
 
 	errorsToPropagate := []struct {
-		name string
-		repo *userRepositoryStub
+		name  string
+		repo  *userRepositoryStub
 		input UpdateUserInput
 	}{
 		{"find", &userRepositoryStub{findByIDFn: func(context.Context, uuid.UUID) (*domain.User, error) { return nil, errors.New("find") }}, validUpdateInput()},
@@ -392,7 +401,7 @@ func TestUserServiceUpdateStatus(t *testing.T) {
 		updated := false
 		repo := &userRepositoryStub{
 			findByIDFn: func(context.Context, uuid.UUID) (*domain.User, error) { return current, nil },
-			updateFn: func(_ context.Context, user *domain.User) error { updated = user == current; return nil },
+			updateFn:   func(_ context.Context, user *domain.User) error { updated = user == current; return nil },
 		}
 		user, err := NewUserService(repo).UpdateStatus(context.Background(), id, UpdateUserStatusInput{Status: " INACTIVE "})
 		if err != nil || user != current || !updated || user.Status != domain.StatusInactive {
@@ -415,14 +424,18 @@ func TestUserServiceUpdateStatus(t *testing.T) {
 	t.Run("propagates find and update errors", func(t *testing.T) {
 		service := NewUserService(&userRepositoryStub{findByIDFn: func(context.Context, uuid.UUID) (*domain.User, error) { return nil, errors.New("find") }})
 		user, err := service.UpdateStatus(context.Background(), id, UpdateUserStatusInput{Status: domain.StatusActive})
-		if err == nil || user != nil { t.Fatalf("find error = %+v, %v", user, err) }
+		if err == nil || user != nil {
+			t.Fatalf("find error = %+v, %v", user, err)
+		}
 
 		service = NewUserService(&userRepositoryStub{
 			findByIDFn: func(context.Context, uuid.UUID) (*domain.User, error) { return &domain.User{UID: id}, nil },
-			updateFn: func(context.Context, *domain.User) error { return errors.New("update") },
+			updateFn:   func(context.Context, *domain.User) error { return errors.New("update") },
 		})
 		user, err = service.UpdateStatus(context.Background(), id, UpdateUserStatusInput{Status: domain.StatusActive})
-		if err == nil || user != nil { t.Fatalf("update error = %+v, %v", user, err) }
+		if err == nil || user != nil {
+			t.Fatalf("update error = %+v, %v", user, err)
+		}
 	})
 }
 
@@ -439,7 +452,7 @@ func TestUserServiceDelete(t *testing.T) {
 		deleted := false
 		repo := &userRepositoryStub{
 			findByIDFn: func(context.Context, uuid.UUID) (*domain.User, error) { return &domain.User{UID: id}, nil },
-			deleteFn: func(_ context.Context, gotID uuid.UUID) error { deleted = gotID == id; return nil },
+			deleteFn:   func(_ context.Context, gotID uuid.UUID) error { deleted = gotID == id; return nil },
 		}
 		if err := NewUserService(repo).Delete(context.Background(), id); err != nil || !deleted {
 			t.Fatalf("Delete() error = %v, deleted=%v", err, deleted)
@@ -450,7 +463,7 @@ func TestUserServiceDelete(t *testing.T) {
 		deleted := false
 		repo := &userRepositoryStub{
 			findByIDFn: func(context.Context, uuid.UUID) (*domain.User, error) { return nil, domain.ErrUserNotFound },
-			deleteFn: func(context.Context, uuid.UUID) error { deleted = true; return nil },
+			deleteFn:   func(context.Context, uuid.UUID) error { deleted = true; return nil },
 		}
 		err := NewUserService(repo).Delete(context.Background(), id)
 		if !errors.Is(err, domain.ErrUserNotFound) || deleted {
@@ -462,7 +475,7 @@ func TestUserServiceDelete(t *testing.T) {
 		wantErr := errors.New("delete")
 		repo := &userRepositoryStub{
 			findByIDFn: func(context.Context, uuid.UUID) (*domain.User, error) { return &domain.User{UID: id}, nil },
-			deleteFn: func(context.Context, uuid.UUID) error { return wantErr },
+			deleteFn:   func(context.Context, uuid.UUID) error { return wantErr },
 		}
 		if err := NewUserService(repo).Delete(context.Background(), id); !errors.Is(err, wantErr) {
 			t.Fatalf("Delete() error = %v", err)

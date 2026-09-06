@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -10,6 +11,8 @@ import (
 
 	submissiondomain "sdms/internal/modules/submission/domain"
 	"sdms/internal/modules/submission/usecase"
+	userdomain "sdms/internal/modules/user/domain"
+	platformmiddleware "sdms/internal/platform/http/middleware"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
@@ -34,6 +37,24 @@ type SubmissionFileService interface {
 		fileUID uuid.UUID,
 	) (*submissiondomain.SubmissionFile, error)
 
+	FindByIDForSubmitter(
+		ctx context.Context,
+		fileUID uuid.UUID,
+		submittedBy uuid.UUID,
+	) (*submissiondomain.SubmissionFile, error)
+
+	OpenForSubmitter(
+		ctx context.Context,
+		fileUID uuid.UUID,
+		submittedBy uuid.UUID,
+	) (*submissiondomain.SubmissionFile, io.ReadCloser, error)
+
+	DeleteForSubmitter(
+		ctx context.Context,
+		fileUID uuid.UUID,
+		submittedBy uuid.UUID,
+	) error
+
 	Open(
 		ctx context.Context,
 		fileUID uuid.UUID,
@@ -46,17 +67,26 @@ type SubmissionFileService interface {
 }
 
 type SubmissionFileHandler struct {
-	service SubmissionFileService
+	service          SubmissionFileService
+	submissionAccess SubmissionService
 }
 
-func NewSubmissionFileHandler(service SubmissionFileService) *SubmissionFileHandler {
-	return &SubmissionFileHandler{service: service}
+func NewSubmissionFileHandler(service SubmissionFileService, accessServices ...SubmissionService) *SubmissionFileHandler {
+	var access SubmissionService
+	if len(accessServices) > 0 {
+		access = accessServices[0]
+	}
+	return &SubmissionFileHandler{service: service, submissionAccess: access}
 }
 
 func (h *SubmissionFileHandler) Upload(c fiber.Ctx) error {
 	topicUID, submissionUID, err := parseTopicAndSubmissionUID(c)
 	if err != nil {
 		return badRequest(c, err.Error())
+	}
+
+	if err := h.authorizeSubmissionAccess(c, topicUID, submissionUID, true); err != nil {
+		return err
 	}
 
 	fieldUID, err := uuid.Parse(c.FormValue("field_uid"))
@@ -106,6 +136,10 @@ func (h *SubmissionFileHandler) FindAll(c fiber.Ctx) error {
 		return badRequest(c, err.Error())
 	}
 
+	if err := h.authorizeSubmissionAccess(c, topicUID, submissionUID, false); err != nil {
+		return err
+	}
+
 	files, err := h.service.FindAll(c.Context(), topicUID, submissionUID)
 	if err != nil {
 		return handleError(c, err)
@@ -124,7 +158,7 @@ func (h *SubmissionFileHandler) FindByID(c fiber.Ctx) error {
 		return badRequest(c, err.Error())
 	}
 
-	file, err := h.service.FindByID(c.Context(), fileUID)
+	file, err := h.findFileForCurrentUser(c, fileUID)
 	if err != nil {
 		return handleError(c, err)
 	}
@@ -139,7 +173,7 @@ func (h *SubmissionFileHandler) View(c fiber.Ctx) error {
 		return badRequest(c, err.Error())
 	}
 
-	file, reader, err := h.service.Open(c.Context(), fileUID)
+	file, reader, err := h.openFileForCurrentUser(c, fileUID)
 	if err != nil {
 		return handleError(c, err)
 	}
@@ -182,7 +216,7 @@ func (h *SubmissionFileHandler) Download(c fiber.Ctx) error {
 		return badRequest(c, err.Error())
 	}
 
-	file, reader, err := h.service.Open(c.Context(), fileUID)
+	file, reader, err := h.openFileForCurrentUser(c, fileUID)
 	if err != nil {
 		return handleError(c, err)
 	}
@@ -198,11 +232,93 @@ func (h *SubmissionFileHandler) Delete(c fiber.Ctx) error {
 		return badRequest(c, err.Error())
 	}
 
-	if err := h.service.Delete(c.Context(), fileUID); err != nil {
+	if err := h.deleteFileForCurrentUser(c, fileUID); err != nil {
 		return handleError(c, err)
 	}
 	return c.SendStatus(fiber.StatusNoContent)
 }
+
+func (h *SubmissionFileHandler) authorizeSubmissionAccess(
+	c fiber.Ctx,
+	topicUID uuid.UUID,
+	submissionUID uuid.UUID,
+	teacherOnly bool,
+) error {
+	user, ok := platformmiddleware.CurrentUser(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "authentication required"})
+	}
+	if teacherOnly && user.Role != userdomain.RoleTeacher {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "forbidden"})
+	}
+	if h.submissionAccess == nil {
+		return nil
+	}
+
+	var err error
+	switch user.Role {
+	case userdomain.RoleDirector:
+		_, err = h.submissionAccess.FindByID(c.Context(), topicUID, submissionUID)
+	case userdomain.RoleTeacher:
+		_, err = h.submissionAccess.FindByIDForSubmitter(c.Context(), topicUID, submissionUID, user.UID)
+	default:
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "forbidden"})
+	}
+	if err != nil {
+		return handleError(c, err)
+	}
+	return nil
+}
+
+func (h *SubmissionFileHandler) findFileForCurrentUser(c fiber.Ctx, fileUID uuid.UUID) (*submissiondomain.SubmissionFile, error) {
+	user, ok := platformmiddleware.CurrentUser(c)
+	if !ok {
+		return nil, errAuthenticationRequired
+	}
+	switch user.Role {
+	case userdomain.RoleDirector:
+		return h.service.FindByID(c.Context(), fileUID)
+	case userdomain.RoleTeacher:
+		return h.service.FindByIDForSubmitter(c.Context(), fileUID, user.UID)
+	default:
+		return nil, errForbidden
+	}
+}
+
+func (h *SubmissionFileHandler) openFileForCurrentUser(c fiber.Ctx, fileUID uuid.UUID) (*submissiondomain.SubmissionFile, io.ReadCloser, error) {
+	user, ok := platformmiddleware.CurrentUser(c)
+	if !ok {
+		return nil, nil, errAuthenticationRequired
+	}
+	switch user.Role {
+	case userdomain.RoleDirector:
+		return h.service.Open(c.Context(), fileUID)
+	case userdomain.RoleTeacher:
+		return h.service.OpenForSubmitter(c.Context(), fileUID, user.UID)
+	default:
+		return nil, nil, errForbidden
+	}
+}
+
+func (h *SubmissionFileHandler) deleteFileForCurrentUser(c fiber.Ctx, fileUID uuid.UUID) error {
+	user, ok := platformmiddleware.CurrentUser(c)
+	if !ok {
+		return errAuthenticationRequired
+	}
+	switch user.Role {
+	case userdomain.RoleDirector:
+		return h.service.Delete(c.Context(), fileUID)
+	case userdomain.RoleTeacher:
+		return h.service.DeleteForSubmitter(c.Context(), fileUID, user.UID)
+	default:
+		return errForbidden
+	}
+}
+
+var (
+	errAuthenticationRequired = errors.New("authentication required")
+	errForbidden              = errors.New("forbidden")
+)
 
 type readCloser struct {
 	io.Reader

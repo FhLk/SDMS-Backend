@@ -9,6 +9,8 @@ import (
 
 	submissiondomain "sdms/internal/modules/submission/domain"
 	"sdms/internal/modules/submission/usecase"
+	userdomain "sdms/internal/modules/user/domain"
+	platformmiddleware "sdms/internal/platform/http/middleware"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
@@ -123,6 +125,13 @@ func (f *fakeSubmissionService) FindByIDForSubmitter(
 	return nil, nil
 }
 
+func attachSubmissionTestUser(app *fiber.App, userID uuid.UUID, role userdomain.Role) {
+	app.Use(func(c fiber.Ctx) error {
+		platformmiddleware.SetCurrentUser(c, &userdomain.User{UID: userID, Role: role, Status: userdomain.StatusActive})
+		return c.Next()
+	})
+}
+
 func TestSubmissionHandlerCreateSuccess(t *testing.T) {
 	topicUID := uuid.New()
 	userUID := uuid.New()
@@ -154,6 +163,7 @@ func TestSubmissionHandlerCreateSuccess(t *testing.T) {
 	handler := NewSubmissionHandler(service)
 
 	app := fiber.New()
+	attachSubmissionTestUser(app, userUID, userdomain.RoleTeacher)
 
 	app.Post(
 		"/topics/:id/submissions",
@@ -253,6 +263,7 @@ func TestSubmissionHandlerCreateInvalidValue(t *testing.T) {
 	handler := NewSubmissionHandler(service)
 
 	app := fiber.New()
+	attachSubmissionTestUser(app, uuid.New(), userdomain.RoleTeacher)
 
 	app.Post(
 		"/topics/:id/submissions",
@@ -343,6 +354,7 @@ func TestSubmissionHandlerFieldValidationErrorIncludesFieldMetadata(t *testing.T
 
 	handler := NewSubmissionHandler(service)
 	app := fiber.New()
+	attachSubmissionTestUser(app, uuid.New(), userdomain.RoleTeacher)
 	app.Post("/topics/:id/submissions", handler.Create)
 
 	req := httptest.NewRequest(
@@ -402,6 +414,7 @@ func TestSubmissionHandlerFindAllFiltersBySubmittedBy(t *testing.T) {
 
 	handler := NewSubmissionHandler(service)
 	app := fiber.New()
+	attachSubmissionTestUser(app, teacherUID, userdomain.RoleTeacher)
 	app.Get("/topics/:id/submissions", handler.FindAll)
 
 	req := httptest.NewRequest(
@@ -426,6 +439,7 @@ func TestSubmissionHandlerFindAllFiltersBySubmittedBy(t *testing.T) {
 func TestSubmissionHandlerFindAllRejectsInvalidSubmittedBy(t *testing.T) {
 	handler := NewSubmissionHandler(&fakeSubmissionService{})
 	app := fiber.New()
+	attachSubmissionTestUser(app, uuid.New(), userdomain.RoleDirector)
 	app.Get("/topics/:id/submissions", handler.FindAll)
 
 	req := httptest.NewRequest(
@@ -471,6 +485,7 @@ func TestSubmissionHandlerFindByIDFiltersBySubmittedBy(t *testing.T) {
 
 	handler := NewSubmissionHandler(service)
 	app := fiber.New()
+	attachSubmissionTestUser(app, teacherUID, userdomain.RoleTeacher)
 	app.Get("/topics/:id/submissions/:submissionID", handler.FindByID)
 
 	req := httptest.NewRequest(
@@ -506,6 +521,7 @@ func TestSubmissionHandlerFindByIDReturnsNotFoundForDifferentSubmitter(t *testin
 
 	handler := NewSubmissionHandler(service)
 	app := fiber.New()
+	attachSubmissionTestUser(app, uuid.New(), userdomain.RoleTeacher)
 	app.Get("/topics/:id/submissions/:submissionID", handler.FindByID)
 
 	req := httptest.NewRequest(

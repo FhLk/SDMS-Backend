@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"sdms/internal/modules/user/domain"
 
 	"github.com/google/uuid"
@@ -52,6 +54,11 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*domai
 		return nil, err
 	}
 
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+
 	user := &domain.User{
 		UID:          uuid.New(),
 		Username:     input.Username,
@@ -61,6 +68,7 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*domai
 		LastName:     input.LastName,
 		Role:         input.Role,
 		Status:       domain.StatusActive,
+		PasswordHash: string(passwordHash),
 	}
 
 	if err := s.repo.Create(ctx, user); err != nil {
@@ -207,6 +215,31 @@ func (s *UserService) UpdateStatus(ctx context.Context, id uuid.UUID, input Upda
 }
 
 // ============================================================
+// Reset Password
+// ============================================================
+
+func (s *UserService) ResetPassword(ctx context.Context, id uuid.UUID, input ResetPasswordInput) error {
+	if id == uuid.Nil {
+		return domain.ErrInvalidUserID
+	}
+	if err := validatePassword(input.Password); err != nil {
+		return err
+	}
+
+	user, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	user.PasswordHash = string(passwordHash)
+	return s.repo.Update(ctx, user)
+}
+
+// ============================================================
 // Delete
 // ============================================================
 
@@ -303,6 +336,10 @@ func validateCreateInput(input CreateUserInput) error {
 		return domain.ErrInvalidRole
 	}
 
+	if err := validatePassword(input.Password); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -331,6 +368,16 @@ func validateUpdateInput(input UpdateUserInput) error {
 		return domain.ErrInvalidRole
 	}
 
+	return nil
+}
+
+func validatePassword(password string) error {
+	if strings.TrimSpace(password) == "" {
+		return domain.ErrPasswordRequired
+	}
+	if len(password) < 8 {
+		return domain.ErrPasswordTooShort
+	}
 	return nil
 }
 

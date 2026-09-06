@@ -111,7 +111,7 @@ func (s *topicServiceStub) DeleteField(ctx context.Context, topicID, fieldID uui
 
 func newTopicTestApp(service TopicService) *fiber.App {
 	app := fiber.New()
-	RegisterTopicRoutes(app.Group("/api/v1"), NewTopicHandler(service))
+	RegisterTopicRoutes(app.Group("/api/v1"), NewTopicHandler(service), func(c fiber.Ctx) error { return c.Next() })
 	return app
 }
 
