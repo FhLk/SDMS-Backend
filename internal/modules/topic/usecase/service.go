@@ -8,8 +8,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const maxPreviewFieldsPerTopic = 3
-
 type SubmissionLookupRepository interface {
 	HasAnyByTopicID(ctx context.Context, topicUID uuid.UUID) (bool, error)
 }
@@ -80,11 +78,6 @@ func (s *TopicService) CreateField(ctx context.Context, topicUID uuid.UUID, inpu
 	}
 
 	field.IsPreview = input.IsPreview
-	if field.IsPreview {
-		if err := s.ensurePreviewLimit(ctx, topicUID, uuid.Nil); err != nil {
-			return nil, err
-		}
-	}
 
 	if err := s.fieldRepo.Create(ctx, field); err != nil {
 		return nil, err
@@ -184,11 +177,6 @@ func (s *TopicService) UpdateField(ctx context.Context, topicID uuid.UUID, field
 	}
 
 	candidate.IsPreview = input.IsPreview
-	if candidate.IsPreview {
-		if err := s.ensurePreviewLimit(ctx, topicID, fieldID); err != nil {
-			return nil, err
-		}
-	}
 
 	if candidate.Type != field.Type {
 		hasSubmissions, err := s.topicHasSubmissions(ctx, topicID)
@@ -222,34 +210,6 @@ func (s *TopicService) DeleteField(ctx context.Context, topicID uuid.UUID, field
 	}
 
 	return s.fieldRepo.Delete(ctx, fieldID)
-}
-
-func (s *TopicService) ensurePreviewLimit(
-	ctx context.Context,
-	topicID uuid.UUID,
-	excludeFieldID uuid.UUID,
-) error {
-	fields, err := s.fieldRepo.FindAllByTopicID(ctx, topicID)
-	if err != nil {
-		return err
-	}
-
-	previewCount := 0
-	for _, field := range fields {
-		if field.UID == excludeFieldID {
-			continue
-		}
-
-		if field.IsPreview {
-			previewCount++
-		}
-	}
-
-	if previewCount >= maxPreviewFieldsPerTopic {
-		return domain.ErrTopicFieldPreviewLimit
-	}
-
-	return nil
 }
 
 func (s *TopicService) topicHasSubmissions(ctx context.Context, topicID uuid.UUID) (bool, error) {

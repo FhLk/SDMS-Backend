@@ -74,3 +74,38 @@ func TestNewSubmissionListResponseIncludesOnlySelectedPreviewValuesInFieldPositi
 		t.Fatalf("unexpected second preview value: %+v", preview[1])
 	}
 }
+
+func TestNewSubmissionListResponseIncludesAllPreviewValuesWithoutLimit(t *testing.T) {
+	topicUID := uuid.New()
+	submissionUID := uuid.New()
+	teacherUID := uuid.New()
+
+	values := make([]domain.SubmissionValue, 0, 5)
+	for i := 0; i < 5; i++ {
+		text := string(rune('A' + i))
+		values = append(values, domain.SubmissionValue{
+			FieldUID:       uuid.New(),
+			FieldLabel:     "preview field",
+			FieldType:      "text",
+			FieldIsPreview: true,
+			FieldPosition:  i,
+			TextValue:      &text,
+		})
+	}
+
+	response := newSubmissionListResponse([]domain.Submission{{
+		UID:         submissionUID,
+		TopicUID:    topicUID,
+		SubmittedBy: teacherUID,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Values:      values,
+	}})
+
+	if len(response) != 1 {
+		t.Fatalf("expected 1 submission, got %d", len(response))
+	}
+	if got := len(response[0].PreviewValues); got != 5 {
+		t.Fatalf("expected all 5 preview values, got %d", got)
+	}
+}

@@ -376,8 +376,7 @@ func handleError(c fiber.Ctx, err error) error {
 		errors.Is(err, domain.ErrTopicFieldSelectOptionLabelRequired),
 		errors.Is(err, domain.ErrTopicFieldSelectOptionValueRequired),
 		errors.Is(err, domain.ErrTopicFieldSelectOptionDuplicateValue),
-		errors.Is(err, domain.ErrTopicFieldOptionsOnlyForSelect),
-		errors.Is(err, domain.ErrTopicFieldPreviewLimit):
+		errors.Is(err, domain.ErrTopicFieldOptionsOnlyForSelect):
 
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),

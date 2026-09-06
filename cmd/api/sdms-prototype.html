@@ -309,7 +309,6 @@ const ERR_TH = {
   "invalid topic field type": "ชนิดฟิลด์ไม่ถูกต้อง",
   "topic field type cannot be changed after submissions exist": "เปลี่ยนชนิดฟิลด์ไม่ได้ เพราะมีการส่งข้อมูลเข้ามาแล้ว",
   "topic field cannot be deleted after submissions exist": "ลบฟิลด์ไม่ได้ เพราะมีการส่งข้อมูลเข้ามาแล้ว",
-  "a topic can have at most 3 preview fields": "หนึ่งหัวข้อกำหนดฟิลด์แสดงในตารางได้สูงสุด 3 ฟิลด์",
   "select field requires at least one option": "ฟิลด์แบบตัวเลือกต้องมีอย่างน้อย 1 ตัวเลือก",
   "select option label is required": "กรุณากรอกป้ายกำกับของตัวเลือก",
   "select option value is required": "กรุณากรอกค่าของตัวเลือก",
@@ -840,7 +839,7 @@ function viewFields() {
     el("div", { class: "card-head" },
       el("h2", {}, "ฟิลด์ทั้งหมด"),
       el("div", { class: "spacer" }),
-      el("span", { class: "badge " + (previewCount >= 3 ? "warn" : "") }, `ฟิลด์แสดงในตาราง ${previewCount}/3`)),
+      el("span", { class: "badge" }, `ฟิลด์แสดงในตาราง ${previewCount}`)),
     table);
 
   const right = el("div", { class: "card" },
@@ -855,16 +854,12 @@ function viewFields() {
 
 function fieldModal(topic, field, allFields) {
   const isEdit = !!field;
-  const usedPreview = allFields.filter((f) => f.is_preview && (!field || f.uid !== field.uid)).length;
-  const previewFull = usedPreview >= 3;
-
   const label = el("input", { type: "text", value: field ? field.label : "", placeholder: "เช่น ชื่อรายวิชา" });
   const type = el("select", {}, ...FIELD_TYPES.map((t) => el("option", { value: t.value }, t.label)));
   type.value = field ? field.type : "text";
   const position = el("input", { type: "number", min: "0", value: field ? field.position : (allFields.length ? Math.max(...allFields.map((f) => f.position)) + 1 : 0) });
   const required = el("input", { type: "checkbox" }); required.checked = field ? field.required : false;
   const isPreview = el("input", { type: "checkbox" }); isPreview.checked = field ? field.is_preview : false;
-  if (previewFull && !isPreview.checked) isPreview.disabled = true;
 
   const optsBox = el("div", {});
   const optsWrap = el("div", { class: "field", style: "display:none" },
@@ -903,8 +898,7 @@ function fieldModal(topic, field, allFields) {
     optsWrap,
     el("label", { class: "field" }, el("span", { class: "lbl" }, "ลำดับการแสดงผล"), position),
     el("label", { class: "check" }, required, "บังคับกรอก"),
-    el("label", { class: "check" }, isPreview, "แสดงคอลัมน์นี้ในตารางรายการที่ส่ง",
-      previewFull && !isPreview.checked ? el("span", { class: "badge warn" }, "ครบ 3 ฟิลด์แล้ว") : null));
+    el("label", { class: "check" }, isPreview, "แสดงคอลัมน์นี้ในตารางรายการที่ส่ง"));
   syncType();
 
   const save = el("button", { class: "btn primary" }, isEdit ? "บันทึก" : "เพิ่มฟิลด์");
@@ -1107,8 +1101,8 @@ function viewSubmissions() {
   const subs = state.data.subs || [];
   const mineOnly = !!state.params.mineOnly;
 
-  // คอลัมน์ preview มาจากฟิลด์ที่ตั้ง is_preview ไว้ (สูงสุด 3)
-  const previewFields = [...(topic.fields || [])].filter((f) => f.is_preview).sort((a, b) => a.position - b.position).slice(0, 3);
+  // คอลัมน์ preview มาจากทุกฟิลด์ที่ตั้ง is_preview ไว้
+  const previewFields = [...(topic.fields || [])].filter((f) => f.is_preview).sort((a, b) => a.position - b.position);
 
   const head = el("div", { class: "page-head" },
     el("div", {},
@@ -1152,7 +1146,7 @@ function viewSubmissions() {
   return el("div", {},
     head,
     !previewFields.length
-      ? el("div", { class: "alert info" }, "หัวข้อนี้ยังไม่ได้เลือกฟิลด์ “แสดงในตาราง” — กำหนดได้สูงสุด 3 ฟิลด์ในหน้าออกแบบฟอร์ม เพื่อให้ตารางนี้อ่านง่ายขึ้น")
+      ? el("div", { class: "alert info" }, "หัวข้อนี้ยังไม่ได้เลือกฟิลด์ “แสดงในตาราง” — เลือกฟิลด์ที่ต้องการได้จากหน้าออกแบบฟอร์ม")
       : null,
     el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", {},
       el("thead", {}, el("tr", {}, ...headerCells, el("th", {}, "ผู้ส่ง"), el("th", {}, "ส่งเมื่อ"), el("th", { style: "text-align:right" }, "จัดการ"))),

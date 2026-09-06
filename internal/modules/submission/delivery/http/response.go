@@ -133,7 +133,7 @@ func newSubmissionListResponse(
 		previewValues := make(
 			[]SubmissionPreviewValueResponse,
 			0,
-			3,
+			len(values),
 		)
 
 		for _, value := range values {
@@ -146,9 +146,6 @@ func newSubmissionListResponse(
 				newSubmissionPreviewValueResponse(value),
 			)
 
-			if len(previewValues) == 3 {
-				break
-			}
 		}
 
 		response = append(

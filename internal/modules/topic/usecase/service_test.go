@@ -627,22 +627,18 @@ func TestDeleteFieldBlocksDeleteAfterSubmission(t *testing.T) {
 	}
 }
 
-func TestCreateFieldRejectsMoreThanThreePreviewFields(t *testing.T) {
+func TestCreateFieldAllowsMoreThanThreePreviewFields(t *testing.T) {
 	topicID := uuid.New()
 	createCalled := false
 
 	service := NewTopicService(
 		&topicRepositoryStub{},
 		&fieldRepositoryStub{
-			findAllByTopicIDFn: func(context.Context, uuid.UUID) ([]domain.TopicField, error) {
-				return []domain.TopicField{
-					{UID: uuid.New(), TopicUID: topicID, IsPreview: true},
-					{UID: uuid.New(), TopicUID: topicID, IsPreview: true},
-					{UID: uuid.New(), TopicUID: topicID, IsPreview: true},
-				}, nil
-			},
-			createFn: func(context.Context, *domain.TopicField) error {
+			createFn: func(_ context.Context, field *domain.TopicField) error {
 				createCalled = true
+				if !field.IsPreview {
+					t.Fatal("expected created field to be marked as preview")
+				}
 				return nil
 			},
 		},
@@ -653,10 +649,13 @@ func TestCreateFieldRejectsMoreThanThreePreviewFields(t *testing.T) {
 		Type:      domain.FieldTypeText,
 		IsPreview: true,
 	})
-	if !errors.Is(err, domain.ErrTopicFieldPreviewLimit) || field != nil {
-		t.Fatalf("CreateField() = %+v, %v", field, err)
+	if err != nil {
+		t.Fatalf("CreateField() error = %v", err)
 	}
-	if createCalled {
-		t.Fatal("field repository Create should not be called")
+	if field == nil || !field.IsPreview {
+		t.Fatalf("CreateField() = %+v", field)
+	}
+	if !createCalled {
+		t.Fatal("field repository Create should be called")
 	}
 }
