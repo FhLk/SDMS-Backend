@@ -3,1460 +3,2255 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SDMS Prototype — School Document Management System</title>
+<title>SDMS · ระบบจัดการเอกสารโรงเรียน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #f4f6fb;
-    --panel: #ffffff;
-    --ink: #16202e;
-    --muted: #6b7891;
-    --line: #e3e8f0;
-    --brand: #3f51b5;
-    --brand-dark: #32409a;
-    --brand-soft: #eef1fc;
-    --ok: #147a52;
-    --ok-soft: #e6f5ee;
-    --warn: #9a6212;
-    --warn-soft: #fdf3e2;
-    --err: #b3261e;
-    --err-soft: #fdecea;
-    --radius: 10px;
-    --shadow: 0 1px 2px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.06);
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: "Sarabun", "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    font-size: 14px;
-    line-height: 1.55;
-  }
-  a { color: var(--brand); }
-  h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -.01em; }
-  h1 { font-size: 20px; }
-  h2 { font-size: 17px; }
-  h3 { font-size: 15px; }
-  p { margin: 0; }
+:root{
+  --navy:#1b3a6b;
+  --navy-700:#16305a;
+  --navy-50:#eef3fa;
+  --gold:#b8862b;
+  --ink:#1a2233;
+  --muted:#5c6b82;
+  --faint:#8895a8;
+  --line:#dde4ee;
+  --line-soft:#eaeff6;
+  --bg:#f4f6fa;
+  --card:#ffffff;
+  --ok:#1c7a4f;
+  --ok-bg:#e7f5ee;
+  --warn:#96650b;
+  --warn-bg:#fdf4e3;
+  --danger:#b02a2a;
+  --danger-bg:#fdecec;
+  --info-bg:#eaf1fb;
+  --radius:10px;
+  --shadow:0 1px 2px rgba(20,35,60,.06), 0 4px 14px rgba(20,35,60,.05);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:"Sarabun","Noto Sans Thai",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:15px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{margin:0;font-weight:600;line-height:1.35}
+p{margin:0}
+a{color:var(--navy);text-decoration:none}
+a:hover{text-decoration:underline}
+[hidden]{display:none !important}
+button{font-family:inherit;font-size:inherit}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#c8d2e0;border-radius:8px;border:2px solid var(--bg)}
 
-  /* ---------- layout ---------- */
-  .topbar {
-    display: flex; align-items: center; gap: 16px;
-    padding: 10px 20px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--line);
-    position: sticky; top: 0; z-index: 30;
-  }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
-  .brand .logo {
-    width: 30px; height: 30px; border-radius: 8px;
-    background: var(--brand); color: #fff;
-    display: grid; place-items: center; font-size: 13px; font-weight: 700;
-  }
-  .brand small { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
-  .topbar .spacer { flex: 1; }
-  .conn { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #c3cad6; }
-  .dot.on { background: #22c55e; }
-  .dot.off { background: #ef4444; }
-  .whoami { display: flex; align-items: center; gap: 10px; }
-  .avatar {
-    width: 32px; height: 32px; border-radius: 50%;
-    background: var(--brand-soft); color: var(--brand-dark);
-    display: grid; place-items: center; font-weight: 700; font-size: 12px;
-  }
-  .whoami .name { font-weight: 600; line-height: 1.2; }
-  .whoami .sub { font-size: 11px; color: var(--muted); line-height: 1.2; }
+/* ---------- form controls ---------- */
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field > label{font-size:13.5px;font-weight:600;color:var(--ink)}
+.field .hint{font-size:12.5px;color:var(--faint)}
+.req{color:var(--danger);margin-left:2px}
+input[type=text],input[type=password],input[type=number],input[type=date],input[type=search],select,textarea{
+  width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;
+  font-family:inherit;font-size:14.5px;color:var(--ink);outline:none;transition:border-color .15s, box-shadow .15s;
+}
+textarea{min-height:96px;resize:vertical}
+input:focus,select:focus,textarea:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(27,58,107,.12)}
+input:disabled,select:disabled,textarea:disabled{background:#f5f7fa;color:var(--faint)}
+input.invalid,select.invalid,textarea.invalid{border-color:var(--danger);box-shadow:0 0 0 3px rgba(176,42,42,.1)}
+.field-error{font-size:12.5px;color:var(--danger);font-weight:500}
+.check{display:flex;align-items:flex-start;gap:9px;font-size:14px;cursor:pointer;user-select:none}
+.check input{margin:4px 0 0;width:16px;height:16px;accent-color:var(--navy);cursor:pointer}
+.check span small{display:block;color:var(--faint);font-size:12.5px}
+input[type=file]{
+  width:100%;padding:8px;border:1px dashed var(--line);border-radius:8px;background:#fbfcfe;font-size:14px;
+}
 
-  .shell { display: flex; min-height: calc(100vh - 51px); }
-  .sidebar {
-    width: 226px; flex: 0 0 226px;
-    background: var(--panel);
-    border-right: 1px solid var(--line);
-    padding: 16px 12px;
-  }
-  .nav-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 8px 10px 4px; }
-  .nav-item {
-    display: flex; align-items: center; gap: 10px;
-    width: 100%; text-align: left;
-    padding: 9px 10px; margin-bottom: 2px;
-    border: 0; border-radius: 8px; background: transparent;
-    color: var(--ink); font: inherit; cursor: pointer;
-  }
-  .nav-item:hover { background: #f1f4f9; }
-  .nav-item.active { background: var(--brand-soft); color: var(--brand-dark); font-weight: 600; }
-  .nav-item .ico { width: 18px; text-align: center; }
-  .main { flex: 1; padding: 22px 26px 60px; min-width: 0; }
-  .page-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
-  .page-head .spacer { flex: 1; }
-  .page-head .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
-  .crumb { background: none; border: 0; color: var(--brand); cursor: pointer; font: inherit; padding: 0; margin-bottom: 6px; }
-  .crumb:hover { text-decoration: underline; }
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:9px 15px;border-radius:8px;border:1px solid transparent;background:var(--navy);color:#fff;
+  font-weight:600;font-size:14px;cursor:pointer;transition:background .15s,border-color .15s,color .15s;white-space:nowrap;
+}
+.btn:hover{background:var(--navy-700)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn.ghost{background:#fff;color:var(--navy);border-color:var(--line)}
+.btn.ghost:hover{background:var(--navy-50);border-color:#c4d2e6}
+.btn.subtle{background:transparent;color:var(--muted);border-color:transparent;padding:7px 10px}
+.btn.subtle:hover{background:#eef1f6;color:var(--ink)}
+.btn.danger{background:var(--danger)}
+.btn.danger:hover{background:#8f2020}
+.btn.danger-ghost{background:#fff;color:var(--danger);border-color:#f0cccc}
+.btn.danger-ghost:hover{background:var(--danger-bg)}
+.btn.sm{padding:6px 11px;font-size:13px;border-radius:7px}
+.btn.block{width:100%}
 
-  /* ---------- primitives ---------- */
-  .card {
-    background: var(--panel); border: 1px solid var(--line);
-    border-radius: var(--radius); box-shadow: var(--shadow);
-  }
-  .card-head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
-  .card-head .spacer { flex: 1; }
-  .card-body { padding: 16px; }
-  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; align-items: start; }
+/* ---------- badges / pills ---------- */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:12.5px;font-weight:600;line-height:1.7;white-space:nowrap}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}
+.badge.off{background:#eef1f6;color:var(--muted)}
+.badge.warn{background:var(--warn-bg);color:var(--warn)}
+.badge.navy{background:var(--navy-50);color:var(--navy)}
+.badge.gold{background:#fbf3e2;color:var(--gold)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.chip{display:inline-block;padding:1px 8px;border-radius:6px;background:#eef1f6;color:var(--muted);font-size:12px;font-weight:600}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
 
-  button { font-family: inherit; }
-  .btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 8px 13px; border-radius: 8px; border: 1px solid var(--line);
-    background: var(--panel); color: var(--ink);
-    font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
-  }
-  .btn:hover { background: #f5f7fb; }
-  .btn:disabled { opacity: .5; cursor: not-allowed; }
-  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
-  .btn.primary:hover { background: var(--brand-dark); }
-  .btn.danger { color: var(--err); border-color: #f0c8c5; }
-  .btn.danger:hover { background: var(--err-soft); }
-  .btn.sm { padding: 5px 9px; font-size: 12px; }
-  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
-  td.actions .btn-row, .file-row .btn-row { flex-wrap: nowrap; }
+/* ---------- login ---------- */
+.login-wrap{min-height:100vh;display:grid;grid-template-columns:1fr;place-items:center;padding:24px;
+  background:linear-gradient(160deg,#1b3a6b 0%,#24518f 55%,#2f5ea1 100%)}
+.login-card{width:100%;max-width:430px;background:#fff;border-radius:14px;padding:30px 28px;box-shadow:0 18px 50px rgba(10,25,50,.28)}
+.login-brand{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.login-seal{width:46px;height:46px;border-radius:12px;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:700;font-size:17px;letter-spacing:.5px}
+.login-title{font-size:19px;font-weight:700}
+.login-sub{font-size:13px;color:var(--muted)}
+.login-card form{margin-top:20px}
+.login-foot{margin-top:16px;padding-top:14px;border-top:1px solid var(--line-soft);font-size:12.5px;color:var(--faint)}
+details.setup{margin-top:12px;border:1px solid var(--line);border-radius:8px;background:#fbfcfe}
+details.setup summary{cursor:pointer;padding:9px 12px;font-size:13px;font-weight:600;color:var(--muted);list-style:none}
+details.setup summary::-webkit-details-marker{display:none}
+details.setup summary::before{content:"⚙  "}
+details.setup .body{padding:0 12px 12px}
+details.setup pre{margin:8px 0 0;padding:9px;background:#f2f5f9;border-radius:6px;font-size:11.5px;overflow-x:auto;color:var(--muted)}
 
-  label.field { display: block; margin-bottom: 14px; }
-  label.field > .lbl { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 5px; }
-  label.field > .hint { display: block; font-size: 11.5px; color: var(--muted); margin-top: 4px; }
-  input[type=text], input[type=number], input[type=date], input[type=file], select, textarea {
-    width: 100%; padding: 8px 10px;
-    border: 1px solid var(--line); border-radius: 8px;
-    background: #fff; color: var(--ink); font: inherit;
-  }
-  input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand-soft); border-color: var(--brand); }
-  textarea { min-height: 84px; resize: vertical; }
-  .check { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 13px; }
-  .check input { width: 16px; height: 16px; }
-  .req { color: var(--err); }
+/* ---------- shell ---------- */
+.topbar{
+  height:58px;background:var(--navy);color:#fff;display:flex;align-items:center;
+  gap:14px;padding:0 18px;position:sticky;top:0;z-index:40;
+}
+.topbar .seal{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.14);display:grid;place-items:center;font-weight:700;font-size:13px}
+.topbar .brand{font-weight:600;font-size:15.5px;letter-spacing:.2px}
+.topbar .brand small{display:block;font-weight:400;font-size:11.5px;opacity:.72;letter-spacing:.3px}
+.topbar .spacer{flex:1}
+.topbar .who{display:flex;align-items:center;gap:10px;font-size:13.5px}
+.topbar .who .avatar{width:32px;height:32px;border-radius:50%;background:var(--gold);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px}
+.topbar .who .meta{line-height:1.35;text-align:right}
+.topbar .who .meta b{font-weight:600;display:block}
+.topbar .who .meta span{opacity:.75;font-size:11.5px}
+.topbar .logout{background:rgba(255,255,255,.12);border:none;color:#fff;padding:7px 12px;border-radius:7px;cursor:pointer;font-weight:600;font-size:13px}
+.topbar .logout:hover{background:rgba(255,255,255,.22)}
+.burger{display:none;background:rgba(255,255,255,.12);border:none;color:#fff;width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:16px}
 
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-  th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; background: #fafbfd; }
-  tbody tr:hover { background: #fafbfe; }
-  td.actions { text-align: right; white-space: nowrap; }
-  .table-wrap { overflow-x: auto; }
+.layout{display:grid;grid-template-columns:232px 1fr;align-items:start}
+.sidebar{position:sticky;top:58px;height:calc(100vh - 58px);background:#fff;border-right:1px solid var(--line);padding:16px 12px;overflow-y:auto}
+.sidebar .group{font-size:11px;font-weight:700;letter-spacing:.9px;color:var(--faint);text-transform:uppercase;padding:12px 10px 6px}
+.sidebar a.nav{
+  display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;color:var(--muted);
+  font-size:14.5px;font-weight:500;margin-bottom:2px;text-decoration:none;
+}
+.sidebar a.nav:hover{background:var(--navy-50);color:var(--navy);text-decoration:none}
+.sidebar a.nav.active{background:var(--navy);color:#fff;font-weight:600}
+.sidebar a.nav .ic{width:18px;text-align:center;font-size:15px}
+main{padding:24px 28px 60px;min-height:calc(100vh - 58px);max-width:1240px}
 
-  .badge {
-    display: inline-block; padding: 2px 8px; border-radius: 999px;
-    font-size: 11.5px; font-weight: 600; background: #eef1f6; color: #4a5568;
-  }
-  .badge.ok { background: var(--ok-soft); color: var(--ok); }
-  .badge.warn { background: var(--warn-soft); color: var(--warn); }
-  .badge.err { background: var(--err-soft); color: var(--err); }
-  .badge.brand { background: var(--brand-soft); color: var(--brand-dark); }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--muted); }
+/* ---------- page head ---------- */
+.page-head{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.page-head .t h1{font-size:22px}
+.page-head .t p{color:var(--muted);font-size:14px;margin-top:3px}
+.page-head .actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.crumb{font-size:13px;color:var(--faint);margin-bottom:8px}
+.crumb a{color:var(--muted)}
 
-  .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
-  .empty .big { font-size: 28px; margin-bottom: 8px; }
+/* ---------- cards / tables ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card + .card{margin-top:16px}
+.card-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+.card-head h3{font-size:15.5px}
+.card-head .sub{font-size:13px;color:var(--faint)}
+.card-head .right{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card-body{padding:18px}
+.card-body.tight{padding:0}
 
-  .alert { padding: 11px 13px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
-  .alert.err { background: var(--err-soft); color: #8c1d18; border: 1px solid #f3cdc9; }
-  .alert.info { background: var(--brand-soft); color: var(--brand-dark); border: 1px solid #d6ddf8; }
-  .alert.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid #f2dfbe; }
-  .alert code { font-size: 11.5px; opacity: .8; }
+.table-scroll{overflow-x:auto}
+.table-scroll table{min-width:680px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{
+  text-align:left;font-weight:600;font-size:12.5px;letter-spacing:.3px;color:var(--muted);
+  background:#f7f9fc;padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap;
+}
+td{padding:11px 14px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#fafbfe}
+td.actions{text-align:right;white-space:nowrap}
+td.actions .btn{margin-left:4px}
+.t-main{font-weight:600}
+.t-sub{font-size:12.5px;color:var(--faint)}
 
-  /* ---------- modal ---------- */
-  .backdrop {
-    position: fixed; inset: 0; background: rgba(16,24,40,.42);
-    display: grid; place-items: center; padding: 20px; z-index: 60;
-  }
-  .modal {
-    background: var(--panel); border-radius: 12px; width: 100%; max-width: 560px;
-    max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(16,24,40,.28);
-  }
-  .modal.wide { max-width: 720px; }
-  .modal-head { padding: 15px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; }
-  .modal-head .spacer { flex: 1; }
-  .modal-body { padding: 18px; overflow-y: auto; }
-  .modal-foot { padding: 13px 18px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
-  .x { border: 0; background: none; font-size: 20px; line-height: 1; color: var(--muted); cursor: pointer; padding: 0 4px; }
+/* ---------- stats ---------- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+.stat .k{font-size:12.5px;color:var(--faint);font-weight:600;letter-spacing:.3px}
+.stat .v{font-size:27px;font-weight:700;margin-top:3px;line-height:1.2}
+.stat .f{font-size:12.5px;color:var(--muted);margin-top:2px}
 
-  /* ---------- toast ---------- */
-  #toasts { position: fixed; right: 18px; bottom: 18px; z-index: 90; display: flex; flex-direction: column; gap: 8px; }
-  .toast {
-    background: #1f2937; color: #fff; padding: 10px 14px; border-radius: 8px;
-    font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.2); max-width: 380px;
-  }
-  .toast.ok { background: #10633f; }
-  .toast.err { background: #8c1d18; }
+/* ---------- misc blocks ---------- */
+.empty{padding:44px 20px;text-align:center;color:var(--faint)}
+.empty .ic{font-size:30px;opacity:.4}
+.empty h4{margin:8px 0 4px;color:var(--muted);font-size:15px}
+.empty p{font-size:13.5px}
+.note{padding:11px 14px;border-radius:8px;font-size:13.5px;display:flex;gap:9px;align-items:flex-start}
+.note.info{background:var(--info-bg);color:#22406e}
+.note.warn{background:var(--warn-bg);color:var(--warn)}
+.note.danger{background:var(--danger-bg);color:var(--danger)}
+.note b{font-weight:600}
+.skeleton{padding:36px;text-align:center;color:var(--faint);font-size:14px}
+.spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px}
+.spinner.dark{border-color:#cdd6e3;border-top-color:var(--navy)}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-  /* ---------- login ---------- */
-  .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 30px 16px; }
-  .login { width: 100%; max-width: 720px; }
-  .login-head { text-align: center; margin-bottom: 20px; }
-  .login-head .logo { width: 46px; height: 46px; border-radius: 12px; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 700; margin: 0 auto 10px; }
-  .user-pick {
-    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
-    padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px;
-    background: #fff; cursor: pointer; margin-bottom: 8px; font: inherit;
-  }
-  .user-pick:hover { border-color: var(--brand); background: var(--brand-soft); }
-  .user-pick .spacer { flex: 1; }
-  .user-pick .nm { font-weight: 600; }
-  .user-pick .mt { font-size: 12px; color: var(--muted); }
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+.tabs a{
+  padding:10px 16px;font-size:14.5px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;
+  text-decoration:none;white-space:nowrap;
+}
+.tabs a:hover{color:var(--navy);text-decoration:none}
+.tabs a.active{color:var(--navy);border-bottom-color:var(--navy)}
 
-  /* ---------- misc ---------- */
-  .kv { display: grid; grid-template-columns: 190px 1fr; gap: 2px 14px; }
-  .kv dt { color: var(--muted); font-size: 12.5px; padding: 7px 0; border-bottom: 1px solid var(--line); }
-  .kv dd { margin: 0; padding: 7px 0; border-bottom: 1px solid var(--line); word-break: break-word; }
-  .file-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
-  .file-row .spacer { flex: 1; }
-  .file-ico { width: 34px; height: 34px; border-radius: 8px; background: var(--brand-soft); display: grid; place-items: center; font-size: 15px; }
-  .opt-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
-  .opt-row input { flex: 1; }
-  .preview-form { background: #fbfcfe; border: 1px dashed var(--line); border-radius: 10px; padding: 16px; }
-  .steps { display: flex; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 12px; flex-wrap: wrap; }
-  .step { padding: 3px 10px; border-radius: 999px; background: #eef1f6; }
-  .step.done { background: var(--ok-soft); color: var(--ok); }
-  .step.active { background: var(--brand-soft); color: var(--brand-dark); font-weight: 600; }
-  .step.fail { background: var(--err-soft); color: var(--err); }
-  @media (max-width: 760px) {
-    .shell { flex-direction: column; }
-    .sidebar { width: 100%; flex: none; border-right: 0; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px; }
-    .nav-label { display: none; }
-    .nav-item { width: auto; }
-    .main { padding: 16px; }
-    .kv { grid-template-columns: 1fr; }
-  }
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:8px 14px;font-size:14px}
+.kv dt{color:var(--faint);font-weight:500}
+.kv dd{margin:0;font-weight:500}
+
+/* ---------- field builder ---------- */
+.fieldrow{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line-soft)}
+.fieldrow:last-child{border-bottom:none}
+.fieldrow .pos{width:30px;height:30px;border-radius:8px;background:var(--navy-50);color:var(--navy);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+.fieldrow .info{flex:1;min-width:0}
+.fieldrow .info .lbl{font-weight:600}
+.fieldrow .info .meta{font-size:12.5px;color:var(--faint);display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:2px}
+.fieldrow .ops{display:flex;gap:4px;flex:none}
+.opt-row{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+.opt-row input{flex:1}
+
+/* ---------- files ---------- */
+.filelist{display:flex;flex-direction:column;gap:10px}
+.fileitem{display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.fileitem .fic{width:38px;height:38px;border-radius:8px;background:var(--navy-50);display:grid;place-items:center;font-size:16px;flex:none}
+.fileitem .fmeta{flex:1;min-width:0}
+.fileitem .fmeta .fn{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fileitem .fmeta .fs{font-size:12.5px;color:var(--faint)}
+.fileitem .fops{display:flex;gap:5px;flex:none}
+.dropzone{border:1.5px dashed var(--line);border-radius:9px;padding:14px;background:#fbfcfe}
+.dropzone.done{border-style:solid;border-color:#bfe0cd;background:var(--ok-bg)}
+
+/* ---------- modal ---------- */
+.overlay{position:fixed;inset:0;background:rgba(16,26,45,.5);display:flex;align-items:flex-start;justify-content:center;
+  padding:40px 16px;z-index:100;overflow-y:auto;animation:fade .15s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.modal{background:#fff;border-radius:12px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(10,25,50,.3);animation:pop .16s ease}
+.modal.wide{max-width:840px}
+.modal.xwide{max-width:1000px}
+@keyframes pop{from{transform:translateY(-8px);opacity:0}to{transform:none;opacity:1}}
+.modal-head{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line-soft)}
+.modal-head h3{font-size:16.5px;flex:1}
+.modal-head .x{background:none;border:none;font-size:20px;color:var(--faint);cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px}
+.modal-head .x:hover{background:#eef1f6;color:var(--ink)}
+.modal-body{padding:20px;max-height:calc(100vh - 220px);overflow-y:auto}
+.modal-foot{display:flex;gap:8px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--line-soft);background:#fafbfd;border-radius:0 0 12px 12px}
+.preview-stage{background:#12213a;border-radius:9px;display:grid;place-items:center;min-height:320px;padding:10px}
+.preview-stage img,.preview-stage video{max-width:100%;max-height:66vh;border-radius:5px;display:block}
+.preview-stage iframe{width:100%;height:70vh;border:none;border-radius:5px;background:#fff}
+
+/* ---------- toast ---------- */
+#toastRoot{position:fixed;right:18px;bottom:18px;z-index:200;display:flex;flex-direction:column;gap:9px;max-width:380px}
+.toast{background:#fff;border-left:4px solid var(--navy);border-radius:8px;padding:12px 15px;box-shadow:0 8px 26px rgba(15,30,55,.18);
+  font-size:14px;animation:slide .18s ease}
+.toast.ok{border-left-color:var(--ok)}
+.toast.err{border-left-color:var(--danger)}
+.toast b{display:block;font-weight:600;margin-bottom:1px}
+.toast span{color:var(--muted);font-size:13px}
+@keyframes slide{from{transform:translateX(16px);opacity:0}to{transform:none;opacity:1}}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr}
+  .sidebar{position:fixed;top:58px;left:0;bottom:0;width:236px;z-index:35;transform:translateX(-100%);transition:transform .2s}
+  .sidebar.open{transform:none;box-shadow:6px 0 24px rgba(15,30,55,.16)}
+  .burger{display:block}
+  main{padding:18px 16px 50px}
+  .grid-2{grid-template-columns:1fr}
+  .kv{grid-template-columns:1fr;gap:2px 0}
+  .kv dt{margin-top:8px}
+  .topbar .who .meta{display:none}
+  .topbar{gap:10px;padding:0 12px}
+  .topbar .brand{font-size:14px}
+  .topbar .brand small{display:none}
+  .stats{grid-template-columns:1fr 1fr;gap:10px}
+  .stat{padding:13px 14px}
+  .stat .v{font-size:23px}
+  .page-head .t h1{font-size:19px}
+  .card-head{padding:12px 14px}
+  .card-head .right{width:100%}
+  .card-head .right input[type=search],.card-head .right select{width:100% !important}
+  .modal-body{max-height:calc(100vh - 190px)}
+  .fieldrow{flex-wrap:wrap}
+  .fieldrow .ops{width:100%;justify-content:flex-end}
+  .fileitem{flex-wrap:wrap}
+  .fileitem .fops{width:100%;justify-content:flex-end}
+}
 </style>
 </head>
 <body>
-<div id="app"></div>
-<div id="modal-root"></div>
-<div id="toasts"></div>
+
+<!-- ============================ LOGIN ============================ -->
+<div class="login-wrap" id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-seal">SD</div>
+      <div>
+        <div class="login-title">SDMS</div>
+        <div class="login-sub">ระบบจัดการเอกสารโรงเรียน</div>
+      </div>
+    </div>
+
+    <form id="loginForm" autocomplete="on">
+      <div class="field">
+        <label for="lgUser">ชื่อผู้ใช้</label>
+        <input id="lgUser" type="text" name="username" autocomplete="username" placeholder="เช่น director01" required>
+      </div>
+      <div class="field">
+        <label for="lgPass">รหัสผ่าน</label>
+        <input id="lgPass" type="password" name="password" autocomplete="current-password" placeholder="อย่างน้อย 8 ตัวอักษร" required>
+      </div>
+      <div id="loginError" hidden class="note danger" style="margin-bottom:14px"></div>
+      <button class="btn block" id="loginBtn" type="submit">เข้าสู่ระบบ</button>
+    </form>
+
+    <details class="setup">
+      <summary>ตั้งค่าการเชื่อมต่อ API</summary>
+      <div class="body">
+        <div class="field" style="margin:10px 0 0">
+          <label for="apiBase">Base URL ของ Backend</label>
+          <input id="apiBase" type="text" spellcheck="false" value="http://localhost:8080/api/v1">
+          <span class="hint">ค่าเริ่มต้นตรงกับ <span class="mono">APP_PORT=8080</span> ใน .env</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn ghost sm" type="button" id="pingBtn">ทดสอบ /health</button>
+          <span id="pingResult" style="font-size:13px;align-self:center"></span>
+        </div>
+        <p style="margin-top:12px;font-size:12.5px;color:var(--muted)">ยังไม่มีบัญชี ผอ. ให้สร้างด้วยคำสั่ง</p>
+        <pre>go run ./cmd/seed-director \
+  -username director01 -password ChangeMe123 \
+  -employee-code 1001 -prefix นาย \
+  -first-name สมชาย -last-name ใจดี</pre>
+      </div>
+    </details>
+
+    <div class="login-foot">Prototype หน้าบ้านสำหรับ SDMS API · Fiber v3 + JWT</div>
+  </div>
+</div>
+
+<!-- ============================ APP SHELL ============================ -->
+<div id="app" hidden>
+  <header class="topbar">
+    <button class="burger" id="burger" type="button" aria-label="เมนู">☰</button>
+    <div class="seal">SD</div>
+    <div class="brand">SDMS<small>ระบบจัดการเอกสารโรงเรียน</small></div>
+    <div class="spacer"></div>
+    <div class="who">
+      <div class="meta">
+        <b id="whoName">—</b>
+        <span id="whoRole">—</span>
+      </div>
+      <div class="avatar" id="whoAvatar">—</div>
+    </div>
+    <button class="logout" id="logoutBtn" type="button">ออกจากระบบ</button>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"><nav id="nav"></nav></aside>
+    <main id="view"></main>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
 
 <script>
-/* =========================================================================
-   SDMS Frontend Prototype
-   -------------------------------------------------------------------------
-   ไฟล์เดียว ไม่ต้อง build — เปิดด้วยเบราว์เซอร์ได้เลย
-   คุยกับ SDMS-Backend (Go + Fiber v3) ผ่าน REST API
-   หมายเหตุ: Backend ยังไม่มีระบบ authentication
-             หน้า "เข้าสู่ระบบ" จึงเป็นการ "เลือกผู้ใช้" เพื่อจำลอง session
-             และใช้ uid ของผู้ใช้ที่เลือกเป็น submitted_by
-   ========================================================================= */
+"use strict";
+/* =====================================================================
+ * SDMS Frontend Prototype
+ * ผูกกับ SDMS-Backend (Go / Fiber v3 / GORM / JWT)
+ *
+ * หมายเหตุ: prototype นี้เก็บ token ไว้ใน memory เท่านั้น
+ * (รีเฟรชหน้า = ต้องล็อกอินใหม่) เพื่อไม่ต้องพึ่ง browser storage
+ * ===================================================================== */
 
-const DEFAULT_BASE = "http://localhost:8080/api/v1";
+/* ---------------------------------------------------------------------
+ * 1) Utilities
+ * ------------------------------------------------------------------ */
+const $ = (sel, root) => (root || document).querySelector(sel);
+const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
-const state = {
-  baseUrl: DEFAULT_BASE,
-  online: null,          // null = ยังไม่ตรวจ, true/false
-  me: null,              // ผู้ใช้ที่ "ล็อกอิน" อยู่
-  users: [],             // cache รายชื่อผู้ใช้ (ใช้แสดงชื่อผู้ส่ง)
-  view: "topics",
-  params: {},
-  data: {},              // ข้อมูลของ view ปัจจุบัน
-  loading: false,
-  error: null,
-};
-
-/* ---------------------------------------------------------------- helpers */
-const $ = (sel, root = document) => root.querySelector(sel);
-const el = (tag, props = {}, ...kids) => {
-  const n = document.createElement(tag);
-  for (const [k, v] of Object.entries(props)) {
-    if (v === null || v === undefined || v === false) continue;
-    if (k === "class") n.className = v;
-    else if (k === "html") n.innerHTML = v;
-    else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2).toLowerCase(), v);
-    else if (k === "value") n.value = v;
-    else if (v === true) n.setAttribute(k, "");
-    else n.setAttribute(k, v);
-  }
-  for (const kid of kids.flat()) {
-    if (kid === null || kid === undefined || kid === false) continue;
-    n.appendChild(typeof kid === "string" || typeof kid === "number" ? document.createTextNode(String(kid)) : kid);
-  }
-  return n;
-};
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-function toast(msg, kind = "") {
-  const t = el("div", { class: "toast " + kind }, msg);
-  $("#toasts").appendChild(t);
-  setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity .3s"; }, 3200);
-  setTimeout(() => t.remove(), 3600);
+function esc(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-const FIELD_TYPES = [
-  { value: "text",     label: "ข้อความสั้น" },
-  { value: "textarea", label: "ข้อความยาว" },
-  { value: "number",   label: "ตัวเลข" },
-  { value: "date",     label: "วันที่" },
-  { value: "select",   label: "ตัวเลือก (dropdown)" },
-  { value: "file",     label: "ไฟล์แนบ" },
-];
-const typeLabel = (t) => (FIELD_TYPES.find((x) => x.value === t) || { label: t }).label;
+function el(html) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html.trim();
+  return tpl.content.firstElementChild;
+}
 
-// นามสกุลไฟล์ที่ backend อนุญาต (internal/modules/submission/usecase/file_service.go)
-const ALLOWED_EXT = [".pdf", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".mp4"];
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return "—";
+  return d.toLocaleString("th-TH", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return String(iso);
+  return d.toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function fmtBytes(n) {
+  if (!n && n !== 0) return "—";
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0, v = Number(n);
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return (i === 0 ? v : v.toFixed(1)) + " " + units[i];
+}
+
+function initials(user) {
+  if (!user) return "—";
+  const a = (user.first_name || "").trim().charAt(0);
+  const b = (user.last_name || "").trim().charAt(0);
+  return (a + b) || (user.username || "?").charAt(0).toUpperCase();
+}
+
+function fullName(user) {
+  if (!user) return "—";
+  return [user.prefix, user.first_name, user.last_name].filter(Boolean).join(" ").trim() || user.username;
+}
 
 const ROLE_LABEL = { DIRECTOR: "ผู้อำนวยการ", TEACHER: "ครู" };
 const STATUS_LABEL = { ACTIVE: "ใช้งาน", INACTIVE: "ระงับ" };
+const FIELD_TYPE_LABEL = {
+  text: "ข้อความสั้น", textarea: "ข้อความยาว", number: "ตัวเลข",
+  date: "วันที่", select: "ตัวเลือก", file: "ไฟล์แนบ",
+};
+const FIELD_TYPE_ICON = {
+  text: "🔤", textarea: "📝", number: "🔢", date: "📅", select: "▾", file: "📎",
+};
+/* ต้องตรงกับ isAllowedUploadExtension() ใน usecase/file_service.go */
+const ALLOWED_EXT = [".pdf", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm", ".mov", ".m4v"];
 
-// แปลข้อความ error จาก backend เป็นภาษาไทย (ตกไปใช้ข้อความเดิมถ้าไม่มี)
-const ERR_TH = {
-  "topic not found": "ไม่พบหัวข้อนี้",
-  "topic name is required": "กรุณากรอกชื่อหัวข้อ",
-  "topic field not found": "ไม่พบฟิลด์นี้",
-  "topic field label is required": "กรุณากรอกป้ายกำกับฟิลด์",
-  "invalid topic field type": "ชนิดฟิลด์ไม่ถูกต้อง",
-  "topic field type cannot be changed after submissions exist": "เปลี่ยนชนิดฟิลด์ไม่ได้ เพราะมีการส่งข้อมูลเข้ามาแล้ว",
-  "topic field cannot be deleted after submissions exist": "ลบฟิลด์ไม่ได้ เพราะมีการส่งข้อมูลเข้ามาแล้ว",
-  "select field requires at least one option": "ฟิลด์แบบตัวเลือกต้องมีอย่างน้อย 1 ตัวเลือก",
-  "select option label is required": "กรุณากรอกป้ายกำกับของตัวเลือก",
-  "select option value is required": "กรุณากรอกค่าของตัวเลือก",
-  "select option value must be unique": "ค่าของตัวเลือกต้องไม่ซ้ำกัน",
-  "options are only allowed for select fields": "กำหนดตัวเลือกได้เฉพาะฟิลด์แบบ dropdown",
+function toast(title, detail, kind) {
+  const node = el(
+    '<div class="toast ' + (kind || "") + '">' +
+      "<b>" + esc(title) + "</b>" +
+      (detail ? "<span>" + esc(detail) + "</span>" : "") +
+    "</div>"
+  );
+  $("#toastRoot").appendChild(node);
+  setTimeout(() => {
+    node.style.transition = "opacity .2s, transform .2s";
+    node.style.opacity = "0";
+    node.style.transform = "translateX(16px)";
+    setTimeout(() => node.remove(), 220);
+  }, kind === "err" ? 5200 : 3200);
+}
+
+/* ---------------------------------------------------------------------
+ * 2) API client
+ * ------------------------------------------------------------------ */
+
+/* แปลข้อความ error ของ backend (Go sentinel errors) เป็นภาษาไทย
+ * บาง error ของ submission จะต่อท้ายด้วยชื่อฟิลด์ เช่น
+ * "required field is missing: ชื่อกิจกรรม" จึงใช้การจับแบบขึ้นต้น */
+const API_MESSAGE_TH = {
+  // auth
+  "invalid username or password": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+  "user is inactive": "บัญชีนี้ถูกระงับการใช้งาน",
+  "current password is invalid": "รหัสผ่านปัจจุบันไม่ถูกต้อง",
+  "authentication required": "กรุณาเข้าสู่ระบบ",
+  "token expired": "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่",
+  forbidden: "บัญชีของคุณไม่มีสิทธิ์ทำรายการนี้",
+  // user
   "user not found": "ไม่พบผู้ใช้",
-  "username is required": "กรุณากรอกชื่อผู้ใช้",
-  "employee code is required": "กรุณากรอกรหัสพนักงาน",
-  "prefix is required": "กรุณากรอกคำนำหน้า",
-  "first name is required": "กรุณากรอกชื่อ",
-  "last name is required": "กรุณากรอกนามสกุล",
+  "username already exists": "ชื่อผู้ใช้นี้ถูกใช้ไปแล้ว",
+  "employee code already exists": "เลขประจำตัวนี้ถูกใช้ไปแล้ว",
+  "username is required": "กรุณาระบุชื่อผู้ใช้",
+  "employee code is required": "กรุณาระบุเลขประจำตัว",
+  "prefix is required": "กรุณาระบุคำนำหน้า",
+  "first name is required": "กรุณาระบุชื่อ",
+  "last name is required": "กรุณาระบุนามสกุล",
+  "password is required": "กรุณาระบุรหัสผ่าน",
+  "password must be at least 8 characters": "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
   "invalid role": "บทบาทไม่ถูกต้อง",
   "invalid status": "สถานะไม่ถูกต้อง",
-  "username already exists": "ชื่อผู้ใช้นี้ถูกใช้แล้ว",
-  "employee code already exists": "รหัสพนักงานนี้ถูกใช้แล้ว",
+  // topic + field
+  "topic not found": "ไม่พบหัวข้อเอกสาร",
+  "topic name is required": "กรุณาระบุชื่อหัวข้อ",
+  "topic field not found": "ไม่พบฟิลด์ในหัวข้อนี้",
+  "topic field label is required": "กรุณาระบุชื่อฟิลด์",
+  "invalid topic field type": "ชนิดของฟิลด์ไม่ถูกต้อง",
+  "topic field type cannot be changed after submissions exist":
+    "เปลี่ยนชนิดฟิลด์ไม่ได้ เพราะมีครูส่งข้อมูลเข้าหัวข้อนี้แล้ว",
+  "topic field cannot be deleted after submissions exist":
+    "ลบฟิลด์ไม่ได้ เพราะมีครูส่งข้อมูลเข้าหัวข้อนี้แล้ว",
+  "select field requires at least one option": "ฟิลด์แบบตัวเลือกต้องมีอย่างน้อย 1 ตัวเลือก",
+  "select option label is required": "กรุณาระบุข้อความของตัวเลือก",
+  "select option value is required": "กรุณาระบุ value ของตัวเลือก",
+  "select option value must be unique": "value ของตัวเลือกต้องไม่ซ้ำกัน",
+  "options are only allowed for select fields": "กำหนดตัวเลือกได้เฉพาะฟิลด์แบบตัวเลือกเท่านั้น",
+  // submission
   "submission not found": "ไม่พบรายการที่ส่ง",
-};
-const CODE_TH = {
-  REQUIRED_FIELD_MISSING: "ยังไม่ได้กรอกข้อมูลที่จำเป็น",
-  INVALID_SUBMISSION_VALUE: "ค่าที่กรอกไม่ถูกต้อง",
-  INVALID_SUBMISSION_FIELD: "ฟิลด์ไม่ถูกต้อง",
-  DUPLICATE_SUBMISSION_FIELD: "ส่งฟิลด์ซ้ำ",
-  FILE_FIELD_UNSUPPORTED: "ฟิลด์ไฟล์ต้องอัปโหลดแยก ไม่ใช่ส่งมากับ JSON",
-  FILE_TOO_LARGE: "ไฟล์มีขนาดใหญ่เกินกำหนด",
-  FILE_TYPE_NOT_ALLOWED: "ชนิดไฟล์นี้ไม่ได้รับอนุญาต",
-  FILE_ALREADY_EXISTS: "ฟิลด์นี้มีไฟล์แนบอยู่แล้ว",
-  FIELD_NOT_FILE: "ฟิลด์นี้ไม่ใช่ฟิลด์ไฟล์",
-  FILE_FIELD_TOPIC_MISMATCH: "ฟิลด์ไม่ได้อยู่ในหัวข้อนี้",
-  FILE_EMPTY: "ไฟล์ว่างเปล่า",
-  TOPIC_INACTIVE: "หัวข้อนี้ปิดรับข้อมูลแล้ว",
-  SUBMITTER_NOT_FOUND: "ไม่พบผู้ส่ง",
-  SUBMITTER_MUST_BE_TEACHER: "ผู้ส่งต้องมีบทบาทเป็นครูเท่านั้น",
-  SUBMITTER_INACTIVE: "บัญชีผู้ส่งถูกระงับการใช้งาน",
-  SUBMITTED_BY_REQUIRED: "ต้องระบุผู้ส่ง",
-  TOPIC_UID_REQUIRED: "ต้องระบุหัวข้อ",
+  "topic is not accepting submissions": "หัวข้อนี้ปิดรับเอกสารแล้ว",
+  "required field is missing": "ยังไม่ได้กรอกช่องที่จำเป็น",
+  "invalid submission value": "ค่าที่กรอกไม่ถูกต้อง",
+  "invalid submission field": "ฟิลด์ไม่ถูกต้อง",
+  "duplicate submission field": "ส่งฟิลด์ซ้ำ",
+  "submission submitter must be a teacher": "ผู้ส่งต้องเป็นบัญชีครูเท่านั้น",
+  "submission submitter is inactive": "บัญชีผู้ส่งถูกระงับ",
+  "file field is not supported by normal submission":
+    "ฟิลด์ไฟล์ต้องอัปโหลดแยกหลังสร้างรายการ",
+  // file
+  "submission file not found": "ไม่พบไฟล์แนบ",
+  "uploaded file is empty": "ไฟล์ว่างเปล่า",
+  "uploaded file is too large": "ไฟล์มีขนาดใหญ่เกินกำหนด",
+  "uploaded file type is not allowed": "ไม่รองรับไฟล์ชนิดนี้",
+  "a file already exists for this submission field": "ฟิลด์นี้มีไฟล์แนบอยู่แล้ว",
+  "submission field is not a file field": "ฟิลด์นี้ไม่ใช่ฟิลด์ไฟล์แนบ",
+  "submission file field does not belong to the submission topic":
+    "ฟิลด์ไฟล์ไม่ได้อยู่ในหัวข้อเดียวกับรายการนี้",
 };
 
-function thMessage(err) {
-  if (!(err instanceof ApiError)) return err.message || String(err);
-  const raw = err.message || "";
-  const base = ERR_TH[raw] || CODE_TH[err.code] || raw || "เกิดข้อผิดพลาด";
-  return err.fieldLabel ? `${base} (ฟิลด์: ${err.fieldLabel})` : base;
+function translateApiMessage(message) {
+  if (!message) return message;
+  const raw = String(message).trim();
+  if (API_MESSAGE_TH[raw]) return API_MESSAGE_TH[raw];
+  // รูปแบบ "<sentinel>: <ชื่อฟิลด์>"
+  const separator = raw.indexOf(": ");
+  if (separator > 0) {
+    const head = raw.slice(0, separator);
+    if (API_MESSAGE_TH[head]) return API_MESSAGE_TH[head] + ": " + raw.slice(separator + 2);
+  }
+  return raw;
 }
 
-const fmtDate = (iso) => {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  if (isNaN(d)) return iso;
-  return d.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
-};
-const fmtDateOnly = (iso) => {
-  if (!iso) return "-";
-  const d = new Date(iso + (iso.length === 10 ? "T00:00:00" : ""));
-  if (isNaN(d)) return iso;
-  return d.toLocaleDateString("th-TH", { dateStyle: "medium" });
-};
-const fmtSize = (b) => {
-  if (!b && b !== 0) return "-";
-  const u = ["B", "KB", "MB", "GB"];
-  let i = 0, n = b;
-  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
-  return `${n.toFixed(i === 0 ? 0 : 1)} ${u[i]}`;
-};
-const fullName = (u) => (u ? `${u.prefix || ""}${u.first_name} ${u.last_name}`.trim() : "-");
-const initials = (u) => (u ? (u.first_name || "?").charAt(0) + (u.last_name || "").charAt(0) : "?");
-const originOf = (base) => base.replace(/\/api\/v1\/?$/, "");
-
-/* -------------------------------------------------------------- API layer */
 class ApiError extends Error {
-  constructor(status, body) {
-    const msg = (body && (body.message || body.error)) || `HTTP ${status}`;
-    super(msg);
+  constructor(status, payload) {
+    const message = translateApiMessage(
+      (payload && (payload.message || payload.error)) ||
+      "เกิดข้อผิดพลาด (HTTP " + status + ")"
+    );
+    super(message);
     this.status = status;
-    this.code = body && body.code;
-    this.fieldUid = body && body.field_uid;
-    this.fieldLabel = body && body.field_label;
-    this.body = body;
+    this.code = payload && payload.code ? payload.code : null;
+    this.fieldUid = payload && payload.field_uid ? payload.field_uid : null;
+    this.fieldLabel = payload && payload.field_label ? payload.field_label : null;
+    this.payload = payload;
   }
 }
 
-async function api(path, opts = {}) {
-  let res;
-  try {
-    res = await fetch(state.baseUrl + path, opts);
-  } catch (e) {
-    state.online = false;
-    throw new Error("เชื่อมต่อ API ไม่ได้ — ตรวจสอบว่า backend รันอยู่ที่ " + state.baseUrl + " และเปิด CORS แล้ว");
-  }
-  state.online = true;
-  if (res.status === 204) return null;
-  const text = await res.text();
-  let body = null;
-  if (text) { try { body = JSON.parse(text); } catch { body = { message: text }; } }
-  if (!res.ok) throw new ApiError(res.status, body);
-  return body;
-}
-const apiJson = (path, method, payload) =>
-  api(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+const api = {
+  base: "http://localhost:8080/api/v1",
+  token: null,
 
-const API = {
-  health:            ()               => api("/health"),
-  listUsers:         ()               => api("/users"),
-  getUser:           (id)             => api(`/users/${id}`),
-  createUser:        (b)              => apiJson("/users/", "POST", b),
-  updateUser:        (id, b)          => apiJson(`/users/${id}`, "PUT", b),
-  updateUserStatus:  (id, status)     => apiJson(`/users/${id}/status`, "PATCH", { status }),
-  deleteUser:        (id)             => api(`/users/${id}`, { method: "DELETE" }),
+  async raw(method, path, options) {
+    const opt = options || {};
+    const headers = {};
+    if (this.token) headers["Authorization"] = "Bearer " + this.token;
+    let body;
+    if (opt.json !== undefined) {
+      headers["Content-Type"] = "application/json";
+      body = JSON.stringify(opt.json);
+    } else if (opt.form) {
+      body = opt.form; // ให้ browser ตั้ง boundary ของ multipart เอง
+    }
 
-  listTopics:        ()               => api("/topics"),
-  getTopic:          (id)             => api(`/topics/${id}`),          // มี fields มาด้วย
-  createTopic:       (b)              => apiJson("/topics/", "POST", b),
-  updateTopic:       (id, b)          => apiJson(`/topics/${id}`, "PUT", b),
-  deleteTopic:       (id)             => api(`/topics/${id}`, { method: "DELETE" }),
+    let response;
+    try {
+      response = await fetch(this.base + path, { method, headers, body });
+    } catch (networkError) {
+      throw new ApiError(0, {
+        message: "เชื่อมต่อ Backend ไม่ได้ — ตรวจสอบว่า API รันอยู่ที่ " + this.base,
+      });
+    }
+    return response;
+  },
 
-  listFields:        (tid)            => api(`/topics/${tid}/fields`),
-  createField:       (tid, b)         => apiJson(`/topics/${tid}/fields`, "POST", b),
-  updateField:       (tid, fid, b)    => apiJson(`/topics/${tid}/fields/${fid}`, "PUT", b),
-  deleteField:       (tid, fid)       => api(`/topics/${tid}/fields/${fid}`, { method: "DELETE" }),
+  async request(method, path, options) {
+    const response = await this.raw(method, path, options);
 
-  listSubmissions:   (tid, by)        => api(`/topics/${tid}/submissions/` + (by ? `?submitted_by=${by}` : "")),
-  getSubmission:     (tid, sid)       => api(`/topics/${tid}/submissions/${sid}`),
-  createSubmission:  (tid, b)         => apiJson(`/topics/${tid}/submissions/`, "POST", b),
+    if (response.status === 204) return null;
 
-  listFiles:         (tid, sid)       => api(`/topics/${tid}/submissions/${sid}/files`),
-  uploadFile:        (tid, sid, fd)   => api(`/topics/${tid}/submissions/${sid}/files`, { method: "POST", body: fd }),
-  deleteFile:        (fid)            => api(`/submission-files/${fid}`, { method: "DELETE" }),
-};
+    const contentType = response.headers.get("Content-Type") || "";
+    let payload = null;
+    if (contentType.includes("application/json")) {
+      payload = await response.json().catch(() => null);
+    } else {
+      const text = await response.text().catch(() => "");
+      if (text) payload = { message: text };
+    }
 
-/* ---------------------------------------------------------------- modal */
-function openModal({ title, body, footer, wide }) {
-  const root = $("#modal-root");
-  const close = () => { root.innerHTML = ""; document.removeEventListener("keydown", onKey); };
-  const onKey = (e) => { if (e.key === "Escape") close(); };
-  document.addEventListener("keydown", onKey);
-
-  const modal = el("div", { class: "modal" + (wide ? " wide" : "") },
-    el("div", { class: "modal-head" },
-      el("h2", {}, title),
-      el("div", { class: "spacer" }),
-      el("button", { class: "x", onClick: close, title: "ปิด" }, "×")),
-    el("div", { class: "modal-body" }, body),
-    footer ? el("div", { class: "modal-foot" }, footer) : null);
-
-  const backdrop = el("div", { class: "backdrop" }, modal);
-  root.innerHTML = "";
-  root.appendChild(backdrop);
-  const firstInput = modal.querySelector("input, select, textarea");
-  if (firstInput) firstInput.focus();
-  return { close, modal };
-}
-
-function confirmDialog(message, onYes, { danger = true, yesLabel = "ยืนยัน" } = {}) {
-  const yes = el("button", { class: "btn " + (danger ? "danger" : "primary") }, yesLabel);
-  const no = el("button", { class: "btn" }, "ยกเลิก");
-  const m = openModal({ title: "ยืนยันการทำงาน", body: el("p", {}, message), footer: [no, yes] });
-  no.onclick = m.close;
-  yes.onclick = async () => { m.close(); await onYes(); };
-}
-
-/* ---------------------------------------------------------------- router */
-const VIEW_DATA_KEY = {
-  topics: "topics", users: "users", fields: "topic", submit: "topic",
-  submissions: "topic", submissionDetail: "sub", mySubmissions: "rows",
-};
-
-function go(view, params = {}) {
-  state.view = view;
-  state.params = params;
-  state.data = {};
-  state.error = null;
-  state.loading = true;   // กัน render รอบแรกไม่ให้อ่าน state.data ที่ยังว่าง
-  render();
-  loadView();
-}
-function reload() { loadView(); }
-
-async function loadView() {
-  const loaders = {
-    topics: async () => ({ topics: await API.listTopics() }),
-    users: async () => ({ users: await refreshUsers() }),
-    fields: async () => ({ topic: await API.getTopic(state.params.topicId) }),
-    submit: async () => ({ topic: await API.getTopic(state.params.topicId) }),
-    submissions: async () => {
-      const [topic, subs] = await Promise.all([
-        API.getTopic(state.params.topicId),
-        API.listSubmissions(state.params.topicId, state.params.mineOnly ? state.me.uid : null),
-      ]);
-      await refreshUsers().catch(() => {});
-      return { topic, subs };
-    },
-    submissionDetail: async () => {
-      const [topic, sub] = await Promise.all([
-        API.getTopic(state.params.topicId),
-        API.getSubmission(state.params.topicId, state.params.submissionId),
-      ]);
-      await refreshUsers().catch(() => {});
-      return { topic, sub };
-    },
-    mySubmissions: async () => {
-      const topics = await API.listTopics();
-      const rows = [];
-      for (const t of topics) {
-        try {
-          const subs = await API.listSubmissions(t.uid, state.me.uid);
-          subs.forEach((s) => rows.push({ topic: t, sub: s }));
-        } catch (_) { /* ข้ามหัวข้อที่ดึงไม่ได้ */ }
+    if (!response.ok) {
+      if (response.status === 401 && api.token) {
+        handleSessionExpired();
       }
-      rows.sort((a, b) => new Date(b.sub.created_at) - new Date(a.sub.created_at));
-      return { rows };
-    },
-  };
-  const fn = loaders[state.view];
-  if (!fn) return;
-  state.loading = true; state.error = null; render();
+      throw new ApiError(response.status, payload);
+    }
+    return payload;
+  },
+
+  get(path) { return this.request("GET", path); },
+  post(path, json) { return this.request("POST", path, { json }); },
+  put(path, json) { return this.request("PUT", path, { json }); },
+  patch(path, json) { return this.request("PATCH", path, { json }); },
+  del(path) { return this.request("DELETE", path); },
+  upload(path, form) { return this.request("POST", path, { form }); },
+
+  async blob(path) {
+    const response = await this.raw("GET", path);
+    if (!response.ok) {
+      let payload = null;
+      try { payload = await response.json(); } catch (_) { /* ignore */ }
+      if (response.status === 401) handleSessionExpired();
+      throw new ApiError(response.status, payload);
+    }
+    return await response.blob();
+  },
+};
+
+/* ---------------------------------------------------------------------
+ * 3) Application state (in-memory)
+ * ------------------------------------------------------------------ */
+const state = {
+  user: null,        // ผู้ใช้ที่ล็อกอินอยู่ (จาก /auth/login หรือ /auth/me)
+  topics: [],        // cache รายการหัวข้อ
+  users: [],         // cache รายชื่อผู้ใช้ (เฉพาะ ผอ.)
+  usersById: {},     // uid -> user
+};
+
+const isDirector = () => state.user && state.user.role === "DIRECTOR";
+const isTeacher = () => state.user && state.user.role === "TEACHER";
+
+function handleSessionExpired() {
+  if (!api.token) return;
+  api.token = null;
+  state.user = null;
+  toast("เซสชันหมดอายุ", "กรุณาเข้าสู่ระบบอีกครั้ง", "err");
+  showLogin();
+}
+
+/* ---------------------------------------------------------------------
+ * 4) Modal helper
+ * ------------------------------------------------------------------ */
+let modalStack = [];
+
+function openModal({ title, bodyHtml, footHtml, size, onMount }) {
+  const overlay = el(
+    '<div class="overlay">' +
+      '<div class="modal ' + (size || "") + '">' +
+        '<div class="modal-head"><h3>' + esc(title) + '</h3>' +
+        '<button class="x" type="button" aria-label="ปิด">&times;</button></div>' +
+        '<div class="modal-body"></div>' +
+        (footHtml ? '<div class="modal-foot">' + footHtml + "</div>" : "") +
+      "</div>" +
+    "</div>"
+  );
+  $(".modal-body", overlay).innerHTML = bodyHtml || "";
+  $("#modalRoot").appendChild(overlay);
+  modalStack.push(overlay);
+
+  const close = () => closeModal(overlay);
+  $(".x", overlay).addEventListener("click", close);
+  overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) close(); });
+
+  if (onMount) onMount(overlay, close);
+  const firstInput = overlay.querySelector("input,select,textarea");
+  if (firstInput) setTimeout(() => firstInput.focus(), 40);
+  return { overlay, close };
+}
+
+function closeModal(overlay) {
+  const target = overlay || modalStack[modalStack.length - 1];
+  if (!target) return;
+  target.remove();
+  modalStack = modalStack.filter((m) => m !== target);
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && modalStack.length) closeModal();
+});
+
+function confirmDialog({ title, message, confirmText, danger }) {
+  return new Promise((resolve) => {
+    const { overlay, close } = openModal({
+      title: title || "ยืนยันการทำรายการ",
+      bodyHtml: '<p style="font-size:14.5px;color:var(--muted)">' + message + "</p>",
+      footHtml:
+        '<button class="btn ghost" data-act="cancel" type="button">ยกเลิก</button>' +
+        '<button class="btn ' + (danger ? "danger" : "") + '" data-act="ok" type="button">' +
+        esc(confirmText || "ยืนยัน") + "</button>",
+      onMount(root) {
+        $('[data-act="cancel"]', root).addEventListener("click", () => { close(); resolve(false); });
+        $('[data-act="ok"]', root).addEventListener("click", () => { close(); resolve(true); });
+      },
+    });
+    overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) resolve(false); });
+  });
+}
+
+/* บันทึกปุ่มขณะกำลังส่งข้อมูล */
+async function withBusy(button, label, fn) {
+  const original = button.innerHTML;
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner"></span> ' + esc(label || "กำลังบันทึก…");
   try {
-    state.data = await fn();
-  } catch (e) {
-    state.error = thMessage(e);
+    return await fn();
   } finally {
-    state.loading = false;
-    render();
+    button.disabled = false;
+    button.innerHTML = original;
   }
 }
 
-async function refreshUsers() {
-  state.users = await API.listUsers();
+/* ---------------------------------------------------------------------
+ * 5) Login / logout
+ * ------------------------------------------------------------------ */
+function showLogin() {
+  $("#app").hidden = true;
+  $("#loginScreen").hidden = false;
+  $("#loginError").hidden = true;
+  $("#lgPass").value = "";
+  $("#modalRoot").innerHTML = "";
+  modalStack = [];
+}
+
+function showApp() {
+  $("#loginScreen").hidden = true;
+  $("#app").hidden = false;
+  renderIdentity();
+  renderNav();
+  if (!location.hash || location.hash === "#") {
+    location.hash = "#/dashboard";
+  } else {
+    router();
+  }
+}
+
+$("#loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const button = $("#loginBtn");
+  const errorBox = $("#loginError");
+  errorBox.hidden = true;
+  api.base = $("#apiBase").value.trim().replace(/\/+$/, "") || "http://localhost:8080/api/v1";
+
+  await withBusy(button, "กำลังเข้าสู่ระบบ…", async () => {
+    try {
+      const result = await api.post("/auth/login", {
+        username: $("#lgUser").value.trim(),
+        password: $("#lgPass").value,
+      });
+      api.token = result.access_token;
+      state.user = result.user;
+      state.topics = [];
+      state.users = [];
+      state.usersById = {};
+      toast("ยินดีต้อนรับ", fullName(result.user), "ok");
+      showApp();
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.hidden = false;
+    }
+  });
+});
+
+$("#pingBtn").addEventListener("click", async () => {
+  const out = $("#pingResult");
+  const base = $("#apiBase").value.trim().replace(/\/+$/, "");
+  out.textContent = "กำลังตรวจสอบ…";
+  out.style.color = "var(--muted)";
+  try {
+    const response = await fetch(base + "/health");
+    const data = await response.json();
+    out.textContent = "✔ " + (data.service || "ok") + " · db:" + (data.database || "?");
+    out.style.color = "var(--ok)";
+  } catch (_) {
+    out.textContent = "✖ เชื่อมต่อไม่ได้";
+    out.style.color = "var(--danger)";
+  }
+});
+
+$("#logoutBtn").addEventListener("click", async () => {
+  const ok = await confirmDialog({
+    title: "ออกจากระบบ",
+    message: "ต้องการออกจากระบบใช่หรือไม่?",
+    confirmText: "ออกจากระบบ",
+  });
+  if (!ok) return;
+  api.token = null;
+  state.user = null;
+  location.hash = "";
+  showLogin();
+});
+
+$("#burger").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+
+/* ---------------------------------------------------------------------
+ * 6) Shell: identity + navigation
+ * ------------------------------------------------------------------ */
+function renderIdentity() {
+  $("#whoName").textContent = fullName(state.user);
+  $("#whoRole").textContent = ROLE_LABEL[state.user.role] || state.user.role;
+  $("#whoAvatar").textContent = initials(state.user);
+}
+
+function navItems() {
+  if (isDirector()) {
+    return [
+      { group: "ภาพรวม" },
+      { href: "#/dashboard", icon: "▦", label: "หน้าแรก" },
+      { group: "งานเอกสาร" },
+      { href: "#/topics", icon: "🗂", label: "หัวข้อเอกสาร" },
+      { group: "ผู้ใช้งาน" },
+      { href: "#/users", icon: "👥", label: "จัดการผู้ใช้" },
+      { group: "บัญชี" },
+      { href: "#/account", icon: "⚙", label: "บัญชีของฉัน" },
+    ];
+  }
+  return [
+    { group: "ภาพรวม" },
+    { href: "#/dashboard", icon: "▦", label: "หน้าแรก" },
+    { group: "งานเอกสาร" },
+    { href: "#/topics", icon: "🗂", label: "หัวข้อที่เปิดรับ" },
+    { group: "บัญชี" },
+    { href: "#/account", icon: "⚙", label: "บัญชีของฉัน" },
+  ];
+}
+
+function renderNav() {
+  const current = "#" + (parseRoute().path || "");
+  $("#nav").innerHTML = navItems()
+    .map((item) => {
+      if (item.group) return '<div class="group">' + esc(item.group) + "</div>";
+      const active = current === item.href || (item.href !== "#/dashboard" && current.startsWith(item.href));
+      return (
+        '<a class="nav' + (active ? " active" : "") + '" href="' + item.href + '">' +
+        '<span class="ic">' + item.icon + "</span>" + esc(item.label) + "</a>"
+      );
+    })
+    .join("");
+}
+
+/* ---------------------------------------------------------------------
+ * 7) Router (hash based)
+ * ------------------------------------------------------------------ */
+function parseRoute() {
+  const hash = location.hash.replace(/^#/, "");
+  const [pathPart, queryPart] = hash.split("?");
+  const parts = pathPart.split("/").filter(Boolean);
+  const query = {};
+  new URLSearchParams(queryPart || "").forEach((value, key) => { query[key] = value; });
+  return { path: pathPart, parts, query };
+}
+
+const view = () => $("#view");
+
+function renderLoading(message) {
+  view().innerHTML = '<div class="card"><div class="skeleton"><span class="spinner dark"></span> ' +
+    esc(message || "กำลังโหลด…") + "</div></div>";
+}
+
+function renderFailure(err) {
+  view().innerHTML =
+    '<div class="card"><div class="card-body">' +
+    '<div class="note danger"><span>⚠</span><div><b>โหลดข้อมูลไม่สำเร็จ</b><br>' + esc(err.message) + "</div></div>" +
+    '<button class="btn ghost" style="margin-top:14px" onclick="router()">ลองอีกครั้ง</button>' +
+    "</div></div>";
+}
+
+async function router() {
+  if (!state.user) { showLogin(); return; }
+  $("#sidebar").classList.remove("open");
+  renderNav();
+  const route = parseRoute();
+  const [section, id] = route.parts;
+
+  try {
+    if (!section || section === "dashboard") return await viewDashboard();
+    if (section === "topics" && !id) return await viewTopicList();
+    if (section === "topics" && id) return await viewTopicDetail(id, route.query.tab);
+    if (section === "users") return await viewUsers();
+    if (section === "account") return await viewAccount();
+    view().innerHTML = '<div class="card"><div class="empty"><div class="ic">🧭</div>' +
+      "<h4>ไม่พบหน้าที่ต้องการ</h4><p>ตรวจสอบลิงก์อีกครั้ง</p></div></div>";
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) return;
+    renderFailure(err);
+  }
+}
+
+window.addEventListener("hashchange", router);
+window.router = router;
+
+/* ---------------------------------------------------------------------
+ * 8) Data loaders (พร้อม cache เบา ๆ)
+ * ------------------------------------------------------------------ */
+async function loadTopics(force) {
+  if (force || !state.topics.length) {
+    state.topics = (await api.get("/topics")) || [];
+  }
+  return state.topics;
+}
+
+async function loadUsers(force) {
+  if (!isDirector()) return [];
+  if (force || !state.users.length) {
+    state.users = (await api.get("/users")) || [];
+    state.usersById = {};
+    state.users.forEach((u) => { state.usersById[u.uid] = u; });
+  }
   return state.users;
 }
-const userById = (id) => state.users.find((u) => u.uid === id);
 
-/* =========================================================================
-   RENDER
-   ========================================================================= */
-function render() {
-  const app = $("#app");
-  app.innerHTML = "";
-  app.appendChild(state.me ? renderShell() : renderLogin());
+function submitterName(uid) {
+  if (state.user && state.user.uid === uid) return fullName(state.user) + " (คุณ)";
+  const user = state.usersById[uid];
+  return user ? fullName(user) : uid.slice(0, 8) + "…";
 }
 
-/* ------------------------------------------------------------ login view */
-function renderLogin() {
-  const wrap = el("div", { class: "login-wrap" });
-  const box = el("div", { class: "login" });
+/* ---------------------------------------------------------------------
+ * 9) หน้าแรก / Dashboard
+ * ------------------------------------------------------------------ */
+async function viewDashboard() {
+  renderLoading("กำลังโหลดภาพรวม…");
+  const topics = await loadTopics(true);
+  const activeTopics = topics.filter((t) => t.is_active);
 
-  box.appendChild(el("div", { class: "login-head" },
-    el("div", { class: "logo" }, "SD"),
-    el("h1", {}, "SDMS — ระบบจัดการเอกสารโรงเรียน"),
-    el("p", { class: "sub", style: "color:var(--muted);margin-top:4px" }, "Frontend Prototype • เชื่อมต่อกับ SDMS-Backend (Go + Fiber)")));
+  let users = [];
+  if (isDirector()) users = await loadUsers(true);
 
-  // ตั้งค่า API
-  const baseInput = el("input", { type: "text", value: state.baseUrl, placeholder: DEFAULT_BASE });
-  const statusEl = el("span", { class: "conn" },
-    el("span", { class: "dot " + (state.online === true ? "on" : state.online === false ? "off" : "") }),
-    state.online === true ? "เชื่อมต่อสำเร็จ" : state.online === false ? "เชื่อมต่อไม่ได้" : "ยังไม่ได้ตรวจสอบ");
+  const countable = isDirector() ? topics : activeTopics;
+  const counts = await Promise.all(
+    countable.map((topic) =>
+      api.get("/topics/" + topic.uid + "/submissions")
+        .then((rows) => (rows || []).length)
+        .catch(() => 0)
+    )
+  );
+  const totalSubmissions = counts.reduce((sum, n) => sum + n, 0);
+  const countByTopic = {};
+  countable.forEach((topic, i) => { countByTopic[topic.uid] = counts[i]; });
 
-  const testBtn = el("button", { class: "btn" }, "ทดสอบการเชื่อมต่อ");
-  testBtn.onclick = async () => {
-    state.baseUrl = baseInput.value.trim().replace(/\/$/, "") || DEFAULT_BASE;
-    testBtn.disabled = true;
-    try { await API.health(); toast("เชื่อมต่อ API สำเร็จ", "ok"); await loadUsersForLogin(); }
-    catch (e) { toast(thMessage(e), "err"); }
-    finally { testBtn.disabled = false; render(); }
+  const stats = isDirector()
+    ? [
+        { k: "หัวข้อเอกสารทั้งหมด", v: topics.length, f: activeTopics.length + " หัวข้อเปิดรับอยู่" },
+        { k: "รายการที่ครูส่ง", v: totalSubmissions, f: "รวมทุกหัวข้อ" },
+        { k: "บัญชีผู้ใช้", v: users.length, f: users.filter((u) => u.role === "TEACHER").length + " ครู · " + users.filter((u) => u.role === "DIRECTOR").length + " ผอ." },
+        { k: "บัญชีที่ถูกระงับ", v: users.filter((u) => u.status === "INACTIVE").length, f: "จากทั้งหมด " + users.length + " บัญชี" },
+      ]
+    : [
+        { k: "หัวข้อที่เปิดรับ", v: activeTopics.length, f: "จากทั้งหมด " + topics.length + " หัวข้อ" },
+        { k: "รายการที่ฉันส่งแล้ว", v: totalSubmissions, f: "รวมทุกหัวข้อ" },
+        { k: "หัวข้อที่ยังไม่ได้ส่ง", v: activeTopics.filter((t) => !countByTopic[t.uid]).length, f: "ควรดำเนินการ" },
+      ];
+
+  const rows = (isDirector() ? topics : activeTopics)
+    .slice()
+    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+    .slice(0, 8);
+
+  view().innerHTML =
+    '<div class="page-head"><div class="t">' +
+      "<h1>สวัสดี " + esc([state.user.prefix, state.user.first_name].filter(Boolean).join(" ")) + "</h1>" +
+      "<p>" + (isDirector()
+        ? "ภาพรวมหัวข้อเอกสาร บัญชีผู้ใช้ และรายการที่ครูส่งเข้ามา"
+        : "หัวข้อที่เปิดรับเอกสารและสถานะการส่งของคุณ") + "</p>" +
+    "</div></div>" +
+    '<div class="stats">' +
+      stats.map((s) =>
+        '<div class="stat"><div class="k">' + esc(s.k) + '</div><div class="v">' +
+        s.v + '</div><div class="f">' + esc(s.f) + "</div></div>"
+      ).join("") +
+    "</div>" +
+    '<div class="card"><div class="card-head">' +
+      "<h3>" + (isDirector() ? "หัวข้อเอกสารล่าสุด" : "หัวข้อที่เปิดรับ") + "</h3>" +
+      '<div class="right"><a class="btn ghost sm" href="#/topics">ดูทั้งหมด</a></div>' +
+    '</div><div class="card-body tight">' +
+      (rows.length
+        ? '<div class="table-scroll"><table><thead><tr>' +
+          "<th>หัวข้อ</th><th>สถานะ</th><th>รายการที่ส่ง</th><th>อัปเดตล่าสุด</th><th></th>" +
+          "</tr></thead><tbody>" +
+          rows.map((topic) =>
+            "<tr>" +
+              '<td><div class="t-main">' + esc(topic.name) + "</div>" +
+              (topic.description ? '<div class="t-sub">' + esc(topic.description) + "</div>" : "") + "</td>" +
+              "<td>" + statusBadge(topic.is_active) + "</td>" +
+              "<td>" + (countByTopic[topic.uid] || 0) + "</td>" +
+              "<td>" + esc(fmtDateTime(topic.updated_at)) + "</td>" +
+              '<td class="actions"><a class="btn ghost sm" href="#/topics/' + topic.uid + '">เปิด</a></td>' +
+            "</tr>"
+          ).join("") +
+          "</tbody></table></div>"
+        : '<div class="empty"><div class="ic">🗂</div><h4>ยังไม่มีหัวข้อเอกสาร</h4><p>' +
+          (isDirector() ? "สร้างหัวข้อแรกเพื่อเริ่มรับเอกสารจากครู" : "รอผู้อำนวยการเปิดหัวข้อ") + "</p></div>") +
+    "</div></div>";
+}
+
+function statusBadge(isActive) {
+  return isActive
+    ? '<span class="badge ok"><span class="dot"></span>เปิดรับ</span>'
+    : '<span class="badge off"><span class="dot"></span>ปิดรับ</span>';
+}
+
+/* ---------------------------------------------------------------------
+ * 10) หัวข้อเอกสาร — รายการ
+ * ------------------------------------------------------------------ */
+async function viewTopicList() {
+  renderLoading("กำลังโหลดหัวข้อเอกสาร…");
+  const topics = await loadTopics(true);
+  const list = isDirector() ? topics : topics.filter((t) => t.is_active);
+
+  view().innerHTML =
+    '<div class="page-head"><div class="t">' +
+      "<h1>" + (isDirector() ? "หัวข้อเอกสาร" : "หัวข้อที่เปิดรับ") + "</h1>" +
+      "<p>" + (isDirector()
+        ? "สร้างหัวข้อ กำหนดฟิลด์ของฟอร์ม และตรวจรายการที่ครูส่งเข้ามา"
+        : "เลือกหัวข้อเพื่อกรอกแบบฟอร์มและแนบไฟล์") + "</p>" +
+    "</div>" +
+    (isDirector()
+      ? '<div class="actions"><button class="btn" id="btnNewTopic" type="button">+ สร้างหัวข้อใหม่</button></div>'
+      : "") +
+    "</div>" +
+    '<div class="card"><div class="card-head">' +
+      '<h3>ทั้งหมด ' + list.length + " หัวข้อ</h3>" +
+      '<div class="right"><input type="search" id="topicSearch" placeholder="ค้นหาชื่อหัวข้อ…" style="width:230px"></div>' +
+    '</div><div class="card-body tight"><div class="table-scroll">' +
+      '<table><thead><tr><th>หัวข้อ</th><th>สถานะ</th><th>สร้างเมื่อ</th><th></th></tr></thead>' +
+      '<tbody id="topicRows"></tbody></table></div></div></div>';
+
+  const renderRows = (keyword) => {
+    const q = (keyword || "").trim().toLowerCase();
+    const filtered = q
+      ? list.filter((t) =>
+          t.name.toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q))
+      : list;
+
+    $("#topicRows").innerHTML = filtered.length
+      ? filtered.map((topic) =>
+          "<tr>" +
+            '<td><div class="t-main">' + esc(topic.name) + "</div>" +
+            (topic.description ? '<div class="t-sub">' + esc(topic.description) + "</div>" : "") + "</td>" +
+            "<td>" + statusBadge(topic.is_active) + "</td>" +
+            "<td>" + esc(fmtDate(topic.created_at)) + "</td>" +
+            '<td class="actions">' +
+              '<a class="btn ghost sm" href="#/topics/' + topic.uid + '">' +
+                (isDirector() ? "จัดการ" : "ส่งเอกสาร") + "</a>" +
+              (isDirector()
+                ? '<button class="btn subtle sm" data-edit="' + topic.uid + '" type="button">แก้ไข</button>' +
+                  '<button class="btn subtle sm" data-del="' + topic.uid + '" type="button" style="color:var(--danger)">ลบ</button>'
+                : "") +
+            "</td>" +
+          "</tr>"
+        ).join("")
+      : '<tr><td colspan="4"><div class="empty"><div class="ic">🔍</div><h4>ไม่พบหัวข้อ</h4>' +
+        "<p>ลองเปลี่ยนคำค้นหา</p></div></td></tr>";
+
+    $$("#topicRows [data-edit]").forEach((button) =>
+      button.addEventListener("click", () =>
+        topicFormModal(list.find((t) => t.uid === button.dataset.edit))));
+
+    $$("#topicRows [data-del]").forEach((button) =>
+      button.addEventListener("click", () =>
+        deleteTopic(list.find((t) => t.uid === button.dataset.del))));
   };
 
-  const cfgCard = el("div", { class: "card", style: "margin-bottom:18px" },
-    el("div", { class: "card-body" },
-      el("label", { class: "field" },
-        el("span", { class: "lbl" }, "ที่อยู่ API"),
-        baseInput,
-        el("span", { class: "hint" }, "ค่าเริ่มต้นของ backend คือ http://localhost:8080/api/v1")),
-      el("div", { class: "btn-row", style: "align-items:center" }, testBtn, statusEl)));
-  box.appendChild(cfgCard);
-
-  // เลือกผู้ใช้
-  const listBox = el("div", {});
-  const card = el("div", { class: "card" },
-    el("div", { class: "card-head" },
-      el("h2", {}, "เลือกผู้ใช้เพื่อเข้าใช้งาน"),
-      el("div", { class: "spacer" }),
-      el("button", { class: "btn sm", onClick: () => loadUsersForLogin().then(render) }, "รีเฟรช")),
-    el("div", { class: "card-body" },
-      el("div", { class: "alert info" },
-        "Backend ยังไม่มีระบบ authentication — หน้านี้จำลองการล็อกอินด้วยการเลือกผู้ใช้ ",
-        "และจะใช้ uid ของผู้ใช้ที่เลือกเป็นค่า submitted_by เมื่อส่งเอกสาร"),
-      listBox));
-  box.appendChild(card);
-
-  if (state.loading) {
-    listBox.appendChild(el("div", { class: "empty" }, "กำลังโหลด..."));
-  } else if (state.error) {
-    listBox.appendChild(el("div", { class: "alert err" }, state.error));
-  } else if (!state.users.length) {
-    listBox.appendChild(el("div", { class: "empty" },
-      el("div", { class: "big" }, "👤"),
-      el("p", {}, "ยังไม่มีผู้ใช้ในระบบ"),
-      el("p", { style: "margin-top:4px" }, "สร้างผู้ใช้คนแรก หรือสร้างชุดข้อมูลตัวอย่างเพื่อทดลองใช้งาน"),
-      el("div", { class: "btn-row", style: "justify-content:center;margin-top:14px" },
-        el("button", { class: "btn primary", onClick: () => userModal(null, () => loadUsersForLogin().then(render)) }, "+ สร้างผู้ใช้"),
-        el("button", { class: "btn", onClick: seedDemoData }, "สร้างข้อมูลตัวอย่าง"))));
-  } else {
-    for (const u of state.users) {
-      const btn = el("button", { class: "user-pick", onClick: () => { state.me = u; go(u.role === "DIRECTOR" ? "topics" : "topics"); } },
-        el("span", { class: "avatar" }, initials(u)),
-        el("span", {},
-          el("span", { class: "nm" }, fullName(u)),
-          el("span", { class: "mt" }, `@${u.username} • ${u.employee_code}`)),
-        el("span", { class: "spacer" }),
-        el("span", { class: "badge " + (u.role === "DIRECTOR" ? "brand" : "") }, ROLE_LABEL[u.role] || u.role),
-        el("span", { class: "badge " + (u.status === "ACTIVE" ? "ok" : "err") }, STATUS_LABEL[u.status] || u.status));
-      listBox.appendChild(btn);
-    }
-    listBox.appendChild(el("div", { class: "btn-row", style: "margin-top:12px" },
-      el("button", { class: "btn", onClick: () => userModal(null, () => loadUsersForLogin().then(render)) }, "+ สร้างผู้ใช้ใหม่"),
-      el("button", { class: "btn", onClick: seedDemoData }, "สร้างข้อมูลตัวอย่าง")));
-  }
-
-  wrap.appendChild(box);
-  return wrap;
+  renderRows("");
+  $("#topicSearch").addEventListener("input", (e) => renderRows(e.target.value));
+  const newButton = $("#btnNewTopic");
+  if (newButton) newButton.addEventListener("click", () => topicFormModal(null));
 }
 
-async function loadUsersForLogin() {
-  state.loading = true; state.error = null; render();
-  try { await refreshUsers(); }
-  catch (e) { state.error = thMessage(e); state.users = []; }
-  finally { state.loading = false; }
-}
-
-/* ------------------------------------------------------------ app shell */
-function renderShell() {
-  const isDirector = state.me.role === "DIRECTOR";
-
-  const navItems = isDirector
-    ? [["topics", "📄", "หัวข้อเอกสาร"], ["users", "👥", "ผู้ใช้งาน"]]
-    : [["topics", "📄", "หัวข้อเอกสาร"], ["mySubmissions", "📥", "เอกสารของฉัน"]];
-
-  const sidebar = el("aside", { class: "sidebar" },
-    el("div", { class: "nav-label" }, "เมนู"),
-    ...navItems.map(([v, ico, label]) =>
-      el("button", {
-        class: "nav-item" + (state.view === v || (v === "topics" && ["fields", "submit", "submissions", "submissionDetail"].includes(state.view)) ? " active" : ""),
-        onClick: () => go(v),
-      }, el("span", { class: "ico" }, ico), label)));
-
-  const topbar = el("header", { class: "topbar" },
-    el("div", { class: "brand" },
-      el("div", { class: "logo" }, "SD"),
-      el("div", {}, "SDMS", el("small", {}, "ระบบจัดการเอกสารโรงเรียน"))),
-    el("div", { class: "spacer" }),
-    el("div", { class: "conn" },
-      el("span", { class: "dot " + (state.online === true ? "on" : state.online === false ? "off" : "") }),
-      el("span", { class: "mono" }, state.baseUrl)),
-    el("div", { class: "whoami" },
-      el("div", { class: "avatar" }, initials(state.me)),
-      el("div", {},
-        el("div", { class: "name" }, fullName(state.me)),
-        el("div", { class: "sub" }, ROLE_LABEL[state.me.role] || state.me.role))),
-    el("button", { class: "btn sm", onClick: () => { state.me = null; state.view = "topics"; state.data = {}; loadUsersForLogin().then(render); } }, "ออกจากระบบ"));
-
-  const main = el("main", { class: "main" }, renderView());
-  return el("div", {}, topbar, el("div", { class: "shell" }, sidebar, main));
-}
-
-function renderView() {
-  if (state.loading) return el("div", { class: "card" }, el("div", { class: "empty" }, "กำลังโหลด..."));
-  if (state.error) {
-    return el("div", {},
-      el("div", { class: "alert err" }, state.error),
-      el("button", { class: "btn", onClick: reload }, "ลองใหม่"));
-  }
-  // ข้อมูลของ view ยังมาไม่ครบ (เช่นเพิ่งเปลี่ยนหน้า) — แสดงสถานะกำลังโหลดแทนที่จะพัง
-  const need = VIEW_DATA_KEY[state.view];
-  if (need && state.data[need] === undefined) {
-    return el("div", { class: "card" }, el("div", { class: "empty" }, "กำลังโหลด..."));
-  }
-  switch (state.view) {
-    case "topics": return viewTopics();
-    case "users": return viewUsers();
-    case "fields": return viewFields();
-    case "submit": return viewSubmit();
-    case "submissions": return viewSubmissions();
-    case "submissionDetail": return viewSubmissionDetail();
-    case "mySubmissions": return viewMySubmissions();
-    default: return el("div", { class: "empty" }, "ไม่พบหน้านี้");
-  }
-}
-
-/* --------------------------------------------------------- view: topics */
-function viewTopics() {
-  const isDirector = state.me.role === "DIRECTOR";
-  const topics = state.data.topics || [];
-
-  const head = el("div", { class: "page-head" },
-    el("div", {},
-      el("h1", {}, "หัวข้อเอกสาร"),
-      el("p", { class: "sub" }, isDirector
-        ? "สร้างหัวข้อและออกแบบฟอร์มที่ครูต้องกรอก"
-        : "เลือกหัวข้อที่ต้องการส่งเอกสาร")),
-    el("div", { class: "spacer" }),
-    isDirector ? el("button", { class: "btn primary", onClick: () => topicModal(null) }, "+ สร้างหัวข้อ") : null);
-
-  if (!topics.length) {
-    return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "empty" },
-      el("div", { class: "big" }, "📄"),
-      el("p", {}, "ยังไม่มีหัวข้อเอกสาร"),
-      isDirector ? el("div", { style: "margin-top:12px" }, el("button", { class: "btn primary", onClick: () => topicModal(null) }, "+ สร้างหัวข้อแรก")) : null)));
-  }
-
-  const rows = topics.map((t) => {
-    const actions = el("td", { class: "actions" });
-    const btns = el("div", { class: "btn-row", style: "justify-content:flex-end" });
-    if (isDirector) {
-      btns.appendChild(el("button", { class: "btn sm", onClick: () => go("fields", { topicId: t.uid }) }, "ออกแบบฟอร์ม"));
-      btns.appendChild(el("button", { class: "btn sm", onClick: () => go("submissions", { topicId: t.uid }) }, "รายการที่ส่ง"));
-      btns.appendChild(el("button", { class: "btn sm", onClick: () => topicModal(t) }, "แก้ไข"));
-      btns.appendChild(el("button", {
-        class: "btn sm danger",
-        onClick: () => confirmDialog(`ลบหัวข้อ "${t.name}" ใช่หรือไม่?`, async () => {
-          try { await API.deleteTopic(t.uid); toast("ลบหัวข้อแล้ว", "ok"); reload(); }
-          catch (e) { toast(thMessage(e), "err"); }
-        }),
-      }, "ลบ"));
-    } else {
-      btns.appendChild(el("button", {
-        class: "btn sm primary", disabled: !t.is_active,
-        title: t.is_active ? "" : "หัวข้อนี้ปิดรับข้อมูลแล้ว",
-        onClick: () => go("submit", { topicId: t.uid }),
-      }, "ส่งเอกสาร"));
-      btns.appendChild(el("button", { class: "btn sm", onClick: () => go("submissions", { topicId: t.uid, mineOnly: true }) }, "รายการของฉัน"));
-    }
-    actions.appendChild(btns);
-
-    return el("tr", {},
-      el("td", {}, el("div", { style: "font-weight:600" }, t.name), el("div", { class: "mono" }, t.uid)),
-      el("td", {}, t.description || el("span", { style: "color:var(--muted)" }, "—")),
-      el("td", {}, el("span", { class: "badge " + (t.is_active ? "ok" : "warn") }, t.is_active ? "เปิดรับ" : "ปิดรับ")),
-      el("td", {}, fmtDate(t.created_at)),
-      actions);
+function topicFormModal(topic) {
+  const editing = !!topic;
+  openModal({
+    title: editing ? "แก้ไขหัวข้อเอกสาร" : "สร้างหัวข้อเอกสาร",
+    bodyHtml:
+      '<div class="field"><label for="tpName">ชื่อหัวข้อ<span class="req">*</span></label>' +
+      '<input id="tpName" type="text" value="' + esc(topic ? topic.name : "") +
+      '" placeholder="เช่น รายงานผลการปฏิบัติงาน ภาคเรียนที่ 1"></div>' +
+      '<div class="field"><label for="tpDesc">คำอธิบาย</label>' +
+      '<textarea id="tpDesc" placeholder="อธิบายรายละเอียด กำหนดส่ง หรือข้อกำหนดของเอกสาร">' +
+      esc(topic ? topic.description : "") + "</textarea></div>" +
+      (editing
+        ? '<label class="check"><input type="checkbox" id="tpActive"' + (topic.is_active ? " checked" : "") +
+          "><span>เปิดรับเอกสาร<small>ถ้าปิด ครูจะไม่สามารถส่งรายการใหม่เข้าหัวข้อนี้ได้</small></span></label>"
+        : '<div class="note info"><span>ℹ</span><div>หัวข้อที่สร้างใหม่จะ<b>เปิดรับเอกสารทันที</b> ' +
+          "และควรกำหนดฟิลด์ของฟอร์มก่อนแจ้งให้ครูส่ง</div></div>"),
+    footHtml:
+      '<button class="btn ghost" data-act="cancel" type="button">ยกเลิก</button>' +
+      '<button class="btn" data-act="save" type="button">' + (editing ? "บันทึก" : "สร้างหัวข้อ") + "</button>",
+    onMount(root, close) {
+      $('[data-act="cancel"]', root).addEventListener("click", close);
+      $('[data-act="save"]', root).addEventListener("click", async (e) => {
+        const name = $("#tpName", root).value.trim();
+        if (!name) { toast("กรอกไม่ครบ", "กรุณาระบุชื่อหัวข้อ", "err"); return; }
+        await withBusy(e.currentTarget, "กำลังบันทึก…", async () => {
+          try {
+            const body = { name, description: $("#tpDesc", root).value.trim() };
+            if (editing) {
+              body.is_active = $("#tpActive", root).checked;
+              await api.put("/topics/" + topic.uid, body);
+              toast("บันทึกแล้ว", "อัปเดตหัวข้อเรียบร้อย", "ok");
+            } else {
+              const created = await api.post("/topics", body);
+              toast("สร้างหัวข้อแล้ว", created.name, "ok");
+            }
+            close();
+            await loadTopics(true);
+            router();
+          } catch (err) {
+            toast("บันทึกไม่สำเร็จ", err.message, "err");
+          }
+        });
+      });
+    },
   });
-
-  return el("div", {}, head,
-    el("div", { class: "card" }, el("div", { class: "table-wrap" },
-      el("table", {},
-        el("thead", {}, el("tr", {},
-          el("th", {}, "ชื่อหัวข้อ"), el("th", {}, "คำอธิบาย"), el("th", {}, "สถานะ"),
-          el("th", {}, "สร้างเมื่อ"), el("th", { style: "text-align:right" }, "จัดการ"))),
-        el("tbody", {}, ...rows)))));
 }
 
-function topicModal(topic) {
-  const isEdit = !!topic;
-  const name = el("input", { type: "text", value: topic ? topic.name : "", placeholder: "เช่น แผนการสอน ภาคเรียนที่ 1" });
-  const desc = el("textarea", { placeholder: "คำอธิบายเพิ่มเติม (ไม่บังคับ)" }, topic ? topic.description : "");
-  if (topic) desc.value = topic.description || "";
-  const active = el("input", { type: "checkbox" });
-  active.checked = topic ? topic.is_active : true;
-  const errBox = el("div", {});
-
-  const body = el("div", {}, errBox,
-    el("label", { class: "field" }, el("span", { class: "lbl" }, "ชื่อหัวข้อ ", el("span", { class: "req" }, "*")), name),
-    el("label", { class: "field" }, el("span", { class: "lbl" }, "คำอธิบาย"), desc),
-    isEdit ? el("label", { class: "check" }, active, "เปิดรับการส่งเอกสาร") : null);
-
-  const save = el("button", { class: "btn primary" }, isEdit ? "บันทึก" : "สร้างหัวข้อ");
-  const cancel = el("button", { class: "btn" }, "ยกเลิก");
-  const m = openModal({ title: isEdit ? "แก้ไขหัวข้อ" : "สร้างหัวข้อใหม่", body, footer: [cancel, save] });
-  cancel.onclick = m.close;
-  save.onclick = async () => {
-    errBox.innerHTML = "";
-    save.disabled = true;
-    try {
-      if (isEdit) await API.updateTopic(topic.uid, { name: name.value, description: desc.value, is_active: active.checked });
-      else await API.createTopic({ name: name.value, description: desc.value });
-      m.close(); toast(isEdit ? "บันทึกแล้ว" : "สร้างหัวข้อแล้ว", "ok"); reload();
-    } catch (e) {
-      errBox.appendChild(el("div", { class: "alert err" }, thMessage(e)));
-      save.disabled = false;
-    }
-  };
-}
-
-/* ------------------------------------------- view: form builder (fields) */
-function viewFields() {
-  const topic = state.data.topic;
-  const fields = [...(topic.fields || [])].sort((a, b) => a.position - b.position);
-  const previewCount = fields.filter((f) => f.is_preview).length;
-
-  const head = el("div", { class: "page-head" },
-    el("div", {},
-      el("button", { class: "crumb", onClick: () => go("topics") }, "← กลับไปหัวข้อเอกสาร"),
-      el("h1", {}, topic.name),
-      el("p", { class: "sub" }, "ออกแบบฟิลด์ที่ครูต้องกรอกในหัวข้อนี้")),
-    el("div", { class: "spacer" }),
-    el("div", { class: "btn-row" },
-      el("button", { class: "btn", onClick: () => go("submissions", { topicId: topic.uid }) }, "ดูรายการที่ส่ง"),
-      el("button", { class: "btn primary", onClick: () => fieldModal(topic, null, fields) }, "+ เพิ่มฟิลด์")));
-
-  const rows = fields.map((f) =>
-    el("tr", {},
-      el("td", {}, el("span", { class: "badge" }, f.position)),
-      el("td", {}, el("div", { style: "font-weight:600" }, f.label),
-        f.type === "select" && f.options && f.options.length
-          ? el("div", { class: "mono" }, f.options.map((o) => o.label).join(" / ")) : null),
-      el("td", {}, el("span", { class: "badge brand" }, typeLabel(f.type))),
-      el("td", {}, f.required ? el("span", { class: "badge err" }, "จำเป็น") : el("span", { style: "color:var(--muted)" }, "ไม่บังคับ")),
-      el("td", {}, f.is_preview ? el("span", { class: "badge ok" }, "แสดง") : el("span", { style: "color:var(--muted)" }, "—")),
-      el("td", { class: "actions" }, el("div", { class: "btn-row", style: "justify-content:flex-end" },
-        el("button", { class: "btn sm", onClick: () => fieldModal(topic, f, fields) }, "แก้ไข"),
-        el("button", {
-          class: "btn sm danger",
-          onClick: () => confirmDialog(`ลบฟิลด์ "${f.label}" ใช่หรือไม่?`, async () => {
-            try { await API.deleteField(topic.uid, f.uid); toast("ลบฟิลด์แล้ว", "ok"); reload(); }
-            catch (e) { toast(thMessage(e), "err"); }
-          }),
-        }, "ลบ")))));
-
-  const table = fields.length
-    ? el("div", { class: "table-wrap" }, el("table", {},
-        el("thead", {}, el("tr", {},
-          el("th", {}, "ลำดับ"), el("th", {}, "ป้ายกำกับ"), el("th", {}, "ชนิด"),
-          el("th", {}, "บังคับกรอก"), el("th", {}, "แสดงในตาราง"), el("th", { style: "text-align:right" }, "จัดการ"))),
-        el("tbody", {}, ...rows)))
-    : el("div", { class: "empty" },
-        el("div", { class: "big" }, "🧩"),
-        el("p", {}, "ยังไม่มีฟิลด์ในหัวข้อนี้"),
-        el("div", { style: "margin-top:12px" }, el("button", { class: "btn primary", onClick: () => fieldModal(topic, null, fields) }, "+ เพิ่มฟิลด์แรก")));
-
-  const left = el("div", { class: "card" },
-    el("div", { class: "card-head" },
-      el("h2", {}, "ฟิลด์ทั้งหมด"),
-      el("div", { class: "spacer" }),
-      el("span", { class: "badge" }, `ฟิลด์แสดงในตาราง ${previewCount}`)),
-    table);
-
-  const right = el("div", { class: "card" },
-    el("div", { class: "card-head" }, el("h2", {}, "ตัวอย่างฟอร์มที่ครูจะเห็น")),
-    el("div", { class: "card-body" },
-      fields.length
-        ? el("div", { class: "preview-form" }, ...fields.map((f) => renderFieldInput(f, { disabled: true })))
-        : el("p", { style: "color:var(--muted)" }, "เพิ่มฟิลด์เพื่อดูตัวอย่าง")));
-
-  return el("div", {}, head, el("div", { class: "grid2" }, left, right));
-}
-
-function fieldModal(topic, field, allFields) {
-  const isEdit = !!field;
-  const label = el("input", { type: "text", value: field ? field.label : "", placeholder: "เช่น ชื่อรายวิชา" });
-  const type = el("select", {}, ...FIELD_TYPES.map((t) => el("option", { value: t.value }, t.label)));
-  type.value = field ? field.type : "text";
-  const position = el("input", { type: "number", min: "0", value: field ? field.position : (allFields.length ? Math.max(...allFields.map((f) => f.position)) + 1 : 0) });
-  const required = el("input", { type: "checkbox" }); required.checked = field ? field.required : false;
-  const isPreview = el("input", { type: "checkbox" }); isPreview.checked = field ? field.is_preview : false;
-
-  const optsBox = el("div", {});
-  const optsWrap = el("div", { class: "field", style: "display:none" },
-    el("span", { class: "lbl" }, "ตัวเลือก ", el("span", { class: "req" }, "*")),
-    optsBox,
-    el("button", { class: "btn sm", onClick: () => addOpt() }, "+ เพิ่มตัวเลือก"),
-    el("span", { class: "hint" }, "ค่า (value) คือสิ่งที่บันทึกลงฐานข้อมูล และต้องไม่ซ้ำกัน"));
-
-  function addOpt(o) {
-    const l = el("input", { type: "text", value: o ? o.label : "", placeholder: "ป้ายกำกับ" });
-    const v = el("input", { type: "text", value: o ? o.value : "", placeholder: "ค่า" });
-    const row = el("div", { class: "opt-row" }, l, v,
-      el("button", { class: "btn sm danger", onClick: () => row.remove() }, "ลบ"));
-    row._get = () => ({ label: l.value.trim(), value: v.value.trim() });
-    optsBox.appendChild(row);
+async function deleteTopic(topic) {
+  const ok = await confirmDialog({
+    title: "ลบหัวข้อเอกสาร",
+    message: "ต้องการลบ <b>" + esc(topic.name) + "</b> ใช่หรือไม่?<br>" +
+      '<span style="color:var(--danger)">ฟิลด์ของฟอร์มและรายการที่ครูส่งในหัวข้อนี้จะถูกลบไปด้วย</span>',
+    confirmText: "ลบหัวข้อ",
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await api.del("/topics/" + topic.uid);
+    toast("ลบแล้ว", topic.name, "ok");
+    await loadTopics(true);
+    router();
+  } catch (err) {
+    toast("ลบไม่สำเร็จ", err.message, "err");
   }
-  (field && field.options ? field.options : []).forEach(addOpt);
-
-  const syncType = () => {
-    const isSelect = type.value === "select";
-    optsWrap.style.display = isSelect ? "block" : "none";
-    if (isSelect && !optsBox.children.length) { addOpt(); addOpt(); }
-    fileHint.style.display = type.value === "file" ? "block" : "none";
-  };
-  const fileHint = el("div", { class: "alert info", style: "display:none" },
-    "ฟิลด์ไฟล์: ครูจะกรอกฟอร์มก่อน ระบบจะสร้างรายการแล้วค่อยอัปโหลดไฟล์ตามหลัง (multipart) — ",
-    "นามสกุลที่อนุญาต: " + ALLOWED_EXT.join(", "));
-  type.onchange = syncType;
-
-  const errBox = el("div", {});
-  const body = el("div", {}, errBox,
-    el("label", { class: "field" }, el("span", { class: "lbl" }, "ป้ายกำกับ ", el("span", { class: "req" }, "*")), label),
-    el("label", { class: "field" }, el("span", { class: "lbl" }, "ชนิดข้อมูล"), type,
-      isEdit ? el("span", { class: "hint" }, "เปลี่ยนชนิดไม่ได้ถ้าหัวข้อนี้มีการส่งข้อมูลแล้ว") : null),
-    fileHint,
-    optsWrap,
-    el("label", { class: "field" }, el("span", { class: "lbl" }, "ลำดับการแสดงผล"), position),
-    el("label", { class: "check" }, required, "บังคับกรอก"),
-    el("label", { class: "check" }, isPreview, "แสดงคอลัมน์นี้ในตารางรายการที่ส่ง"));
-  syncType();
-
-  const save = el("button", { class: "btn primary" }, isEdit ? "บันทึก" : "เพิ่มฟิลด์");
-  const cancel = el("button", { class: "btn" }, "ยกเลิก");
-  const m = openModal({ title: isEdit ? "แก้ไขฟิลด์" : "เพิ่มฟิลด์ใหม่", body, footer: [cancel, save] });
-  cancel.onclick = m.close;
-  save.onclick = async () => {
-    errBox.innerHTML = "";
-    const payload = {
-      label: label.value.trim(),
-      type: type.value,
-      required: required.checked,
-      is_preview: isPreview.checked,
-      position: Number(position.value) || 0,
-      options: type.value === "select" ? [...optsBox.children].map((r) => r._get()).filter((o) => o.label || o.value) : [],
-    };
-    save.disabled = true;
-    try {
-      if (isEdit) await API.updateField(topic.uid, field.uid, payload);
-      else await API.createField(topic.uid, payload);
-      m.close(); toast(isEdit ? "บันทึกฟิลด์แล้ว" : "เพิ่มฟิลด์แล้ว", "ok"); reload();
-    } catch (e) {
-      errBox.appendChild(el("div", { class: "alert err" }, thMessage(e)));
-      save.disabled = false;
-    }
-  };
 }
 
-/* --------------------------------------------- dynamic field input render */
-function renderFieldInput(field, { disabled = false } = {}) {
-  const id = "f_" + field.uid;
-  let input;
-  switch (field.type) {
-    case "textarea":
-      input = el("textarea", { id, disabled, placeholder: disabled ? "" : "กรอกข้อความ" });
-      break;
-    case "number":
-      input = el("input", { type: "number", id, disabled, step: "any", placeholder: disabled ? "" : "0" });
-      break;
-    case "date":
-      input = el("input", { type: "date", id, disabled });
-      break;
-    case "select":
-      input = el("select", { id, disabled },
-        el("option", { value: "" }, "— เลือก —"),
-        ...(field.options || []).map((o) => el("option", { value: o.value }, o.label)));
-      break;
-    case "file":
-      input = el("input", { type: "file", id, disabled, accept: ALLOWED_EXT.join(",") });
-      break;
-    default:
-      input = el("input", { type: "text", id, disabled, placeholder: disabled ? "" : "กรอกข้อความ" });
+/* ---------------------------------------------------------------------
+ * 11) หัวข้อเอกสาร — รายละเอียด
+ * ------------------------------------------------------------------ */
+async function viewTopicDetail(topicId, tab) {
+  renderLoading("กำลังโหลดหัวข้อ…");
+  const detail = await api.get("/topics/" + topicId);
+  const fields = (detail.fields || []).slice().sort((a, b) => a.position - b.position);
+
+  const tabs = isDirector()
+    ? [{ key: "fields", label: "ฟิลด์ของฟอร์ม" }, { key: "submissions", label: "รายการที่ครูส่ง" }]
+    : [{ key: "submit", label: "ส่งเอกสาร" }, { key: "mine", label: "ประวัติการส่งของฉัน" }];
+  const activeTab = tabs.some((t) => t.key === tab) ? tab : tabs[0].key;
+
+  view().innerHTML =
+    '<div class="crumb"><a href="#/topics">หัวข้อเอกสาร</a> / ' + esc(detail.name) + "</div>" +
+    '<div class="page-head"><div class="t">' +
+      "<h1>" + esc(detail.name) + " " + statusBadge(detail.is_active) + "</h1>" +
+      "<p>" + esc(detail.description || "ไม่มีคำอธิบาย") + "</p>" +
+    "</div>" +
+    (isDirector()
+      ? '<div class="actions">' +
+        '<button class="btn ghost" id="btnEditTopic" type="button">แก้ไขหัวข้อ</button>' +
+        '<button class="btn" id="btnNewField" type="button">+ เพิ่มฟิลด์</button></div>'
+      : "") +
+    "</div>" +
+    '<div class="tabs">' +
+      tabs.map((t) =>
+        '<a href="#/topics/' + topicId + "?tab=" + t.key + '" class="' +
+        (t.key === activeTab ? "active" : "") + '">' + esc(t.label) + "</a>"
+      ).join("") +
+    "</div>" +
+    '<div id="tabBody"></div>';
+
+  if (isDirector()) {
+    $("#btnEditTopic").addEventListener("click", () => topicFormModal(detail));
+    $("#btnNewField").addEventListener("click", () => fieldFormModal(topicId, null, fields.length));
   }
-  input.dataset.fieldUid = field.uid;
-  input.dataset.fieldType = field.type;
 
-  const wrap = el("label", { class: "field", for: id },
-    el("span", { class: "lbl" }, field.label, field.required ? el("span", { class: "req" }, " *") : null,
-      el("span", { class: "badge", style: "margin-left:8px;font-weight:500" }, typeLabel(field.type))),
-    input,
-    field.type === "file" ? el("span", { class: "hint" }, "รองรับ: " + ALLOWED_EXT.join(", ")) : null);
-  wrap._input = input;
-  return wrap;
+  if (activeTab === "fields") return renderFieldsTab(topicId, fields);
+  if (activeTab === "submissions") return renderDirectorSubmissions(detail, fields);
+  if (activeTab === "submit") return renderTeacherSubmitTab(detail, fields);
+  if (activeTab === "mine") return renderTeacherHistory(detail, fields);
 }
 
-/* --------------------------------------------------- view: submit (ครู) */
-function viewSubmit() {
-  const topic = state.data.topic;
-  const fields = [...(topic.fields || [])].sort((a, b) => a.position - b.position);
-  const dataFields = fields.filter((f) => f.type !== "file");
-  const fileFields = fields.filter((f) => f.type === "file");
+/* ---------- Tab: ฟิลด์ของฟอร์ม (ผอ.) ---------- */
+function renderFieldsTab(topicId, fields) {
+  const body = $("#tabBody");
+  body.innerHTML =
+    '<div class="note info" style="margin-bottom:14px"><span>ℹ</span><div>' +
+      "ฟิลด์เหล่านี้คือแบบฟอร์มที่ครูต้องกรอก · ติ๊ก <b>แสดงในตารางสรุป</b> " +
+      "เพื่อให้ค่านั้นโผล่เป็นคอลัมน์ในหน้ารายการที่ครูส่ง<br>" +
+      '<span style="font-size:12.5px">เมื่อมีครูส่งข้อมูลเข้าหัวข้อนี้แล้ว จะไม่สามารถเปลี่ยนชนิดฟิลด์หรือลบฟิลด์ได้</span>' +
+    "</div></div>" +
+    '<div class="card"><div class="card-head"><h3>ฟิลด์ทั้งหมด ' + fields.length + " รายการ</h3>" +
+    '<div class="right"><span class="sub">เรียงตามลำดับการแสดงผล</span></div></div>' +
+    '<div class="card-body tight" id="fieldList"></div></div>';
 
-  const head = el("div", { class: "page-head" },
-    el("div", {},
-      el("button", { class: "crumb", onClick: () => go("topics") }, "← กลับไปหัวข้อเอกสาร"),
-      el("h1", {}, "ส่งเอกสาร: " + topic.name),
-      el("p", { class: "sub" }, topic.description || "กรอกข้อมูลตามฟอร์มด้านล่าง")));
-
+  const list = $("#fieldList");
   if (!fields.length) {
-    return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "empty" },
-      el("div", { class: "big" }, "🧩"), el("p", {}, "หัวข้อนี้ยังไม่ได้กำหนดฟิลด์ ติดต่อผู้อำนวยการเพื่อออกแบบฟอร์ม"))));
+    list.innerHTML = '<div class="empty"><div class="ic">🧩</div><h4>ยังไม่มีฟิลด์ในฟอร์ม</h4>' +
+      '<p>กด “+ เพิ่มฟิลด์” เพื่อกำหนดข้อมูลที่ต้องการให้ครูกรอก</p></div>';
+    return;
   }
 
-  const errBox = el("div", {});
-  const stepsBox = el("div", { class: "steps" });
-  const inputs = [];
-  const form = el("div", {});
+  list.innerHTML = fields.map((field, index) =>
+    '<div class="fieldrow">' +
+      '<div class="pos">' + (index + 1) + "</div>" +
+      '<div class="info"><div class="lbl">' + esc(field.label) +
+        (field.required ? '<span class="req">*</span>' : "") + "</div>" +
+        '<div class="meta">' +
+          '<span class="chip">' + (FIELD_TYPE_ICON[field.type] || "") + " " +
+            esc(FIELD_TYPE_LABEL[field.type] || field.type) + "</span>" +
+          (field.required ? '<span class="badge warn">จำเป็น</span>' : '<span class="badge off">ไม่บังคับ</span>') +
+          (field.is_preview ? '<span class="badge navy">แสดงในตารางสรุป</span>' : "") +
+          (field.type === "select" && field.options && field.options.length
+            ? "<span>" + field.options.length + " ตัวเลือก: " +
+              esc(field.options.slice(0, 3).map((o) => o.label).join(", ")) +
+              (field.options.length > 3 ? " …" : "") + "</span>"
+            : "") +
+        "</div>" +
+      "</div>" +
+      '<div class="ops">' +
+        '<button class="btn subtle sm" data-up="' + field.uid + '" type="button" title="เลื่อนขึ้น"' +
+          (index === 0 ? " disabled" : "") + ">↑</button>" +
+        '<button class="btn subtle sm" data-down="' + field.uid + '" type="button" title="เลื่อนลง"' +
+          (index === fields.length - 1 ? " disabled" : "") + ">↓</button>" +
+        '<button class="btn ghost sm" data-edit="' + field.uid + '" type="button">แก้ไข</button>' +
+        '<button class="btn subtle sm" data-del="' + field.uid + '" type="button" style="color:var(--danger)">ลบ</button>' +
+      "</div>" +
+    "</div>"
+  ).join("");
 
-  for (const f of fields) {
-    const w = renderFieldInput(f);
-    inputs.push({ field: f, input: w._input });
-    form.appendChild(w);
+  $$("#fieldList [data-edit]").forEach((button) =>
+    button.addEventListener("click", () =>
+      fieldFormModal(topicId, fields.find((f) => f.uid === button.dataset.edit), fields.length)));
+
+  $$("#fieldList [data-del]").forEach((button) =>
+    button.addEventListener("click", () =>
+      deleteField(topicId, fields.find((f) => f.uid === button.dataset.del))));
+
+  $$("#fieldList [data-up]").forEach((button) =>
+    button.addEventListener("click", () => swapFieldPosition(topicId, fields, button.dataset.up, -1)));
+
+  $$("#fieldList [data-down]").forEach((button) =>
+    button.addEventListener("click", () => swapFieldPosition(topicId, fields, button.dataset.down, +1)));
+}
+
+function fieldPayload(field, overrides) {
+  return Object.assign({
+    label: field.label,
+    type: field.type,
+    required: field.required,
+    is_preview: field.is_preview,
+    position: field.position,
+    options: (field.options || []).map((o) => ({ label: o.label, value: o.value })),
+  }, overrides || {});
+}
+
+async function swapFieldPosition(topicId, fields, fieldUid, direction) {
+  const index = fields.findIndex((f) => f.uid === fieldUid);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= fields.length) return;
+  const a = fields[index];
+  const b = fields[target];
+  try {
+    await api.put("/topics/" + topicId + "/fields/" + a.uid, fieldPayload(a, { position: b.position }));
+    await api.put("/topics/" + topicId + "/fields/" + b.uid, fieldPayload(b, { position: a.position }));
+    router();
+  } catch (err) {
+    toast("จัดลำดับไม่สำเร็จ", err.message, "err");
   }
+}
 
-  const submitBtn = el("button", { class: "btn primary" }, "ส่งเอกสาร");
-  const resetBtn = el("button", { class: "btn" }, "ล้างฟอร์ม");
-  resetBtn.onclick = () => { inputs.forEach(({ input }) => { input.value = ""; }); errBox.innerHTML = ""; stepsBox.innerHTML = ""; };
+function fieldFormModal(topicId, field, fieldCount) {
+  const editing = !!field;
+  const options = editing && field.options ? field.options.slice() : [];
 
-  submitBtn.onclick = async () => {
-    errBox.innerHTML = "";
-    stepsBox.innerHTML = "";
+  const typeOptions = Object.keys(FIELD_TYPE_LABEL).map((key) =>
+    '<option value="' + key + '"' + (editing && field.type === key ? " selected" : "") + ">" +
+    FIELD_TYPE_ICON[key] + "  " + FIELD_TYPE_LABEL[key] + "</option>"
+  ).join("");
 
-    // 1) ตรวจฝั่ง client ก่อน — ฟิลด์ไฟล์ backend ไม่ได้บังคับตอนสร้าง จึงตรวจที่นี่
-    const missing = [];
-    for (const { field, input } of inputs) {
-      if (!field.required) continue;
-      const empty = field.type === "file" ? !input.files.length : !String(input.value).trim();
-      if (empty) missing.push(field.label);
-    }
-    if (missing.length) {
-      errBox.appendChild(el("div", { class: "alert err" }, "กรุณากรอกข้อมูลที่จำเป็น: " + missing.join(", ")));
-      return;
-    }
+  openModal({
+    title: editing ? "แก้ไขฟิลด์" : "เพิ่มฟิลด์ใหม่",
+    size: "wide",
+    bodyHtml:
+      '<div class="grid-2">' +
+        '<div class="field"><label for="fdLabel">ชื่อฟิลด์ (label)<span class="req">*</span></label>' +
+        '<input id="fdLabel" type="text" value="' + esc(editing ? field.label : "") +
+        '" placeholder="เช่น ชื่อกิจกรรม"></div>' +
+        '<div class="field"><label for="fdType">ชนิดข้อมูล<span class="req">*</span></label>' +
+        '<select id="fdType">' + typeOptions + "</select>" +
+        '<span class="hint">ชนิด <b>ไฟล์แนบ</b> จะให้ครูอัปโหลดไฟล์หลังกดส่งฟอร์ม</span></div>' +
+      "</div>" +
+      '<div class="field"><label for="fdPos">ลำดับการแสดงผล</label>' +
+      '<input id="fdPos" type="number" min="0" value="' + (editing ? field.position : fieldCount) + '"></div>' +
+      '<label class="check" style="margin-bottom:10px"><input type="checkbox" id="fdReq"' +
+        (editing && field.required ? " checked" : "") +
+        "><span>บังคับกรอก<small>ครูต้องกรอกฟิลด์นี้จึงจะส่งฟอร์มได้</small></span></label>" +
+      '<label class="check" style="margin-bottom:14px"><input type="checkbox" id="fdPrev"' +
+        (editing && field.is_preview ? " checked" : "") +
+        "><span>แสดงในตารางสรุป<small>ค่าของฟิลด์นี้จะกลายเป็นคอลัมน์ในหน้ารายการที่ครูส่ง</small></span></label>" +
+      '<div id="optBox" hidden>' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+          '<label style="font-size:13.5px;font-weight:600">ตัวเลือก<span class="req">*</span></label>' +
+          '<button class="btn ghost sm" id="addOpt" type="button" style="margin-left:auto">+ เพิ่มตัวเลือก</button>' +
+        "</div>" +
+        '<div id="optRows"></div>' +
+        '<span class="hint">value ต้องไม่ซ้ำกัน — ระบบหลังบ้านจะตรวจค่าที่ครูเลือกกับรายการนี้</span>' +
+      "</div>" +
+      (editing
+        ? '<div class="note warn" style="margin-top:14px"><span>⚠</span><div>' +
+          "หากมีครูส่งข้อมูลเข้าหัวข้อนี้แล้ว การ<b>เปลี่ยนชนิดข้อมูล</b>จะถูกปฏิเสธ (HTTP 409)</div></div>"
+        : ""),
+    footHtml:
+      '<button class="btn ghost" data-act="cancel" type="button">ยกเลิก</button>' +
+      '<button class="btn" data-act="save" type="button">' + (editing ? "บันทึก" : "เพิ่มฟิลด์") + "</button>",
+    onMount(root, close) {
+      const typeSelect = $("#fdType", root);
+      const optionBox = $("#optBox", root);
+      const optionRows = $("#optRows", root);
 
-    const values = [];
-    for (const { field, input } of inputs) {
-      if (field.type === "file") continue;
-      const raw = String(input.value).trim();
-      if (!raw) continue; // ฟิลด์ไม่บังคับที่ปล่อยว่างไว้ ไม่ต้องส่ง
-      values.push({ field_uid: field.uid, value: field.type === "number" ? Number(raw) : raw });
-    }
+      const drawOptions = () => {
+        optionRows.innerHTML = options.map((opt, i) =>
+          '<div class="opt-row">' +
+            '<input type="text" data-ol="' + i + '" placeholder="ข้อความที่แสดง" value="' + esc(opt.label) + '">' +
+            '<input type="text" data-ov="' + i + '" placeholder="value" value="' + esc(opt.value) + '">' +
+            '<button class="btn subtle sm" data-orm="' + i + '" type="button" style="color:var(--danger)">✕</button>' +
+          "</div>"
+        ).join("") || '<p class="hint" style="margin-bottom:8px">ยังไม่มีตัวเลือก</p>';
 
-    const stepCreate = el("span", { class: "step active" }, "1. บันทึกข้อมูล");
-    stepsBox.appendChild(stepCreate);
-    const fileSteps = fileFields.map((f, i) => {
-      const s = el("span", { class: "step" }, `${i + 2}. อัปโหลด ${f.label}`);
-      stepsBox.appendChild(s);
-      return { field: f, step: s };
-    });
+        $$("[data-ol]", optionRows).forEach((input) =>
+          input.addEventListener("input", (e) => { options[+e.target.dataset.ol].label = e.target.value; }));
+        $$("[data-ov]", optionRows).forEach((input) =>
+          input.addEventListener("input", (e) => { options[+e.target.dataset.ov].value = e.target.value; }));
+        $$("[data-orm]", optionRows).forEach((button) =>
+          button.addEventListener("click", (e) => {
+            options.splice(+e.currentTarget.dataset.orm, 1);
+            drawOptions();
+          }));
+      };
 
-    submitBtn.disabled = true; resetBtn.disabled = true;
-    let submission;
+      const syncType = () => {
+        const isSelect = typeSelect.value === "select";
+        optionBox.hidden = !isSelect;
+        if (isSelect && !options.length) {
+          options.push({ label: "", value: "" });
+          drawOptions();
+        }
+      };
+
+      $("#addOpt", root).addEventListener("click", () => {
+        options.push({ label: "", value: "" });
+        drawOptions();
+      });
+
+      typeSelect.addEventListener("change", syncType);
+      drawOptions();
+      syncType();
+
+      $('[data-act="cancel"]', root).addEventListener("click", close);
+      $('[data-act="save"]', root).addEventListener("click", async (e) => {
+        const label = $("#fdLabel", root).value.trim();
+        const type = typeSelect.value;
+        if (!label) { toast("กรอกไม่ครบ", "กรุณาระบุชื่อฟิลด์", "err"); return; }
+
+        const cleanOptions = type === "select"
+          ? options
+              .map((o) => ({ label: o.label.trim(), value: o.value.trim() }))
+              .filter((o) => o.label || o.value)
+          : [];
+
+        if (type === "select") {
+          if (!cleanOptions.length) { toast("กรอกไม่ครบ", "ฟิลด์แบบตัวเลือกต้องมีอย่างน้อย 1 รายการ", "err"); return; }
+          if (cleanOptions.some((o) => !o.label || !o.value)) {
+            toast("กรอกไม่ครบ", "ตัวเลือกต้องมีทั้งข้อความและ value", "err"); return;
+          }
+          const values = cleanOptions.map((o) => o.value);
+          if (new Set(values).size !== values.length) {
+            toast("ค่าซ้ำ", "value ของตัวเลือกต้องไม่ซ้ำกัน", "err"); return;
+          }
+        }
+
+        const body = {
+          label,
+          type,
+          required: $("#fdReq", root).checked,
+          is_preview: $("#fdPrev", root).checked,
+          position: Number($("#fdPos", root).value) || 0,
+          options: cleanOptions,
+        };
+
+        await withBusy(e.currentTarget, "กำลังบันทึก…", async () => {
+          try {
+            if (editing) {
+              await api.put("/topics/" + topicId + "/fields/" + field.uid, body);
+              toast("บันทึกแล้ว", "อัปเดตฟิลด์เรียบร้อย", "ok");
+            } else {
+              await api.post("/topics/" + topicId + "/fields", body);
+              toast("เพิ่มฟิลด์แล้ว", label, "ok");
+            }
+            close();
+            router();
+          } catch (err) {
+            toast(err.status === 409 ? "แก้ไขไม่ได้" : "บันทึกไม่สำเร็จ", err.message, "err");
+          }
+        });
+      });
+    },
+  });
+}
+
+async function deleteField(topicId, field) {
+  const ok = await confirmDialog({
+    title: "ลบฟิลด์",
+    message: "ต้องการลบฟิลด์ <b>" + esc(field.label) + "</b> ใช่หรือไม่?",
+    confirmText: "ลบฟิลด์",
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await api.del("/topics/" + topicId + "/fields/" + field.uid);
+    toast("ลบแล้ว", field.label, "ok");
+    router();
+  } catch (err) {
+    toast(err.status === 409 ? "ลบไม่ได้" : "ลบไม่สำเร็จ", err.message, "err");
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * 12) Tab: รายการที่ครูส่ง (ผอ.)
+ * ------------------------------------------------------------------ */
+async function renderDirectorSubmissions(topic, fields) {
+  const body = $("#tabBody");
+  const previewFields = fields.filter((f) => f.is_preview);
+  await loadUsers();
+  const teachers = state.users.filter((u) => u.role === "TEACHER");
+
+  body.innerHTML =
+    '<div class="card"><div class="card-head">' +
+      "<h3>รายการที่ส่งเข้ามา</h3>" +
+      '<div class="right">' +
+        '<select id="filterTeacher" style="width:230px"><option value="">ครูทุกคน</option>' +
+        teachers.map((t) => '<option value="' + t.uid + '">' + esc(fullName(t)) + "</option>").join("") +
+        "</select>" +
+        '<button class="btn ghost sm" id="btnReloadSubs" type="button">รีเฟรช</button>' +
+      "</div>" +
+    '</div><div class="card-body tight" id="subsBox"></div></div>' +
+    (previewFields.length
+      ? ""
+      : '<div class="note info" style="margin-top:14px"><span>ℹ</span><div>ยังไม่มีฟิลด์ที่ติ๊ก ' +
+        "<b>แสดงในตารางสรุป</b> — ตารางจึงแสดงเฉพาะผู้ส่งและเวลา กดปุ่ม “ดูรายละเอียด” เพื่อดูค่าทั้งหมด</div></div>");
+
+  const load = async (submittedBy) => {
+    $("#subsBox").innerHTML = '<div class="skeleton"><span class="spinner dark"></span> กำลังโหลด…</div>';
+    const query = submittedBy ? "?submitted_by=" + encodeURIComponent(submittedBy) : "";
+    let rows = [];
     try {
-      submission = await API.createSubmission(topic.uid, { submitted_by: state.me.uid, values });
-      stepCreate.className = "step done";
-    } catch (e) {
-      stepCreate.className = "step fail";
-      errBox.appendChild(el("div", { class: "alert err" }, thMessage(e),
-        e.code ? el("div", {}, el("code", {}, "code: " + e.code)) : null));
-      submitBtn.disabled = false; resetBtn.disabled = false;
+      rows = (await api.get("/topics/" + topic.uid + "/submissions" + query)) || [];
+    } catch (err) {
+      $("#subsBox").innerHTML = '<div class="empty"><div class="ic">⚠</div><h4>โหลดไม่สำเร็จ</h4><p>' +
+        esc(err.message) + "</p></div>";
       return;
     }
 
-    // 2) อัปโหลดไฟล์ทีละฟิลด์ (multipart) หลังจากมี submission แล้ว
-    const failed = [];
-    for (const { field, step } of fileSteps) {
-      const entry = inputs.find((i) => i.field.uid === field.uid);
-      if (!entry.input.files.length) { step.className = "step"; step.textContent += " (ไม่มีไฟล์)"; continue; }
-      step.className = "step active";
-      const fd = new FormData();
-      fd.append("field_uid", field.uid);
-      fd.append("file", entry.input.files[0]);
-      try { await API.uploadFile(topic.uid, submission.uid, fd); step.className = "step done"; }
-      catch (e) { step.className = "step fail"; failed.push(`${field.label}: ${thMessage(e)}`); }
+    if (!rows.length) {
+      $("#subsBox").innerHTML = '<div class="empty"><div class="ic">📭</div><h4>ยังไม่มีรายการ</h4>' +
+        "<p>เมื่อครูส่งเอกสารเข้าหัวข้อนี้ รายการจะปรากฏที่นี่</p></div>";
+      return;
     }
 
-    if (failed.length) {
-      errBox.appendChild(el("div", { class: "alert warn" },
-        el("div", { style: "font-weight:600;margin-bottom:4px" }, "บันทึกข้อมูลสำเร็จ แต่อัปโหลดไฟล์บางรายการไม่สำเร็จ"),
-        ...failed.map((f) => el("div", {}, "• " + f)),
-        el("div", { style: "margin-top:6px" }, "อัปโหลดซ้ำได้ที่หน้ารายละเอียดรายการ")));
-      toast("บันทึกแล้ว แต่มีไฟล์ที่อัปโหลดไม่สำเร็จ", "err");
-    } else {
-      toast("ส่งเอกสารสำเร็จ", "ok");
-    }
-    go("submissionDetail", { topicId: topic.uid, submissionId: submission.uid, mineOnly: true });
+    rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    $("#subsBox").innerHTML =
+      '<div class="table-scroll"><table><thead><tr>' +
+        "<th>ผู้ส่ง</th>" +
+        previewFields.map((f) => "<th>" + esc(f.label) + "</th>").join("") +
+        "<th>ส่งเมื่อ</th><th></th>" +
+      "</tr></thead><tbody>" +
+      rows.map((row) => {
+        const byField = {};
+        (row.preview_values || []).forEach((p) => { byField[p.field_uid] = p; });
+        return "<tr>" +
+          '<td><div class="t-main">' + esc(submitterName(row.submitted_by)) + "</div>" +
+          '<div class="t-sub mono">' + esc(row.uid.slice(0, 8)) + "…</div></td>" +
+          previewFields.map((f) =>
+            "<td>" + esc(displayValue(byField[f.uid] ? byField[f.uid].value : null, f)) + "</td>").join("") +
+          "<td>" + esc(fmtDateTime(row.created_at)) + "</td>" +
+          '<td class="actions"><button class="btn ghost sm" data-open="' + row.uid +
+          '" type="button">ดูรายละเอียด</button></td>' +
+        "</tr>";
+      }).join("") +
+      "</tbody></table></div>";
+
+    $$("#subsBox [data-open]").forEach((button) =>
+      button.addEventListener("click", () =>
+        submissionDetailModal(topic, fields, button.dataset.open)));
   };
 
-  const left = el("div", { class: "card" },
-    el("div", { class: "card-head" }, el("h2", {}, "แบบฟอร์ม"),
-      el("div", { class: "spacer" }),
-      el("span", { class: "badge" }, `${dataFields.length} ฟิลด์ข้อมูล`),
-      fileFields.length ? el("span", { class: "badge brand" }, `${fileFields.length} ไฟล์แนบ`) : null),
-    el("div", { class: "card-body" }, errBox, stepsBox, form,
-      el("div", { class: "btn-row", style: "margin-top:6px" }, submitBtn, resetBtn)));
-
-  const right = el("div", { class: "card" },
-    el("div", { class: "card-head" }, el("h2", {}, "ข้อมูลผู้ส่ง")),
-    el("div", { class: "card-body" },
-      el("dl", { class: "kv" },
-        el("dt", {}, "ชื่อ-สกุล"), el("dd", {}, fullName(state.me)),
-        el("dt", {}, "บทบาท"), el("dd", {}, ROLE_LABEL[state.me.role] || state.me.role),
-        el("dt", {}, "รหัสพนักงาน"), el("dd", {}, state.me.employee_code),
-        el("dt", {}, "submitted_by"), el("dd", { class: "mono" }, state.me.uid)),
-      state.me.role !== "TEACHER"
-        ? el("div", { class: "alert warn", style: "margin-top:14px" }, "backend อนุญาตให้เฉพาะผู้ใช้บทบาท “ครู” เป็นผู้ส่งเท่านั้น การส่งด้วยบัญชีนี้จะถูกปฏิเสธ")
-        : null,
-      state.me.status !== "ACTIVE"
-        ? el("div", { class: "alert err", style: "margin-top:14px" }, "บัญชีนี้ถูกระงับ จึงส่งเอกสารไม่ได้")
-        : null,
-      el("div", { class: "alert info", style: "margin-top:14px" },
-        "ลำดับการทำงาน: สร้างรายการ (JSON) → อัปโหลดไฟล์แนบทีละฟิลด์ (multipart/form-data) ตามที่ backend กำหนด")));
-
-  return el("div", {}, head, el("div", { class: "grid2" }, left, right));
+  $("#filterTeacher").addEventListener("change", (e) => load(e.target.value));
+  $("#btnReloadSubs").addEventListener("click", () => load($("#filterTeacher").value));
+  await load("");
 }
 
-/* ------------------------------------------------- view: submissions list */
-function viewSubmissions() {
-  const topic = state.data.topic;
-  const subs = state.data.subs || [];
-  const mineOnly = !!state.params.mineOnly;
-
-  // คอลัมน์ preview มาจากทุกฟิลด์ที่ตั้ง is_preview ไว้
-  const previewFields = [...(topic.fields || [])].filter((f) => f.is_preview).sort((a, b) => a.position - b.position);
-
-  const head = el("div", { class: "page-head" },
-    el("div", {},
-      el("button", { class: "crumb", onClick: () => go("topics") }, "← กลับไปหัวข้อเอกสาร"),
-      el("h1", {}, (mineOnly ? "รายการของฉัน: " : "รายการที่ส่ง: ") + topic.name),
-      el("p", { class: "sub" }, `ทั้งหมด ${subs.length} รายการ`)),
-    el("div", { class: "spacer" }),
-    el("div", { class: "btn-row" },
-      state.me.role === "DIRECTOR"
-        ? el("button", { class: "btn", onClick: () => go("fields", { topicId: topic.uid }) }, "ออกแบบฟอร์ม")
-        : el("button", { class: "btn primary", disabled: !topic.is_active, onClick: () => go("submit", { topicId: topic.uid }) }, "+ ส่งเอกสาร"),
-      el("button", { class: "btn", onClick: reload }, "รีเฟรช")));
-
-  if (!subs.length) {
-    return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "empty" },
-      el("div", { class: "big" }, "📭"), el("p", {}, "ยังไม่มีรายการที่ส่ง"))));
-  }
-
-  const rows = subs.map((s) => {
-    const cells = previewFields.map((pf) => {
-      const pv = (s.preview_values || []).find((v) => v.field_uid === pf.uid);
-      return el("td", {}, pv ? formatValue(pv.value, pf) : el("span", { style: "color:var(--muted)" }, "—"));
-    });
-    const submitter = userById(s.submitted_by);
-    return el("tr", {},
-      ...cells,
-      el("td", {}, submitter ? fullName(submitter) : el("span", { class: "mono" }, s.submitted_by)),
-      el("td", {}, fmtDate(s.created_at)),
-      el("td", { class: "actions" },
-        el("button", { class: "btn sm", onClick: () => go("submissionDetail", { topicId: topic.uid, submissionId: s.uid, mineOnly }) }, "ดูรายละเอียด")));
-  });
-
-  const headerCells = previewFields.length
-    ? previewFields.map((f) => el("th", {}, f.label))
-    : [el("th", {}, "รายการ")];
-  if (!previewFields.length) {
-    // ไม่มีฟิลด์ preview — แสดง uid แทน
-    rows.forEach((tr, i) => tr.insertBefore(el("td", { class: "mono" }, subs[i].uid), tr.firstChild));
-  }
-
-  return el("div", {},
-    head,
-    !previewFields.length
-      ? el("div", { class: "alert info" }, "หัวข้อนี้ยังไม่ได้เลือกฟิลด์ “แสดงในตาราง” — เลือกฟิลด์ที่ต้องการได้จากหน้าออกแบบฟอร์ม")
-      : null,
-    el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", {},
-      el("thead", {}, el("tr", {}, ...headerCells, el("th", {}, "ผู้ส่ง"), el("th", {}, "ส่งเมื่อ"), el("th", { style: "text-align:right" }, "จัดการ"))),
-      el("tbody", {}, ...rows)))));
-}
-
-function formatValue(value, field) {
+/* field: TopicFieldResponse — ใช้ options เพื่อแปลง value ของ select กลับเป็น label */
+function displayValue(value, field) {
   if (value === null || value === undefined || value === "") return "—";
-  if (!field) return String(value);
-  if (field.type === "date") return fmtDateOnly(String(value));
-  if (field.type === "number") return Number(value).toLocaleString("th-TH");
-  if (field.type === "select") {
-    const o = (field.options || []).find((x) => x.value === value);
-    return o ? o.label : String(value);
+  const type = typeof field === "string" ? field : (field && field.type);
+  if (type === "date") return fmtDate(value);
+  if (type === "number") return Number(value).toLocaleString("th-TH");
+  if (type === "select" && field && field.options) {
+    const match = field.options.find((option) => option.value === value);
+    if (match) return match.label;
   }
   return String(value);
 }
 
-/* ------------------------------------------------ view: submission detail */
-function viewSubmissionDetail() {
-  const topic = state.data.topic;
-  const sub = state.data.sub;
-  const fields = [...(topic.fields || [])].sort((a, b) => a.position - b.position);
-  const fieldMap = Object.fromEntries(fields.map((f) => [f.uid, f]));
-  const submitter = userById(sub.submitted_by);
-  const origin = originOf(state.baseUrl);
-  const canEdit = state.me.role === "DIRECTOR" || state.me.uid === sub.submitted_by;
+/* ---------------------------------------------------------------------
+ * 13) รายละเอียดรายการที่ส่ง (ใช้ร่วมกันทั้งสอง role)
+ * ------------------------------------------------------------------ */
+async function submissionDetailModal(topic, fields, submissionUid) {
+  const { overlay, close } = openModal({
+    title: "รายละเอียดรายการที่ส่ง",
+    size: "wide",
+    bodyHtml: '<div class="skeleton"><span class="spinner dark"></span> กำลังโหลด…</div>',
+    footHtml: '<button class="btn ghost" data-act="close" type="button">ปิด</button>',
+    onMount(root, closeFn) {
+      $('[data-act="close"]', root).addEventListener("click", closeFn);
+    },
+  });
 
-  const head = el("div", { class: "page-head" },
-    el("div", {},
-      el("button", { class: "crumb", onClick: () => go("submissions", { topicId: topic.uid, mineOnly: state.params.mineOnly }) }, "← กลับไปรายการ"),
-      el("h1", {}, "รายละเอียดการส่ง"),
-      el("p", { class: "sub" }, topic.name)),
-    el("div", { class: "spacer" }),
-    el("button", { class: "btn", onClick: reload }, "รีเฟรช"));
-
-  // ---- ค่าที่กรอก
-  const valueRows = [];
-  for (const f of fields) {
-    if (f.type === "file") continue;
-    const v = (sub.values || []).find((x) => x.field_uid === f.uid);
-    valueRows.push(el("dt", {}, f.label, f.required ? el("span", { class: "req" }, " *") : null));
-    valueRows.push(el("dd", {}, v ? formatValue(v.value, f) : el("span", { style: "color:var(--muted)" }, "— ไม่ได้กรอก —")));
+  let submission;
+  try {
+    submission = await api.get("/topics/" + topic.uid + "/submissions/" + submissionUid);
+  } catch (err) {
+    $(".modal-body", overlay).innerHTML = '<div class="note danger"><span>⚠</span><div>' + esc(err.message) + "</div></div>";
+    return;
   }
 
-  const infoCard = el("div", { class: "card" },
-    el("div", { class: "card-head" }, el("h2", {}, "ข้อมูลที่กรอก")),
-    el("div", { class: "card-body" },
-      valueRows.length ? el("dl", { class: "kv" }, ...valueRows) : el("p", { style: "color:var(--muted)" }, "ไม่มีฟิลด์ข้อมูล")));
+  const render = () => {
+    const valueByField = {};
+    (submission.values || []).forEach((v) => { valueByField[v.field_uid] = v.value; });
+    const filesByField = {};
+    (submission.files || []).forEach((f) => { filesByField[f.field_uid] = f; });
 
-  // ---- ไฟล์แนบ
-  const files = sub.files || [];
-  const fileFields = fields.filter((f) => f.type === "file");
-  const filesBox = el("div", {});
+    const rows = fields.map((field) => {
+      if (field.type === "file") {
+        const file = filesByField[field.uid];
+        return "<dt>" + esc(field.label) + "</dt><dd>" +
+          (file
+            ? '<span class="badge navy">📎 ' + esc(file.original_filename) + "</span>"
+            : '<span style="color:var(--faint)">ไม่มีไฟล์แนบ</span>') + "</dd>";
+      }
+      return "<dt>" + esc(field.label) + "</dt><dd>" +
+        esc(displayValue(valueByField[field.uid], field)) + "</dd>";
+    }).join("");
 
-  for (const f of fileFields) {
-    const file = files.find((x) => x.field_uid === f.uid);
-    if (file) {
-      filesBox.appendChild(el("div", { class: "file-row" },
-        el("div", { class: "file-ico" }, fileIcon(file.original_filename)),
-        el("div", {},
-          el("div", { style: "font-weight:600" }, file.original_filename),
-          el("div", { class: "mono" }, `${f.label} • ${fmtSize(file.size)} • ${file.content_type}`)),
-        el("div", { class: "spacer" }),
-        el("div", { class: "btn-row" },
-          el("a", { class: "btn sm", href: origin + file.view_url, target: "_blank", rel: "noopener" }, "ดู"),
-          el("a", { class: "btn sm", href: origin + file.download_url }, "ดาวน์โหลด"),
-          canEdit ? el("button", {
-            class: "btn sm danger",
-            onClick: () => confirmDialog(`ลบไฟล์ "${file.original_filename}" ใช่หรือไม่?`, async () => {
-              try { await API.deleteFile(file.uid); toast("ลบไฟล์แล้ว", "ok"); reload(); }
-              catch (e) { toast(thMessage(e), "err"); }
-            }),
-          }, "ลบ") : null)));
+    const canDelete = isDirector() || (state.user && submission.submitted_by === state.user.uid);
+
+    $(".modal-body", overlay).innerHTML =
+      '<dl class="kv" style="margin-bottom:18px">' +
+        "<dt>หัวข้อ</dt><dd>" + esc(topic.name) + "</dd>" +
+        "<dt>ผู้ส่ง</dt><dd>" + esc(submitterName(submission.submitted_by)) + "</dd>" +
+        "<dt>ส่งเมื่อ</dt><dd>" + esc(fmtDateTime(submission.created_at)) + "</dd>" +
+        '<dt>รหัสรายการ</dt><dd class="mono">' + esc(submission.uid) + "</dd>" +
+      "</dl>" +
+      '<h4 style="font-size:14px;margin-bottom:10px;color:var(--muted)">ข้อมูลในแบบฟอร์ม</h4>' +
+      (fields.length ? '<dl class="kv">' + rows + "</dl>"
+        : '<p class="hint">หัวข้อนี้ยังไม่มีฟิลด์</p>') +
+      '<h4 style="font-size:14px;margin:22px 0 10px;color:var(--muted)">ไฟล์แนบ (' +
+        (submission.files || []).length + ")</h4>" +
+      '<div class="filelist" id="subFiles"></div>';
+
+    const fileBox = $("#subFiles", overlay);
+    if (!(submission.files || []).length) {
+      fileBox.innerHTML = '<p class="hint">ไม่มีไฟล์แนบในรายการนี้</p>';
     } else {
-      // ยังไม่มีไฟล์ในฟิลด์นี้ — เปิดให้อัปโหลดเพิ่ม
-      const picker = el("input", { type: "file", accept: ALLOWED_EXT.join(",") });
-      const btn = el("button", { class: "btn sm primary" }, "อัปโหลด");
-      btn.onclick = async () => {
-        if (!picker.files.length) { toast("เลือกไฟล์ก่อน", "err"); return; }
-        btn.disabled = true;
-        const fd = new FormData();
-        fd.append("field_uid", f.uid);
-        fd.append("file", picker.files[0]);
-        try { await API.uploadFile(topic.uid, sub.uid, fd); toast("อัปโหลดสำเร็จ", "ok"); reload(); }
-        catch (e) { toast(thMessage(e), "err"); btn.disabled = false; }
-      };
-      filesBox.appendChild(el("div", { class: "file-row" },
-        el("div", { class: "file-ico" }, "＋"),
-        el("div", { style: "min-width:0;flex:1" },
-          el("div", { style: "font-weight:600" }, f.label,
-            f.required ? el("span", { class: "badge err", style: "margin-left:8px" }, "จำเป็น") : null),
-          el("div", { style: "display:flex;gap:8px;margin-top:6px;align-items:center" },
-            canEdit ? picker : el("span", { class: "mono" }, "ยังไม่มีไฟล์"),
-            canEdit ? btn : null))));
+      fileBox.innerHTML = submission.files.map((file) => fileItemHtml(file, canDelete)).join("");
+      bindFileActions(fileBox, submission.files, async () => {
+        submission = await api.get("/topics/" + topic.uid + "/submissions/" + submissionUid);
+        render();
+      });
     }
-  }
+  };
 
-  // ไฟล์ที่ไม่ผูกกับฟิลด์ที่รู้จัก (เผื่อฟิลด์ถูกลบไปแล้ว)
-  for (const file of files) {
-    if (fileFields.some((f) => f.uid === file.field_uid)) continue;
-    filesBox.appendChild(el("div", { class: "file-row" },
-      el("div", { class: "file-ico" }, fileIcon(file.original_filename)),
-      el("div", {},
-        el("div", { style: "font-weight:600" }, file.original_filename),
-        el("div", { class: "mono" }, "ฟิลด์ที่ถูกลบไปแล้ว • " + fmtSize(file.size))),
-      el("div", { class: "spacer" }),
-      el("a", { class: "btn sm", href: origin + file.download_url }, "ดาวน์โหลด")));
-  }
-
-  const filesCard = el("div", { class: "card" },
-    el("div", { class: "card-head" }, el("h2", {}, "ไฟล์แนบ"),
-      el("div", { class: "spacer" }), el("span", { class: "badge" }, `${files.length} ไฟล์`)),
-    el("div", { class: "card-body" },
-      fileFields.length || files.length ? filesBox : el("p", { style: "color:var(--muted)" }, "หัวข้อนี้ไม่มีฟิลด์ไฟล์แนบ")));
-
-  const metaCard = el("div", { class: "card" },
-    el("div", { class: "card-head" }, el("h2", {}, "ข้อมูลรายการ")),
-    el("div", { class: "card-body" },
-      el("dl", { class: "kv" },
-        el("dt", {}, "ผู้ส่ง"), el("dd", {}, submitter ? `${fullName(submitter)} (@${submitter.username})` : el("span", { class: "mono" }, sub.submitted_by)),
-        el("dt", {}, "ส่งเมื่อ"), el("dd", {}, fmtDate(sub.created_at)),
-        el("dt", {}, "แก้ไขล่าสุด"), el("dd", {}, fmtDate(sub.updated_at)),
-        el("dt", {}, "รหัสรายการ"), el("dd", { class: "mono" }, sub.uid))));
-
-  return el("div", {}, head, el("div", { class: "grid2" }, el("div", {}, infoCard, el("div", { style: "height:18px" }), filesCard), metaCard));
+  render();
 }
 
-function fileIcon(name) {
-  const ext = (name || "").toLowerCase().split(".").pop();
-  if (["png", "jpg", "jpeg"].includes(ext)) return "🖼";
-  if (ext === "pdf") return "📕";
-  if (["xls", "xlsx"].includes(ext)) return "📊";
-  if (["mp4", "mov"].includes(ext)) return "🎬";
+/* ---------------------------------------------------------------------
+ * 14) ไฟล์แนบ — แสดงผล / ดู / ดาวน์โหลด / ลบ
+ * ------------------------------------------------------------------ */
+function fileIcon(contentType, filename) {
+  const type = (contentType || "").toLowerCase();
+  const name = (filename || "").toLowerCase();
+  if (type.startsWith("image/")) return "🖼";
+  if (type.startsWith("video/")) return "🎬";
+  if (type.includes("pdf") || name.endsWith(".pdf")) return "📄";
+  if (name.endsWith(".xls") || name.endsWith(".xlsx")) return "📊";
   return "📎";
 }
 
-/* ---------------------------------------------- view: เอกสารของฉัน (ครู) */
-function viewMySubmissions() {
-  const rows = state.data.rows || [];
-  const head = el("div", { class: "page-head" },
-    el("div", {}, el("h1", {}, "เอกสารของฉัน"), el("p", { class: "sub" }, `ทั้งหมด ${rows.length} รายการจากทุกหัวข้อ`)),
-    el("div", { class: "spacer" }),
-    el("button", { class: "btn", onClick: reload }, "รีเฟรช"));
+function fileItemHtml(file, canDelete) {
+  return '<div class="fileitem" data-file="' + file.uid + '">' +
+    '<div class="fic">' + fileIcon(file.content_type, file.original_filename) + "</div>" +
+    '<div class="fmeta"><div class="fn">' + esc(file.original_filename) + "</div>" +
+    '<div class="fs">' + esc(fmtBytes(file.size)) + " · " + esc(file.content_type || "—") + "</div></div>" +
+    '<div class="fops">' +
+      '<button class="btn ghost sm" data-view="' + file.uid + '" type="button">ดู</button>' +
+      '<button class="btn ghost sm" data-download="' + file.uid + '" type="button">ดาวน์โหลด</button>' +
+      (canDelete
+        ? '<button class="btn subtle sm" data-delfile="' + file.uid + '" type="button" style="color:var(--danger)">ลบ</button>'
+        : "") +
+    "</div></div>";
+}
 
-  if (!rows.length) {
-    return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "empty" },
-      el("div", { class: "big" }, "📭"), el("p", {}, "ยังไม่ได้ส่งเอกสารใดๆ"),
-      el("div", { style: "margin-top:12px" }, el("button", { class: "btn primary", onClick: () => go("topics") }, "ไปที่หัวข้อเอกสาร")))));
+function bindFileActions(container, files, onChanged) {
+  const findFile = (uid) => files.find((f) => f.uid === uid);
+
+  $$("[data-view]", container).forEach((button) =>
+    button.addEventListener("click", () => previewFile(findFile(button.dataset.view))));
+
+  $$("[data-download]", container).forEach((button) =>
+    button.addEventListener("click", () => downloadFile(findFile(button.dataset.download))));
+
+  $$("[data-delfile]", container).forEach((button) =>
+    button.addEventListener("click", async () => {
+      const file = findFile(button.dataset.delfile);
+      const ok = await confirmDialog({
+        title: "ลบไฟล์แนบ",
+        message: "ต้องการลบ <b>" + esc(file.original_filename) + "</b> ใช่หรือไม่?",
+        confirmText: "ลบไฟล์",
+        danger: true,
+      });
+      if (!ok) return;
+      try {
+        await api.del("/submission-files/" + file.uid);
+        toast("ลบไฟล์แล้ว", file.original_filename, "ok");
+        if (onChanged) await onChanged();
+      } catch (err) {
+        toast("ลบไม่สำเร็จ", err.message, "err");
+      }
+    }));
+}
+
+async function previewFile(file) {
+  const type = (file.content_type || "").toLowerCase();
+  const isImage = type.startsWith("image/");
+  const isVideo = type.startsWith("video/");
+  const isPdf = type.includes("pdf");
+
+  if (!isImage && !isVideo && !isPdf) {
+    toast("เปิดดูไม่ได้", "ไฟล์ชนิดนี้ให้ใช้ปุ่มดาวน์โหลดแทน");
+    return downloadFile(file);
   }
 
-  const trs = rows.map(({ topic, sub }) =>
-    el("tr", {},
-      el("td", {}, el("div", { style: "font-weight:600" }, topic.name)),
-      el("td", {}, (sub.preview_values || []).length
-        ? el("div", {}, ...sub.preview_values.map((pv) => el("div", {}, el("span", { class: "mono" }, pv.label + ": "), formatValue(pv.value, { type: pv.type }))))
-        : el("span", { style: "color:var(--muted)" }, "—")),
-      el("td", {}, fmtDate(sub.created_at)),
-      el("td", { class: "actions" },
-        el("button", { class: "btn sm", onClick: () => go("submissionDetail", { topicId: topic.uid, submissionId: sub.uid, mineOnly: true }) }, "ดูรายละเอียด"))));
+  const { overlay, close } = openModal({
+    title: file.original_filename,
+    size: "xwide",
+    bodyHtml: '<div class="preview-stage"><span class="spinner"></span></div>',
+    footHtml:
+      '<span style="margin-right:auto;font-size:13px;color:var(--faint)">' +
+        esc(fmtBytes(file.size)) + " · " + esc(file.content_type) + "</span>" +
+      '<button class="btn ghost" data-act="dl" type="button">ดาวน์โหลด</button>' +
+      '<button class="btn" data-act="close" type="button">ปิด</button>',
+    onMount(root, closeFn) {
+      $('[data-act="close"]', root).addEventListener("click", closeFn);
+      $('[data-act="dl"]', root).addEventListener("click", () => downloadFile(file));
+    },
+  });
 
-  return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", {},
-    el("thead", {}, el("tr", {}, el("th", {}, "หัวข้อ"), el("th", {}, "ข้อมูลย่อ"), el("th", {}, "ส่งเมื่อ"), el("th", { style: "text-align:right" }, "จัดการ"))),
-    el("tbody", {}, ...trs)))));
-}
-
-/* ---------------------------------------------------------- view: users */
-function viewUsers() {
-  const users = state.data.users || [];
-  const head = el("div", { class: "page-head" },
-    el("div", {}, el("h1", {}, "ผู้ใช้งาน"), el("p", { class: "sub" }, "จัดการบัญชีผู้อำนวยการและครู")),
-    el("div", { class: "spacer" }),
-    el("button", { class: "btn primary", onClick: () => userModal(null, reload) }, "+ เพิ่มผู้ใช้"));
-
-  if (!users.length) {
-    return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "empty" },
-      el("div", { class: "big" }, "👥"), el("p", {}, "ยังไม่มีผู้ใช้"))));
-  }
-
-  const rows = users.map((u) =>
-    el("tr", {},
-      el("td", {}, el("div", { style: "display:flex;align-items:center;gap:10px" },
-        el("span", { class: "avatar" }, initials(u)),
-        el("span", {}, el("div", { style: "font-weight:600" }, fullName(u)), el("div", { class: "mono" }, "@" + u.username)))),
-      el("td", {}, u.employee_code),
-      el("td", {}, el("span", { class: "badge " + (u.role === "DIRECTOR" ? "brand" : "") }, ROLE_LABEL[u.role] || u.role)),
-      el("td", {}, el("span", { class: "badge " + (u.status === "ACTIVE" ? "ok" : "err") }, STATUS_LABEL[u.status] || u.status)),
-      el("td", {}, fmtDate(u.created_at)),
-      el("td", { class: "actions" }, el("div", { class: "btn-row", style: "justify-content:flex-end" },
-        el("button", { class: "btn sm", onClick: () => userModal(u, reload) }, "แก้ไข"),
-        el("button", {
-          class: "btn sm",
-          onClick: async () => {
-            const next = u.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
-            try {
-              const updated = await API.updateUserStatus(u.uid, next);
-              if (state.me.uid === u.uid) state.me = updated;
-              toast("อัปเดตสถานะแล้ว", "ok"); reload();
-            } catch (e) { toast(thMessage(e), "err"); }
-          },
-        }, u.status === "ACTIVE" ? "ระงับ" : "เปิดใช้"),
-        el("button", {
-          class: "btn sm danger", disabled: u.uid === state.me.uid,
-          title: u.uid === state.me.uid ? "ลบบัญชีที่กำลังใช้งานอยู่ไม่ได้" : "",
-          onClick: () => confirmDialog(`ลบผู้ใช้ "${fullName(u)}" ใช่หรือไม่?`, async () => {
-            try { await API.deleteUser(u.uid); toast("ลบผู้ใช้แล้ว", "ok"); reload(); }
-            catch (e) { toast(thMessage(e), "err"); }
-          }),
-        }, "ลบ")))));
-
-  return el("div", {}, head, el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", {},
-    el("thead", {}, el("tr", {},
-      el("th", {}, "ผู้ใช้"), el("th", {}, "รหัสพนักงาน"), el("th", {}, "บทบาท"),
-      el("th", {}, "สถานะ"), el("th", {}, "สร้างเมื่อ"), el("th", { style: "text-align:right" }, "จัดการ"))),
-    el("tbody", {}, ...rows)))));
-}
-
-function userModal(user, onDone) {
-  const isEdit = !!user;
-  const username = el("input", { type: "text", value: user ? user.username : "", placeholder: "เช่น somchai.k" });
-  const code = el("input", { type: "text", value: user ? user.employee_code : "", placeholder: "เช่น EMP-001" });
-  const prefix = el("input", { type: "text", value: user ? user.prefix : "", placeholder: "นาย / นาง / นางสาว" });
-  const first = el("input", { type: "text", value: user ? user.first_name : "", placeholder: "ชื่อ" });
-  const last = el("input", { type: "text", value: user ? user.last_name : "", placeholder: "นามสกุล" });
-  const role = el("select", {}, el("option", { value: "TEACHER" }, "ครู"), el("option", { value: "DIRECTOR" }, "ผู้อำนวยการ"));
-  role.value = user ? user.role : "TEACHER";
-  const errBox = el("div", {});
-
-  const body = el("div", {}, errBox,
-    el("label", { class: "field" }, el("span", { class: "lbl" }, "ชื่อผู้ใช้ ", el("span", { class: "req" }, "*")), username),
-    el("label", { class: "field" }, el("span", { class: "lbl" }, "รหัสพนักงาน ", el("span", { class: "req" }, "*")), code),
-    el("div", { style: "display:grid;grid-template-columns:110px 1fr 1fr;gap:10px" },
-      el("label", { class: "field" }, el("span", { class: "lbl" }, "คำนำหน้า ", el("span", { class: "req" }, "*")), prefix),
-      el("label", { class: "field" }, el("span", { class: "lbl" }, "ชื่อ ", el("span", { class: "req" }, "*")), first),
-      el("label", { class: "field" }, el("span", { class: "lbl" }, "นามสกุล ", el("span", { class: "req" }, "*")), last)),
-    el("label", { class: "field" }, el("span", { class: "lbl" }, "บทบาท"), role,
-      el("span", { class: "hint" }, "เฉพาะบทบาท “ครู” เท่านั้นที่ส่งเอกสารได้")));
-
-  const save = el("button", { class: "btn primary" }, isEdit ? "บันทึก" : "สร้างผู้ใช้");
-  const cancel = el("button", { class: "btn" }, "ยกเลิก");
-  const m = openModal({ title: isEdit ? "แก้ไขผู้ใช้" : "เพิ่มผู้ใช้ใหม่", body, footer: [cancel, save] });
-  cancel.onclick = m.close;
-  save.onclick = async () => {
-    errBox.innerHTML = "";
-    const payload = {
-      username: username.value.trim(),
-      employee_code: code.value.trim(),
-      prefix: prefix.value.trim(),
-      first_name: first.value.trim(),
-      last_name: last.value.trim(),
-      role: role.value,
-    };
-    save.disabled = true;
-    try {
-      let saved;
-      if (isEdit) { saved = await API.updateUser(user.uid, payload); if (state.me && state.me.uid === user.uid) state.me = saved; }
-      else saved = await API.createUser(payload);
-      m.close(); toast(isEdit ? "บันทึกแล้ว" : "สร้างผู้ใช้แล้ว", "ok");
-      if (onDone) onDone();
-    } catch (e) {
-      errBox.appendChild(el("div", { class: "alert err" }, thMessage(e)));
-      save.disabled = false;
-    }
-  };
-}
-
-/* ------------------------------------------------------------ demo seed */
-async function seedDemoData() {
-  const stamp = Date.now().toString().slice(-5);
+  let objectUrl = null;
   try {
-    toast("กำลังสร้างข้อมูลตัวอย่าง...");
-    const director = await API.createUser({
-      username: "director" + stamp, employee_code: "DIR-" + stamp,
-      prefix: "นาย", first_name: "สมชาย", last_name: "ผู้บริหาร", role: "DIRECTOR",
-    });
-    await API.createUser({
-      username: "teacher" + stamp, employee_code: "TCH-" + stamp,
-      prefix: "นางสาว", first_name: "สมหญิง", last_name: "ใจดี", role: "TEACHER",
-    });
+    const blob = await api.blob("/submission-files/" + file.uid + "/view");
+    objectUrl = URL.createObjectURL(blob);
+    const stage = $(".preview-stage", overlay);
+    if (isImage) stage.innerHTML = '<img src="' + objectUrl + '" alt="">';
+    else if (isVideo) stage.innerHTML = '<video src="' + objectUrl + '" controls playsinline></video>';
+    else stage.innerHTML = '<iframe src="' + objectUrl + '" title="preview"></iframe>';
+  } catch (err) {
+    $(".preview-stage", overlay).innerHTML =
+      '<p style="color:#fff;padding:20px">เปิดไฟล์ไม่ได้: ' + esc(err.message) + "</p>";
+  }
 
-    const topic = await API.createTopic({
-      name: "แผนการสอน ภาคเรียนที่ 1/" + (new Date().getFullYear() + 543),
-      description: "ส่งแผนการสอนรายวิชาพร้อมไฟล์แนบ",
-    });
-    const fields = [
-      { label: "ชื่อรายวิชา", type: "text", required: true, is_preview: true, position: 0, options: [] },
-      { label: "ระดับชั้น", type: "select", required: true, is_preview: true, position: 1,
-        options: [{ label: "ม.1", value: "m1" }, { label: "ม.2", value: "m2" }, { label: "ม.3", value: "m3" }] },
-      { label: "จำนวนคาบต่อสัปดาห์", type: "number", required: false, is_preview: true, position: 2, options: [] },
-      { label: "วันที่เริ่มใช้แผน", type: "date", required: true, is_preview: false, position: 3, options: [] },
-      { label: "หมายเหตุ", type: "textarea", required: false, is_preview: false, position: 4, options: [] },
-      { label: "ไฟล์แผนการสอน (PDF)", type: "file", required: true, is_preview: false, position: 5, options: [] },
-    ];
-    for (const f of fields) await API.createField(topic.uid, f);
+  const observer = new MutationObserver(() => {
+    if (!document.body.contains(overlay)) {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      observer.disconnect();
+    }
+  });
+  observer.observe($("#modalRoot"), { childList: true });
+}
 
-    toast("สร้างข้อมูลตัวอย่างสำเร็จ", "ok");
-    await loadUsersForLogin();
-    render();
-  } catch (e) {
-    toast("สร้างข้อมูลตัวอย่างไม่สำเร็จ: " + thMessage(e), "err");
+async function downloadFile(file) {
+  try {
+    const blob = await api.blob("/submission-files/" + file.uid + "/download");
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = file.original_filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (err) {
+    toast("ดาวน์โหลดไม่สำเร็จ", err.message, "err");
   }
 }
 
-/* ------------------------------------------------------------- bootstrap */
-(async function init() {
-  render();
-  try { await API.health(); } catch (_) { /* แสดงสถานะไม่เชื่อมต่อในหน้าล็อกอิน */ }
-  await loadUsersForLogin();
-  render();
-})();
+/* ---------------------------------------------------------------------
+ * 15) Tab: ส่งเอกสาร (ครู)
+ * ------------------------------------------------------------------ */
+function renderTeacherSubmitTab(topic, fields) {
+  const body = $("#tabBody");
+
+  if (!topic.is_active) {
+    body.innerHTML = '<div class="card"><div class="empty"><div class="ic">🔒</div>' +
+      "<h4>หัวข้อนี้ปิดรับเอกสารแล้ว</h4><p>ติดต่อผู้อำนวยการหากต้องการส่งเพิ่มเติม</p></div></div>";
+    return;
+  }
+  if (!fields.length) {
+    body.innerHTML = '<div class="card"><div class="empty"><div class="ic">🧩</div>' +
+      "<h4>หัวข้อนี้ยังไม่มีแบบฟอร์ม</h4><p>รอผู้อำนวยการกำหนดฟิลด์ก่อนจึงจะส่งได้</p></div></div>";
+    return;
+  }
+
+  const inputFields = fields.filter((f) => f.type !== "file");
+  const fileFields = fields.filter((f) => f.type === "file");
+
+  body.innerHTML =
+    '<div class="card"><div class="card-head"><h3>แบบฟอร์ม</h3>' +
+      '<div class="right sub">ช่องที่มี <span class="req">*</span> จำเป็นต้องกรอก</div></div>' +
+    '<div class="card-body">' +
+      '<form id="subForm" novalidate>' +
+        inputFields.map(renderFormField).join("") +
+        (fileFields.length
+          ? '<h4 style="font-size:14px;margin:20px 0 10px;color:var(--muted)">ไฟล์แนบ</h4>' +
+            '<div class="note info" style="margin-bottom:14px"><span>ℹ</span><div>' +
+              "ระบบจะสร้างรายการก่อน แล้วอัปโหลดไฟล์ตามหลังโดยอัตโนมัติ<br>" +
+              '<span style="font-size:12.5px">รองรับ: ' + ALLOWED_EXT.join(", ") + "</span></div></div>" +
+            fileFields.map((f) =>
+              '<div class="field"><label>' + esc(f.label) +
+              (f.required ? '<span class="req">*</span>' : "") + "</label>" +
+              '<input type="file" data-filefield="' + f.uid + '" accept="' + ALLOWED_EXT.join(",") + '">' +
+              '<span class="field-error" data-err="' + f.uid + '" hidden></span></div>').join("")
+          : "") +
+      "</form>" +
+      '<div id="submitLog" hidden style="margin-top:14px"></div>' +
+    '</div><div class="modal-foot" style="border-radius:0 0 10px 10px">' +
+      '<button class="btn ghost" type="button" id="btnResetForm">ล้างฟอร์ม</button>' +
+      '<button class="btn" type="button" id="btnSubmitForm">ส่งเอกสาร</button>' +
+    "</div></div>";
+
+  $("#btnResetForm").addEventListener("click", () => {
+    $("#subForm").reset();
+    $$("#subForm .invalid").forEach((n) => n.classList.remove("invalid"));
+    $$("#subForm .field-error").forEach((n) => { n.hidden = true; });
+    $("#submitLog").hidden = true;
+  });
+
+  $("#btnSubmitForm").addEventListener("click", (e) =>
+    submitTeacherForm(e.currentTarget, topic, inputFields, fileFields));
+}
+
+function renderFormField(field) {
+  const required = field.required ? '<span class="req">*</span>' : "";
+  const attr = 'data-field="' + field.uid + '" data-type="' + field.type + '"';
+  let control;
+
+  switch (field.type) {
+    case "textarea":
+      control = "<textarea " + attr + ' placeholder="พิมพ์ข้อความ…"></textarea>';
+      break;
+    case "number":
+      control = '<input type="number" step="any" ' + attr + ' placeholder="0">';
+      break;
+    case "date":
+      control = '<input type="date" ' + attr + ">";
+      break;
+    case "select":
+      control = "<select " + attr + '><option value="">— เลือก —</option>' +
+        (field.options || []).map((o) =>
+          '<option value="' + esc(o.value) + '">' + esc(o.label) + "</option>").join("") +
+        "</select>";
+      break;
+    default:
+      control = '<input type="text" ' + attr + ' placeholder="พิมพ์ข้อความ…">';
+  }
+
+  return '<div class="field"><label>' + esc(field.label) + required + "</label>" + control +
+    '<span class="field-error" data-err="' + field.uid + '" hidden></span></div>';
+}
+
+function setFieldError(fieldUid, message) {
+  const input = $('[data-field="' + fieldUid + '"]') || $('[data-filefield="' + fieldUid + '"]');
+  const errorBox = $('[data-err="' + fieldUid + '"]');
+  if (input) input.classList.add("invalid");
+  if (errorBox) { errorBox.textContent = message; errorBox.hidden = false; }
+}
+
+function clearFieldErrors() {
+  $$("#subForm .invalid").forEach((n) => n.classList.remove("invalid"));
+  $$("#subForm .field-error").forEach((n) => { n.hidden = true; });
+}
+
+async function submitTeacherForm(button, topic, inputFields, fileFields) {
+  clearFieldErrors();
+  const values = [];
+  let clientError = false;
+
+  for (const field of inputFields) {
+    const input = $('[data-field="' + field.uid + '"]');
+    const raw = (input.value || "").trim();
+
+    if (!raw) {
+      if (field.required) { setFieldError(field.uid, "กรุณากรอกข้อมูลในช่องนี้"); clientError = true; }
+      continue; // ฟิลด์ไม่บังคับที่เว้นว่าง จะไม่ส่งไปเลย
+    }
+    if (field.type === "number") {
+      const num = Number(raw);
+      if (Number.isNaN(num)) { setFieldError(field.uid, "ต้องเป็นตัวเลข"); clientError = true; continue; }
+      values.push({ field_uid: field.uid, value: num });
+    } else {
+      // text / textarea / date (YYYY-MM-DD) / select (value)
+      values.push({ field_uid: field.uid, value: raw });
+    }
+  }
+
+  const uploads = [];
+  for (const field of fileFields) {
+    const input = $('[data-filefield="' + field.uid + '"]');
+    const file = input.files && input.files[0];
+    if (!file) {
+      if (field.required) { setFieldError(field.uid, "กรุณาแนบไฟล์"); clientError = true; }
+      continue;
+    }
+    const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
+    if (!ALLOWED_EXT.includes(ext)) {
+      setFieldError(field.uid, "ไม่รองรับนามสกุล " + ext);
+      clientError = true;
+      continue;
+    }
+    uploads.push({ field, file });
+  }
+
+  if (clientError) { toast("ตรวจสอบแบบฟอร์ม", "ยังมีช่องที่กรอกไม่ถูกต้อง", "err"); return; }
+
+  const log = $("#submitLog");
+  log.hidden = false;
+  log.innerHTML = '<div class="note info"><span class="spinner dark"></span><div>กำลังส่งข้อมูล…</div></div>';
+
+  await withBusy(button, "กำลังส่ง…", async () => {
+    let submission;
+    try {
+      submission = await api.post("/topics/" + topic.uid + "/submissions", { values });
+    } catch (err) {
+      log.innerHTML = '<div class="note danger"><span>⚠</span><div><b>ส่งไม่สำเร็จ</b><br>' +
+        esc(err.message) + (err.code ? ' <span class="chip">' + esc(err.code) + "</span>" : "") + "</div></div>";
+      if (err.fieldUid) setFieldError(err.fieldUid, err.message);
+      toast("ส่งไม่สำเร็จ", err.message, "err");
+      return;
+    }
+
+    const results = [];
+    for (const item of uploads) {
+      log.innerHTML = '<div class="note info"><span class="spinner dark"></span><div>กำลังอัปโหลด ' +
+        esc(item.file.name) + " …</div></div>";
+      const form = new FormData();
+      form.append("field_uid", item.field.uid);
+      form.append("file", item.file);
+      try {
+        await api.upload("/topics/" + topic.uid + "/submissions/" + submission.uid + "/files", form);
+        results.push({ ok: true, name: item.file.name });
+      } catch (err) {
+        results.push({ ok: false, name: item.file.name, message: err.message });
+        setFieldError(item.field.uid, err.message);
+      }
+    }
+
+    const failed = results.filter((r) => !r.ok);
+    log.innerHTML =
+      '<div class="note ' + (failed.length ? "warn" : "info") + '"><span>' +
+      (failed.length ? "⚠" : "✔") + "</span><div>" +
+        "<b>บันทึกรายการเรียบร้อย</b><br>" +
+        '<span class="mono">' + esc(submission.uid) + "</span>" +
+        (results.length
+          ? "<br>ไฟล์แนบ: " + results.map((r) =>
+              (r.ok ? "✔ " : "✖ ") + esc(r.name) + (r.ok ? "" : " (" + esc(r.message) + ")")).join(" · ")
+          : "") +
+      "</div></div>";
+
+    if (failed.length) {
+      toast("ส่งแล้ว แต่มีไฟล์อัปโหลดไม่สำเร็จ", failed.length + " ไฟล์", "err");
+    } else {
+      toast("ส่งเอกสารเรียบร้อย", topic.name, "ok");
+      $("#subForm").reset();
+      setTimeout(() => { location.hash = "#/topics/" + topic.uid + "?tab=mine"; }, 700);
+    }
+  });
+}
+
+/* ---------------------------------------------------------------------
+ * 16) Tab: ประวัติการส่งของฉัน (ครู)
+ * ------------------------------------------------------------------ */
+async function renderTeacherHistory(topic, fields) {
+  const body = $("#tabBody");
+  body.innerHTML = '<div class="card"><div class="card-head"><h3>ประวัติการส่งของฉัน</h3>' +
+    '<div class="right"><button class="btn ghost sm" id="btnReloadMine" type="button">รีเฟรช</button></div>' +
+    '</div><div class="card-body tight" id="mineBox"></div></div>';
+
+  const previewFields = fields.filter((f) => f.is_preview);
+
+  const load = async () => {
+    $("#mineBox").innerHTML = '<div class="skeleton"><span class="spinner dark"></span> กำลังโหลด…</div>';
+    let rows = [];
+    try {
+      rows = (await api.get("/topics/" + topic.uid + "/submissions")) || [];
+    } catch (err) {
+      $("#mineBox").innerHTML = '<div class="empty"><div class="ic">⚠</div><h4>โหลดไม่สำเร็จ</h4><p>' +
+        esc(err.message) + "</p></div>";
+      return;
+    }
+
+    if (!rows.length) {
+      $("#mineBox").innerHTML = '<div class="empty"><div class="ic">📭</div><h4>ยังไม่เคยส่งในหัวข้อนี้</h4>' +
+        '<p>ไปที่แท็บ “ส่งเอกสาร” เพื่อกรอกแบบฟอร์ม</p></div>';
+      return;
+    }
+
+    rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    $("#mineBox").innerHTML =
+      '<div class="table-scroll"><table><thead><tr>' +
+        "<th>รหัสรายการ</th>" +
+        previewFields.map((f) => "<th>" + esc(f.label) + "</th>").join("") +
+        "<th>ส่งเมื่อ</th><th></th>" +
+      "</tr></thead><tbody>" +
+      rows.map((row) => {
+        const byField = {};
+        (row.preview_values || []).forEach((p) => { byField[p.field_uid] = p; });
+        return "<tr>" +
+          '<td class="mono">' + esc(row.uid.slice(0, 8)) + "…</td>" +
+          previewFields.map((f) =>
+            "<td>" + esc(displayValue(byField[f.uid] ? byField[f.uid].value : null, f)) + "</td>").join("") +
+          "<td>" + esc(fmtDateTime(row.created_at)) + "</td>" +
+          '<td class="actions"><button class="btn ghost sm" data-open="' + row.uid +
+          '" type="button">ดู / จัดการไฟล์</button></td>' +
+        "</tr>";
+      }).join("") +
+      "</tbody></table></div>";
+
+    $$("#mineBox [data-open]").forEach((button) =>
+      button.addEventListener("click", () =>
+        submissionDetailModal(topic, fields, button.dataset.open)));
+  };
+
+  $("#btnReloadMine").addEventListener("click", load);
+  await load();
+}
+
+/* ---------------------------------------------------------------------
+ * 17) จัดการผู้ใช้ (ผอ.)
+ * ------------------------------------------------------------------ */
+async function viewUsers() {
+  if (!isDirector()) {
+    view().innerHTML = '<div class="card"><div class="empty"><div class="ic">🔒</div>' +
+      "<h4>เฉพาะผู้อำนวยการ</h4><p>บัญชีของคุณไม่มีสิทธิ์เข้าถึงหน้านี้</p></div></div>";
+    return;
+  }
+
+  renderLoading("กำลังโหลดรายชื่อผู้ใช้…");
+  const users = await loadUsers(true);
+
+  view().innerHTML =
+    '<div class="page-head"><div class="t"><h1>จัดการผู้ใช้</h1>' +
+      "<p>สร้างบัญชีครู กำหนดสถานะ และรีเซ็ตรหัสผ่าน</p></div>" +
+      '<div class="actions"><button class="btn" id="btnNewUser" type="button">+ เพิ่มผู้ใช้</button></div></div>' +
+    '<div class="card"><div class="card-head"><h3>บัญชีทั้งหมด ' + users.length + " รายการ</h3>" +
+      '<div class="right">' +
+        '<input type="search" id="userSearch" placeholder="ค้นหาชื่อ / username / เลขประจำตัว…" style="width:250px">' +
+        '<select id="userRole" style="width:150px"><option value="">ทุกบทบาท</option>' +
+          '<option value="DIRECTOR">ผู้อำนวยการ</option><option value="TEACHER">ครู</option></select>' +
+        '<select id="userStatus" style="width:140px"><option value="">ทุกสถานะ</option>' +
+          '<option value="ACTIVE">ใช้งาน</option><option value="INACTIVE">ระงับ</option></select>' +
+      "</div></div>" +
+    '<div class="card-body tight"><div class="table-scroll"><table><thead><tr>' +
+      "<th>ชื่อ-สกุล</th><th>ชื่อผู้ใช้</th><th>เลขประจำตัว</th><th>บทบาท</th><th>สถานะ</th><th></th>" +
+      '</tr></thead><tbody id="userRows"></tbody></table></div></div></div>';
+
+  const draw = () => {
+    const keyword = $("#userSearch").value.trim().toLowerCase();
+    const role = $("#userRole").value;
+    const status = $("#userStatus").value;
+
+    const filtered = users.filter((u) => {
+      if (role && u.role !== role) return false;
+      if (status && u.status !== status) return false;
+      if (!keyword) return true;
+      return [u.username, u.employee_code, u.first_name, u.last_name, fullName(u)]
+        .join(" ").toLowerCase().includes(keyword);
+    });
+
+    $("#userRows").innerHTML = filtered.length
+      ? filtered.map((user) =>
+          "<tr>" +
+            '<td><div class="t-main">' + esc(fullName(user)) + "</div>" +
+            '<div class="t-sub">สร้างเมื่อ ' + esc(fmtDate(user.created_at)) + "</div></td>" +
+            '<td class="mono">' + esc(user.username) + "</td>" +
+            "<td>" + esc(user.employee_code) + "</td>" +
+            '<td><span class="badge ' + (user.role === "DIRECTOR" ? "gold" : "navy") + '">' +
+              esc(ROLE_LABEL[user.role] || user.role) + "</span></td>" +
+            "<td>" + (user.status === "ACTIVE"
+              ? '<span class="badge ok"><span class="dot"></span>ใช้งาน</span>'
+              : '<span class="badge off"><span class="dot"></span>ระงับ</span>') + "</td>" +
+            '<td class="actions">' +
+              '<button class="btn ghost sm" data-edit="' + user.uid + '" type="button">แก้ไข</button>' +
+              '<button class="btn subtle sm" data-status="' + user.uid + '" type="button">' +
+                (user.status === "ACTIVE" ? "ระงับ" : "เปิดใช้") + "</button>" +
+              '<button class="btn subtle sm" data-pw="' + user.uid + '" type="button">รีเซ็ตรหัส</button>' +
+              (user.uid === state.user.uid
+                ? ""
+                : '<button class="btn subtle sm" data-del="' + user.uid +
+                  '" type="button" style="color:var(--danger)">ลบ</button>') +
+            "</td>" +
+          "</tr>"
+        ).join("")
+      : '<tr><td colspan="6"><div class="empty"><div class="ic">🔍</div><h4>ไม่พบผู้ใช้</h4>' +
+        "<p>ลองเปลี่ยนตัวกรองหรือคำค้นหา</p></div></td></tr>";
+
+    const find = (uid) => users.find((u) => u.uid === uid);
+    $$("#userRows [data-edit]").forEach((b) =>
+      b.addEventListener("click", () => userFormModal(find(b.dataset.edit))));
+    $$("#userRows [data-status]").forEach((b) =>
+      b.addEventListener("click", () => toggleUserStatus(find(b.dataset.status))));
+    $$("#userRows [data-pw]").forEach((b) =>
+      b.addEventListener("click", () => resetPasswordModal(find(b.dataset.pw))));
+    $$("#userRows [data-del]").forEach((b) =>
+      b.addEventListener("click", () => deleteUser(find(b.dataset.del))));
+  };
+
+  draw();
+  $("#userSearch").addEventListener("input", draw);
+  $("#userRole").addEventListener("change", draw);
+  $("#userStatus").addEventListener("change", draw);
+  $("#btnNewUser").addEventListener("click", () => userFormModal(null));
+}
+
+function userFormModal(user) {
+  const editing = !!user;
+  openModal({
+    title: editing ? "แก้ไขข้อมูลผู้ใช้" : "เพิ่มผู้ใช้ใหม่",
+    size: "wide",
+    bodyHtml:
+      '<div class="grid-2">' +
+        '<div class="field"><label for="usPrefix">คำนำหน้า<span class="req">*</span></label>' +
+        '<input id="usPrefix" type="text" value="' + esc(editing ? user.prefix : "") + '" placeholder="นาย / นาง / นางสาว"></div>' +
+        '<div class="field"><label for="usCode">เลขประจำตัว<span class="req">*</span></label>' +
+        '<input id="usCode" type="text" value="' + esc(editing ? user.employee_code : "") + '" placeholder="เช่น 1042"></div>' +
+        '<div class="field"><label for="usFirst">ชื่อ<span class="req">*</span></label>' +
+        '<input id="usFirst" type="text" value="' + esc(editing ? user.first_name : "") + '"></div>' +
+        '<div class="field"><label for="usLast">นามสกุล<span class="req">*</span></label>' +
+        '<input id="usLast" type="text" value="' + esc(editing ? user.last_name : "") + '"></div>' +
+        '<div class="field"><label for="usName">ชื่อผู้ใช้ (username)<span class="req">*</span></label>' +
+        '<input id="usName" type="text" spellcheck="false" value="' + esc(editing ? user.username : "") + '"></div>' +
+        '<div class="field"><label for="usRole">บทบาท<span class="req">*</span></label>' +
+        '<select id="usRole">' +
+          '<option value="TEACHER"' + (editing && user.role === "TEACHER" ? " selected" : "") + ">ครู</option>" +
+          '<option value="DIRECTOR"' + (editing && user.role === "DIRECTOR" ? " selected" : "") + ">ผู้อำนวยการ</option>" +
+        "</select></div>" +
+      "</div>" +
+      (editing
+        ? '<div class="note info"><span>ℹ</span><div>เปลี่ยนรหัสผ่านได้จากปุ่ม <b>รีเซ็ตรหัส</b> ในตาราง</div></div>'
+        : '<div class="field"><label for="usPass">รหัสผ่านเริ่มต้น<span class="req">*</span></label>' +
+          '<input id="usPass" type="text" spellcheck="false" placeholder="อย่างน้อย 8 ตัวอักษร">' +
+          '<span class="hint">แจ้งรหัสนี้ให้เจ้าของบัญชี แล้วให้เปลี่ยนเองภายหลังที่หน้า “บัญชีของฉัน”</span></div>'),
+    footHtml:
+      '<button class="btn ghost" data-act="cancel" type="button">ยกเลิก</button>' +
+      '<button class="btn" data-act="save" type="button">' + (editing ? "บันทึก" : "สร้างบัญชี") + "</button>",
+    onMount(root, close) {
+      $('[data-act="cancel"]', root).addEventListener("click", close);
+      $('[data-act="save"]', root).addEventListener("click", async (e) => {
+        const body = {
+          username: $("#usName", root).value.trim(),
+          employee_code: $("#usCode", root).value.trim(),
+          prefix: $("#usPrefix", root).value.trim(),
+          first_name: $("#usFirst", root).value.trim(),
+          last_name: $("#usLast", root).value.trim(),
+          role: $("#usRole", root).value,
+        };
+        if (!editing) body.password = $("#usPass", root).value;
+
+        const missing = ["username", "employee_code", "prefix", "first_name", "last_name"]
+          .some((key) => !body[key]);
+        if (missing) { toast("กรอกไม่ครบ", "กรุณากรอกข้อมูลที่มีเครื่องหมาย *", "err"); return; }
+        if (!editing && (body.password || "").length < 8) {
+          toast("รหัสผ่านสั้นเกินไป", "ต้องมีอย่างน้อย 8 ตัวอักษร", "err"); return;
+        }
+
+        await withBusy(e.currentTarget, "กำลังบันทึก…", async () => {
+          try {
+            if (editing) {
+              await api.put("/users/" + user.uid, body);
+              toast("บันทึกแล้ว", fullName(body), "ok");
+            } else {
+              await api.post("/users", body);
+              toast("สร้างบัญชีแล้ว", body.username, "ok");
+            }
+            close();
+            await loadUsers(true);
+            router();
+          } catch (err) {
+            toast("บันทึกไม่สำเร็จ", err.message, "err");
+          }
+        });
+      });
+    },
+  });
+}
+
+async function toggleUserStatus(user) {
+  const next = user.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+  const ok = await confirmDialog({
+    title: next === "INACTIVE" ? "ระงับบัญชี" : "เปิดใช้บัญชี",
+    message: (next === "INACTIVE"
+      ? "ผู้ใช้ <b>" + esc(fullName(user)) + "</b> จะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้อีกครั้ง"
+      : "เปิดให้ <b>" + esc(fullName(user)) + "</b> กลับมาใช้งานระบบได้"),
+    confirmText: next === "INACTIVE" ? "ระงับบัญชี" : "เปิดใช้",
+    danger: next === "INACTIVE",
+  });
+  if (!ok) return;
+  try {
+    await api.patch("/users/" + user.uid + "/status", { status: next });
+    toast("อัปเดตสถานะแล้ว", fullName(user) + " → " + STATUS_LABEL[next], "ok");
+    await loadUsers(true);
+    router();
+  } catch (err) {
+    toast("อัปเดตไม่สำเร็จ", err.message, "err");
+  }
+}
+
+function resetPasswordModal(user) {
+  openModal({
+    title: "รีเซ็ตรหัสผ่าน",
+    bodyHtml:
+      '<p style="color:var(--muted);font-size:14px;margin-bottom:14px">ตั้งรหัสผ่านใหม่ให้ <b>' +
+        esc(fullName(user)) + "</b></p>" +
+      '<div class="field"><label for="rpPass">รหัสผ่านใหม่<span class="req">*</span></label>' +
+      '<input id="rpPass" type="text" spellcheck="false" placeholder="อย่างน้อย 8 ตัวอักษร"></div>',
+    footHtml:
+      '<button class="btn ghost" data-act="cancel" type="button">ยกเลิก</button>' +
+      '<button class="btn" data-act="save" type="button">ตั้งรหัสผ่าน</button>',
+    onMount(root, close) {
+      $('[data-act="cancel"]', root).addEventListener("click", close);
+      $('[data-act="save"]', root).addEventListener("click", async (e) => {
+        const password = $("#rpPass", root).value;
+        if (password.length < 8) { toast("รหัสผ่านสั้นเกินไป", "ต้องมีอย่างน้อย 8 ตัวอักษร", "err"); return; }
+        await withBusy(e.currentTarget, "กำลังบันทึก…", async () => {
+          try {
+            await api.patch("/users/" + user.uid + "/password", { password });
+            toast("รีเซ็ตรหัสผ่านแล้ว", fullName(user), "ok");
+            close();
+          } catch (err) {
+            toast("ไม่สำเร็จ", err.message, "err");
+          }
+        });
+      });
+    },
+  });
+}
+
+async function deleteUser(user) {
+  const ok = await confirmDialog({
+    title: "ลบบัญชีผู้ใช้",
+    message: "ต้องการลบ <b>" + esc(fullName(user)) + "</b> ออกจากระบบใช่หรือไม่?",
+    confirmText: "ลบบัญชี",
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await api.del("/users/" + user.uid);
+    toast("ลบบัญชีแล้ว", fullName(user), "ok");
+    await loadUsers(true);
+    router();
+  } catch (err) {
+    toast("ลบไม่สำเร็จ", err.message, "err");
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * 18) บัญชีของฉัน
+ * ------------------------------------------------------------------ */
+async function viewAccount() {
+  renderLoading("กำลังโหลดข้อมูลบัญชี…");
+  const me = await api.get("/auth/me");
+  state.user = me;
+  renderIdentity();
+
+  view().innerHTML =
+    '<div class="page-head"><div class="t"><h1>บัญชีของฉัน</h1>' +
+      "<p>ข้อมูลผู้ใช้และการเปลี่ยนรหัสผ่าน</p></div></div>" +
+    '<div class="card"><div class="card-head"><h3>ข้อมูลผู้ใช้</h3>' +
+      '<div class="right"><span class="badge ' + (me.role === "DIRECTOR" ? "gold" : "navy") + '">' +
+      esc(ROLE_LABEL[me.role] || me.role) + "</span></div></div>" +
+    '<div class="card-body"><dl class="kv">' +
+      "<dt>ชื่อ-สกุล</dt><dd>" + esc(fullName(me)) + "</dd>" +
+      "<dt>ชื่อผู้ใช้</dt><dd class=\"mono\">" + esc(me.username) + "</dd>" +
+      "<dt>เลขประจำตัว</dt><dd>" + esc(me.employee_code) + "</dd>" +
+      "<dt>บทบาท</dt><dd>" + esc(ROLE_LABEL[me.role] || me.role) + "</dd>" +
+      "<dt>สถานะ</dt><dd>" + (me.status === "ACTIVE"
+        ? '<span class="badge ok"><span class="dot"></span>ใช้งาน</span>'
+        : '<span class="badge off"><span class="dot"></span>ระงับ</span>') + "</dd>" +
+      '<dt>รหัสผู้ใช้</dt><dd class="mono">' + esc(me.uid) + "</dd>" +
+    "</dl></div></div>" +
+    '<div class="card"><div class="card-head"><h3>เปลี่ยนรหัสผ่าน</h3></div>' +
+    '<div class="card-body" style="max-width:460px">' +
+      '<div class="field"><label for="pwCurrent">รหัสผ่านปัจจุบัน<span class="req">*</span></label>' +
+      '<input id="pwCurrent" type="password" autocomplete="current-password"></div>' +
+      '<div class="field"><label for="pwNew">รหัสผ่านใหม่<span class="req">*</span></label>' +
+      '<input id="pwNew" type="password" autocomplete="new-password">' +
+      '<span class="hint">อย่างน้อย 8 ตัวอักษร</span></div>' +
+      '<div class="field"><label for="pwConfirm">ยืนยันรหัสผ่านใหม่<span class="req">*</span></label>' +
+      '<input id="pwConfirm" type="password" autocomplete="new-password"></div>' +
+      '<button class="btn" id="btnChangePw" type="button">เปลี่ยนรหัสผ่าน</button>' +
+    "</div></div>";
+
+  $("#btnChangePw").addEventListener("click", async (e) => {
+    const current = $("#pwCurrent").value;
+    const next = $("#pwNew").value;
+    const confirm = $("#pwConfirm").value;
+
+    if (!current || !next) { toast("กรอกไม่ครบ", "กรุณากรอกรหัสผ่านให้ครบ", "err"); return; }
+    if (next.length < 8) { toast("รหัสผ่านสั้นเกินไป", "ต้องมีอย่างน้อย 8 ตัวอักษร", "err"); return; }
+    if (next !== confirm) { toast("รหัสผ่านไม่ตรงกัน", "ตรวจสอบช่องยืนยันอีกครั้ง", "err"); return; }
+
+    await withBusy(e.currentTarget, "กำลังเปลี่ยน…", async () => {
+      try {
+        await api.patch("/auth/password", { current_password: current, new_password: next });
+        toast("เปลี่ยนรหัสผ่านแล้ว", "ครั้งถัดไปให้ใช้รหัสผ่านใหม่", "ok");
+        $("#pwCurrent").value = ""; $("#pwNew").value = ""; $("#pwConfirm").value = "";
+      } catch (err) {
+        toast("เปลี่ยนไม่สำเร็จ", err.message, "err");
+      }
+    });
+  });
+}
+
+/* ---------------------------------------------------------------------
+ * 19) Boot
+ * ------------------------------------------------------------------ */
+showLogin();
+
 </script>
 </body>
 </html>
