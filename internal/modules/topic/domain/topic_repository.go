@@ -8,12 +8,9 @@ import (
 
 type TopicRepository interface {
 	Create(ctx context.Context, topic *Topic) error
-
 	FindAll(ctx context.Context) ([]Topic, error)
-
+	FindAllByAcademicYear(ctx context.Context, academicYear string) ([]Topic, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Topic, error)
-
 	Update(ctx context.Context, topic *Topic) error
-
 	Delete(ctx context.Context, id uuid.UUID) error
 }

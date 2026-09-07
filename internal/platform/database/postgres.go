@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"sdms/internal/config"
+	"sdms/internal/platform/audit"
 
 	submissionpostgres "sdms/internal/modules/submission/repository/postgres"
 	topicpostgres "sdms/internal/modules/topic/repository/postgres"
@@ -38,6 +39,7 @@ func NewPostgres(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		&submissionpostgres.SubmissionModel{},
 		&submissionpostgres.SubmissionValueModel{},
 		&submissionpostgres.SubmissionFileModel{},
+		&audit.LogModel{},
 	); err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}

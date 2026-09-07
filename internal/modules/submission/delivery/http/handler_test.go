@@ -46,6 +46,10 @@ type fakeSubmissionService struct {
 		uuid.UUID,
 		uuid.UUID,
 	) (*submissiondomain.Submission, error)
+
+	updateForSubmitterFn func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, usecase.UpdateSubmissionInput) (*submissiondomain.Submission, error)
+	deleteForSubmitterFn func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error
+	statusFn             func(context.Context, uuid.UUID) ([]usecase.TopicSubmissionStatus, error)
 }
 
 func (f *fakeSubmissionService) Create(
@@ -61,6 +65,27 @@ func (f *fakeSubmissionService) Create(
 		)
 	}
 
+	return nil, nil
+}
+
+func (f *fakeSubmissionService) UpdateForSubmitter(ctx context.Context, topicUID, submissionUID, submittedBy uuid.UUID, input usecase.UpdateSubmissionInput) (*submissiondomain.Submission, error) {
+	if f.updateForSubmitterFn != nil {
+		return f.updateForSubmitterFn(ctx, topicUID, submissionUID, submittedBy, input)
+	}
+	return nil, nil
+}
+
+func (f *fakeSubmissionService) DeleteForSubmitter(ctx context.Context, topicUID, submissionUID, submittedBy uuid.UUID) error {
+	if f.deleteForSubmitterFn != nil {
+		return f.deleteForSubmitterFn(ctx, topicUID, submissionUID, submittedBy)
+	}
+	return nil
+}
+
+func (f *fakeSubmissionService) GetTopicSubmissionStatus(ctx context.Context, topicUID uuid.UUID) ([]usecase.TopicSubmissionStatus, error) {
+	if f.statusFn != nil {
+		return f.statusFn(ctx, topicUID)
+	}
 	return nil, nil
 }
 

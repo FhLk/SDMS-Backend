@@ -9,8 +9,10 @@ import (
 type Role string
 
 const (
+	RoleAdmin    Role = "ADMIN"
 	RoleDirector Role = "DIRECTOR"
 	RoleTeacher  Role = "TEACHER"
+	RoleQA       Role = "QA"
 )
 
 type Status string

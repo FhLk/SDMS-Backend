@@ -87,7 +87,8 @@ func (s *userUsecaseStub) Delete(ctx context.Context, id uuid.UUID) error {
 
 func newUserTestApp(service UserUsecase) *fiber.App {
 	app := fiber.New()
-	RegisterRoutes(app.Group("/api/v1"), NewUserHandler(service), func(c fiber.Ctx) error { return c.Next() })
+	allow := func(c fiber.Ctx) error { return c.Next() }
+	RegisterRoutes(app.Group("/api/v1"), NewUserHandler(service), allow, allow)
 	return app
 }
 

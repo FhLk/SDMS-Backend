@@ -7,10 +7,12 @@ import (
 )
 
 type CreateSubmissionRequest struct {
-	Values []CreateSubmissionValueRequest `json:"values"`
+	Values []SubmissionValueRequest `json:"values"`
 }
 
-type CreateSubmissionValueRequest struct {
+type UpdateSubmissionRequest = CreateSubmissionRequest
+
+type SubmissionValueRequest struct {
 	FieldUID uuid.UUID       `json:"field_uid"`
 	Value    json.RawMessage `json:"value"`
 }

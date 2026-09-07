@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"encoding/json"
 	"time"
 
 	"sdms/internal/modules/submission/domain"
@@ -11,20 +12,20 @@ import (
 )
 
 type SubmissionModel struct {
-	UID         uuid.UUID                `gorm:"type:uuid;primaryKey"`
-	TopicUID    uuid.UUID                `gorm:"type:uuid;not null;index"`
-	SubmittedBy uuid.UUID                `gorm:"type:uuid;not null;index"`
-	Topic       topicpostgres.TopicModel `gorm:"foreignKey:TopicUID;references:UID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	Submitter   userpostgres.UserModel   `gorm:"foreignKey:SubmittedBy;references:UID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	Values      []SubmissionValueModel   `gorm:"foreignKey:SubmissionUID;references:UID;constraint:OnDelete:CASCADE;"`
-	Files       []SubmissionFileModel    `gorm:"foreignKey:SubmissionUID;references:UID;constraint:OnDelete:CASCADE;"`
-	CreatedAt   time.Time                `gorm:"not null"`
-	UpdatedAt   time.Time                `gorm:"not null"`
+	UID          uuid.UUID                `gorm:"type:uuid;primaryKey"`
+	TopicUID     uuid.UUID                `gorm:"type:uuid;not null;index"`
+	SubmittedBy  uuid.UUID                `gorm:"type:uuid;not null;index"`
+	FormVersion  int                      `gorm:"not null;default:1"`
+	FormSnapshot string                   `gorm:"type:jsonb;not null;default:'[]'"`
+	Topic        topicpostgres.TopicModel `gorm:"foreignKey:TopicUID;references:UID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	Submitter    userpostgres.UserModel   `gorm:"foreignKey:SubmittedBy;references:UID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	Values       []SubmissionValueModel   `gorm:"foreignKey:SubmissionUID;references:UID;constraint:OnDelete:CASCADE;"`
+	Files        []SubmissionFileModel    `gorm:"foreignKey:SubmissionUID;references:UID;constraint:OnDelete:CASCADE;"`
+	CreatedAt    time.Time                `gorm:"not null"`
+	UpdatedAt    time.Time                `gorm:"not null"`
 }
 
-func (SubmissionModel) TableName() string {
-	return "submissions"
-}
+func (SubmissionModel) TableName() string { return "submissions" }
 
 type SubmissionValueModel struct {
 	UID           uuid.UUID                     `gorm:"type:uuid;primaryKey"`
@@ -38,94 +39,63 @@ type SubmissionValueModel struct {
 	UpdatedAt     time.Time                     `gorm:"not null"`
 }
 
-func (SubmissionValueModel) TableName() string {
-	return "submission_values"
-}
+func (SubmissionValueModel) TableName() string { return "submission_values" }
 
 func fromDomain(submission domain.Submission) SubmissionModel {
-	values := make(
-		[]SubmissionValueModel,
-		0,
-		len(submission.Values),
-	)
-
+	values := make([]SubmissionValueModel, 0, len(submission.Values))
 	for _, value := range submission.Values {
-		values = append(
-			values,
-			fromValueDomain(value),
-		)
+		values = append(values, fromValueDomain(value))
 	}
-
+	snapshot, _ := json.Marshal(submission.FormSnapshot)
 	return SubmissionModel{
-		UID:         submission.UID,
-		TopicUID:    submission.TopicUID,
-		SubmittedBy: submission.SubmittedBy,
-		Values:      values,
-		CreatedAt:   submission.CreatedAt,
-		UpdatedAt:   submission.UpdatedAt,
+		UID: submission.UID, TopicUID: submission.TopicUID, SubmittedBy: submission.SubmittedBy,
+		FormVersion: submission.FormVersion, FormSnapshot: string(snapshot), Values: values,
+		CreatedAt: submission.CreatedAt, UpdatedAt: submission.UpdatedAt,
 	}
 }
 
-func fromValueDomain(
-	value domain.SubmissionValue,
-) SubmissionValueModel {
+func fromValueDomain(value domain.SubmissionValue) SubmissionValueModel {
 	return SubmissionValueModel{
-		UID:           value.UID,
-		SubmissionUID: value.SubmissionUID,
-		FieldUID:      value.FieldUID,
-		TextValue:     value.TextValue,
-		NumberValue:   value.NumberValue,
-		DateValue:     value.DateValue,
-		CreatedAt:     value.CreatedAt,
-		UpdatedAt:     value.UpdatedAt,
+		UID: value.UID, SubmissionUID: value.SubmissionUID, FieldUID: value.FieldUID,
+		TextValue: value.TextValue, NumberValue: value.NumberValue, DateValue: value.DateValue,
+		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 	}
 }
 
 func toDomain(model SubmissionModel) domain.Submission {
-	values := make(
-		[]domain.SubmissionValue,
-		0,
-		len(model.Values),
-	)
-
+	values := make([]domain.SubmissionValue, 0, len(model.Values))
 	for _, value := range model.Values {
-		values = append(
-			values,
-			toValueDomain(value),
-		)
+		values = append(values, toValueDomain(value))
 	}
-
 	files := make([]domain.SubmissionFile, 0, len(model.Files))
 	for _, file := range model.Files {
 		files = append(files, toFileDomain(file))
 	}
-
+	var snapshot []domain.FormSnapshotField
+	_ = json.Unmarshal([]byte(model.FormSnapshot), &snapshot)
+	snapshotByField := make(map[uuid.UUID]domain.FormSnapshotField, len(snapshot))
+	for _, field := range snapshot {
+		snapshotByField[field.UID] = field
+	}
+	for i := range values {
+		if field, ok := snapshotByField[values[i].FieldUID]; ok {
+			values[i].FieldLabel = field.Label
+			values[i].FieldType = field.Type
+			values[i].FieldIsPreview = field.IsPreview
+			values[i].FieldPosition = field.Position
+		}
+	}
 	return domain.Submission{
-		UID:         model.UID,
-		TopicUID:    model.TopicUID,
-		SubmittedBy: model.SubmittedBy,
-		Values:      values,
-		Files:       files,
-		CreatedAt:   model.CreatedAt,
-		UpdatedAt:   model.UpdatedAt,
+		UID: model.UID, TopicUID: model.TopicUID, SubmittedBy: model.SubmittedBy, FormVersion: model.FormVersion,
+		FormSnapshot: snapshot, Values: values, Files: files, CreatedAt: model.CreatedAt, UpdatedAt: model.UpdatedAt,
 	}
 }
 
-func toValueDomain(
-	model SubmissionValueModel,
-) domain.SubmissionValue {
+func toValueDomain(model SubmissionValueModel) domain.SubmissionValue {
 	return domain.SubmissionValue{
-		UID:            model.UID,
-		SubmissionUID:  model.SubmissionUID,
-		FieldUID:       model.FieldUID,
-		FieldLabel:     model.Field.Label,
-		FieldType:      model.Field.Type,
-		FieldIsPreview: model.Field.IsPreview,
-		FieldPosition:  model.Field.Position,
-		TextValue:      model.TextValue,
-		NumberValue:    model.NumberValue,
-		DateValue:      model.DateValue,
-		CreatedAt:      model.CreatedAt,
-		UpdatedAt:      model.UpdatedAt,
+		UID: model.UID, SubmissionUID: model.SubmissionUID, FieldUID: model.FieldUID,
+		FieldLabel: model.Field.Label, FieldType: model.Field.Type, FieldIsPreview: model.Field.IsPreview,
+		FieldPosition: model.Field.Position, TextValue: model.TextValue, NumberValue: model.NumberValue,
+		DateValue: model.DateValue, CreatedAt: model.CreatedAt, UpdatedAt: model.UpdatedAt,
 	}
 }

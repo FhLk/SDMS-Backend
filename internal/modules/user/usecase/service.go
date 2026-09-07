@@ -383,8 +383,10 @@ func validatePassword(password string) error {
 
 func isValidRole(role domain.Role) bool {
 	switch role {
-	case domain.RoleDirector,
-		domain.RoleTeacher:
+	case domain.RoleAdmin,
+		domain.RoleDirector,
+		domain.RoleTeacher,
+		domain.RoleQA:
 		return true
 
 	default:

@@ -1098,3 +1098,46 @@ func TestSubmissionFileServiceDeleteReturnsStorageDeleteError(t *testing.T) {
 		t.Fatalf("expected %v, got %v", expectedErr, err)
 	}
 }
+
+func TestSubmissionFileServiceDeleteAllRemovesStorageAndMetadata(t *testing.T) {
+	topicUID := uuid.New()
+	submissionUID := uuid.New()
+	fileA := submissiondomain.SubmissionFile{UID: uuid.New(), SubmissionUID: submissionUID, StoragePath: "submissions/a.pdf"}
+	fileB := submissiondomain.SubmissionFile{UID: uuid.New(), SubmissionUID: submissionUID, StoragePath: "submissions/b.jpg"}
+
+	submissionRepo := &fakeSubmissionRepository{findByIDAndTopicIDFn: func(_ context.Context, gotSubmissionUID, gotTopicUID uuid.UUID) (*submissiondomain.Submission, error) {
+		if gotSubmissionUID != submissionUID || gotTopicUID != topicUID {
+			t.Fatalf("submission lookup = %s / %s", gotSubmissionUID, gotTopicUID)
+		}
+		return &submissiondomain.Submission{UID: submissionUID, TopicUID: topicUID}, nil
+	}}
+	deletedMetadata := make([]uuid.UUID, 0, 2)
+	fileRepo := &fakeSubmissionFileRepository{
+		findAllFn: func(_ context.Context, got uuid.UUID) ([]submissiondomain.SubmissionFile, error) {
+			if got != submissionUID {
+				t.Fatalf("FindAllBySubmissionID uid = %s", got)
+			}
+			return []submissiondomain.SubmissionFile{fileA, fileB}, nil
+		},
+		deleteFn: func(_ context.Context, got uuid.UUID) error {
+			deletedMetadata = append(deletedMetadata, got)
+			return nil
+		},
+	}
+	deletedStorage := make([]string, 0, 2)
+	storage := &fakeSubmissionFileStorage{deleteFn: func(_ context.Context, path string) error {
+		deletedStorage = append(deletedStorage, path)
+		return nil
+	}}
+
+	service := NewSubmissionFileService(submissionRepo, fileRepo, &fakeFieldRepository{}, storage, DefaultMaxUploadSize)
+	if err := service.DeleteAll(context.Background(), topicUID, submissionUID); err != nil {
+		t.Fatalf("DeleteAll() error = %v", err)
+	}
+	if len(deletedStorage) != 2 || deletedStorage[0] != fileA.StoragePath || deletedStorage[1] != fileB.StoragePath {
+		t.Fatalf("deleted storage = %+v", deletedStorage)
+	}
+	if len(deletedMetadata) != 2 || deletedMetadata[0] != fileA.UID || deletedMetadata[1] != fileB.UID {
+		t.Fatalf("deleted metadata = %+v", deletedMetadata)
+	}
+}

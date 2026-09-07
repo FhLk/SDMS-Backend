@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -14,8 +15,9 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Env  string
-	Port string
+	Env            string
+	Port           string
+	AllowedOrigins []string
 }
 
 type UploadConfig struct {
@@ -41,8 +43,9 @@ type DatabaseConfig struct {
 func Load() *Config {
 	return &Config{
 		App: AppConfig{
-			Env:  getEnv("APP_ENV", "development"),
-			Port: getEnv("APP_PORT", "8080"),
+			Env:            getEnv("APP_ENV", "development"),
+			Port:           getEnv("APP_PORT", "8080"),
+			AllowedOrigins: getEnvCSV("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://127.0.0.1:5501"),
 		},
 		Upload: UploadConfig{
 			Dir:          getEnv("UPLOAD_DIR", "uploads"),
@@ -96,4 +99,16 @@ func getEnvInt64(key string, fallback int64) int64 {
 		return fallback
 	}
 	return parsed
+}
+func getEnvCSV(key, fallback string) []string {
+	value := getEnv(key, fallback)
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
 }

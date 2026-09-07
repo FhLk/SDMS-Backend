@@ -11,11 +11,12 @@ import (
 )
 
 type topicRepositoryStub struct {
-	createFn   func(context.Context, *domain.Topic) error
-	findAllFn  func(context.Context) ([]domain.Topic, error)
-	findByIDFn func(context.Context, uuid.UUID) (*domain.Topic, error)
-	updateFn   func(context.Context, *domain.Topic) error
-	deleteFn   func(context.Context, uuid.UUID) error
+	createFn                func(context.Context, *domain.Topic) error
+	findAllFn               func(context.Context) ([]domain.Topic, error)
+	findAllByAcademicYearFn func(context.Context, string) ([]domain.Topic, error)
+	findByIDFn              func(context.Context, uuid.UUID) (*domain.Topic, error)
+	updateFn                func(context.Context, *domain.Topic) error
+	deleteFn                func(context.Context, uuid.UUID) error
 }
 
 func (s *topicRepositoryStub) Create(ctx context.Context, topic *domain.Topic) error {
@@ -30,6 +31,13 @@ func (s *topicRepositoryStub) FindAll(ctx context.Context) ([]domain.Topic, erro
 		return s.findAllFn(ctx)
 	}
 	return []domain.Topic{}, nil
+}
+
+func (s *topicRepositoryStub) FindAllByAcademicYear(ctx context.Context, academicYear string) ([]domain.Topic, error) {
+	if s.findAllByAcademicYearFn != nil {
+		return s.findAllByAcademicYearFn(ctx, academicYear)
+	}
+	return s.FindAll(ctx)
 }
 
 func (s *topicRepositoryStub) FindByID(ctx context.Context, id uuid.UUID) (*domain.Topic, error) {
@@ -118,14 +126,14 @@ func TestCreateTopic(t *testing.T) {
 		}
 		service := NewTopicService(repo, &fieldRepositoryStub{})
 
-		topic, err := service.CreateTopic(context.Background(), "  งานวิชาการ  ", "  รายละเอียด  ")
+		topic, err := service.CreateTopic(context.Background(), "  2569  ", "  งานวิชาการ  ", "  รายละเอียด  ")
 		if err != nil {
 			t.Fatalf("CreateTopic() error = %v", err)
 		}
 		if topic != persisted {
 			t.Fatal("repository did not receive the returned topic")
 		}
-		if topic.UID == uuid.Nil || topic.Name != "งานวิชาการ" || topic.Description != "รายละเอียด" || !topic.IsActive {
+		if topic.UID == uuid.Nil || topic.AcademicYear != "2569" || topic.Name != "งานวิชาการ" || topic.Description != "รายละเอียด" || !topic.IsActive || topic.FormVersion != 1 {
 			t.Errorf("topic = %+v", topic)
 		}
 	})
@@ -138,7 +146,7 @@ func TestCreateTopic(t *testing.T) {
 		}}
 		service := NewTopicService(repo, &fieldRepositoryStub{})
 
-		topic, err := service.CreateTopic(context.Background(), " \t ", "description")
+		topic, err := service.CreateTopic(context.Background(), "2569", " \t ", "description")
 		if !errors.Is(err, domain.ErrTopicNameEmpty) || topic != nil {
 			t.Fatalf("topic = %+v, error = %v", topic, err)
 		}
@@ -153,7 +161,7 @@ func TestCreateTopic(t *testing.T) {
 			createFn: func(context.Context, *domain.Topic) error { return wantErr },
 		}, &fieldRepositoryStub{})
 
-		topic, err := service.CreateTopic(context.Background(), "topic", "description")
+		topic, err := service.CreateTopic(context.Background(), "2569", "topic", "description")
 		if !errors.Is(err, wantErr) || topic != nil {
 			t.Fatalf("topic = %+v, error = %v", topic, err)
 		}
@@ -314,7 +322,7 @@ func TestUpdateTopic(t *testing.T) {
 	topicID := uuid.New()
 
 	t.Run("trims and persists all mutable fields", func(t *testing.T) {
-		existing := &domain.Topic{UID: topicID, Name: "old", IsActive: true}
+		existing := &domain.Topic{UID: topicID, AcademicYear: "2569", Name: "old", IsActive: true, FormVersion: 1}
 		updateCalled := false
 		service := NewTopicService(&topicRepositoryStub{
 			findByIDFn: func(context.Context, uuid.UUID) (*domain.Topic, error) { return existing, nil },
@@ -327,7 +335,7 @@ func TestUpdateTopic(t *testing.T) {
 			},
 		}, &fieldRepositoryStub{})
 
-		got, err := service.Update(context.Background(), topicID, "  new  ", "  detail  ", false)
+		got, err := service.Update(context.Background(), topicID, "2569", "  new  ", "  detail  ", false)
 		if err != nil || got != existing || !updateCalled {
 			t.Fatalf("Update() = %+v, %v", got, err)
 		}
@@ -342,7 +350,7 @@ func TestUpdateTopic(t *testing.T) {
 			lookupCalled = true
 			return nil, nil
 		}}, &fieldRepositoryStub{})
-		got, err := service.Update(context.Background(), topicID, " ", "detail", true)
+		got, err := service.Update(context.Background(), topicID, "2569", " ", "detail", true)
 		if !errors.Is(err, domain.ErrTopicNameEmpty) || got != nil || lookupCalled {
 			t.Fatalf("Update() = %+v, %v, lookupCalled=%v", got, err, lookupCalled)
 		}
@@ -353,7 +361,7 @@ func TestUpdateTopic(t *testing.T) {
 		service := NewTopicService(&topicRepositoryStub{
 			findByIDFn: func(context.Context, uuid.UUID) (*domain.Topic, error) { return nil, wantErr },
 		}, &fieldRepositoryStub{})
-		got, err := service.Update(context.Background(), topicID, "new", "detail", true)
+		got, err := service.Update(context.Background(), topicID, "2569", "new", "detail", true)
 		if !errors.Is(err, wantErr) || got != nil {
 			t.Fatalf("Update() = %+v, %v", got, err)
 		}
@@ -362,10 +370,12 @@ func TestUpdateTopic(t *testing.T) {
 	t.Run("propagates update error", func(t *testing.T) {
 		wantErr := errors.New("update failed")
 		service := NewTopicService(&topicRepositoryStub{
-			findByIDFn: func(context.Context, uuid.UUID) (*domain.Topic, error) { return &domain.Topic{UID: topicID}, nil },
-			updateFn:   func(context.Context, *domain.Topic) error { return wantErr },
+			findByIDFn: func(context.Context, uuid.UUID) (*domain.Topic, error) {
+				return &domain.Topic{UID: topicID, AcademicYear: "2569", Name: "old", FormVersion: 1}, nil
+			},
+			updateFn: func(context.Context, *domain.Topic) error { return wantErr },
 		}, &fieldRepositoryStub{})
-		got, err := service.Update(context.Background(), topicID, "new", "detail", true)
+		got, err := service.Update(context.Background(), topicID, "2569", "new", "detail", true)
 		if !errors.Is(err, wantErr) || got != nil {
 			t.Fatalf("Update() = %+v, %v", got, err)
 		}

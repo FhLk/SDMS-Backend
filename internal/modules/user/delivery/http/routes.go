@@ -5,16 +5,20 @@ import "github.com/gofiber/fiber/v3"
 func RegisterRoutes(
 	router fiber.Router,
 	handler *userHandler,
-	directorOnly fiber.Handler,
+	userManager fiber.Handler,
+	reviewerOnly fiber.Handler,
 ) {
 	users := router.Group("/users")
-	users.Use(directorOnly)
-	users.Post("/", handler.Create)
-	users.Get("/", handler.List)
-	users.Get("/username/:username", handler.GetByUsername)
-	users.Get("/:id", handler.GetByID)
-	users.Put("/:id", handler.Update)
-	users.Patch("/:id/status", handler.UpdateStatus)
-	users.Patch("/:id/password", handler.ResetPassword)
-	users.Delete("/:id", handler.Delete)
+
+	// Review roles need teacher identity data to inspect submissions by person,
+	// but only administrators may change accounts.
+	users.Get("/", reviewerOnly, handler.List)
+	users.Get("/username/:username", reviewerOnly, handler.GetByUsername)
+	users.Get("/:id", reviewerOnly, handler.GetByID)
+
+	users.Post("/", userManager, handler.Create)
+	users.Put("/:id", userManager, handler.Update)
+	users.Patch("/:id/status", userManager, handler.UpdateStatus)
+	users.Patch("/:id/password", userManager, handler.ResetPassword)
+	users.Delete("/:id", userManager, handler.Delete)
 }

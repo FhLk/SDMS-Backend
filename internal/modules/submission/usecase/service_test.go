@@ -47,6 +47,9 @@ type fakeSubmissionRepository struct {
 		context.Context,
 		uuid.UUID,
 	) (bool, error)
+
+	updateValuesFn func(context.Context, *submissiondomain.Submission) error
+	deleteFn       func(context.Context, uuid.UUID) error
 }
 
 func (f *fakeSubmissionRepository) Create(
@@ -57,6 +60,20 @@ func (f *fakeSubmissionRepository) Create(
 		return f.createFn(ctx, submission)
 	}
 
+	return nil
+}
+
+func (f *fakeSubmissionRepository) UpdateValues(ctx context.Context, submission *submissiondomain.Submission) error {
+	if f.updateValuesFn != nil {
+		return f.updateValuesFn(ctx, submission)
+	}
+	return nil
+}
+
+func (f *fakeSubmissionRepository) Delete(ctx context.Context, submissionUID uuid.UUID) error {
+	if f.deleteFn != nil {
+		return f.deleteFn(ctx, submissionUID)
+	}
 	return nil
 }
 
@@ -145,6 +162,11 @@ type fakeTopicRepository struct {
 		context.Context,
 	) ([]topicdomain.Topic, error)
 
+	findAllByAcademicYearFn func(
+		context.Context,
+		string,
+	) ([]topicdomain.Topic, error)
+
 	findByIDFn func(
 		context.Context,
 		uuid.UUID,
@@ -180,6 +202,13 @@ func (f *fakeTopicRepository) FindAll(
 	}
 
 	return []topicdomain.Topic{}, nil
+}
+
+func (f *fakeTopicRepository) FindAllByAcademicYear(ctx context.Context, academicYear string) ([]topicdomain.Topic, error) {
+	if f.findAllByAcademicYearFn != nil {
+		return f.findAllByAcademicYearFn(ctx, academicYear)
+	}
+	return f.FindAll(ctx)
 }
 
 func (f *fakeTopicRepository) FindByID(

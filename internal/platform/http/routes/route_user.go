@@ -9,10 +9,15 @@ import (
 	"gorm.io/gorm"
 )
 
-func NewRouteUser(v1 fiber.Router, db *gorm.DB, directorOnly fiber.Handler) {
+func NewRouteUser(
+	v1 fiber.Router,
+	db *gorm.DB,
+	userManager fiber.Handler,
+	reviewerOnly fiber.Handler,
+) {
 	userRepository := userpostgres.NewUserRepository(db)
 	userService := userusecase.NewUserService(userRepository)
 	userHandler := userhttp.NewUserHandler(userService)
 
-	userhttp.RegisterRoutes(v1, userHandler, directorOnly)
+	userhttp.RegisterRoutes(v1, userHandler, userManager, reviewerOnly)
 }

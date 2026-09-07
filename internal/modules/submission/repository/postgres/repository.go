@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"sdms/internal/modules/submission/domain"
@@ -10,207 +11,125 @@ import (
 	"gorm.io/gorm"
 )
 
-type repository struct {
-	db *gorm.DB
-}
+type repository struct{ db *gorm.DB }
 
-func NewSubmissionRepository(db *gorm.DB) domain.SubmissionRepository {
-	return &repository{
-		db: db,
-	}
-}
+func NewSubmissionRepository(db *gorm.DB) domain.SubmissionRepository { return &repository{db: db} }
 
-func (r *repository) Create(
-	ctx context.Context,
-	submission *domain.Submission,
-) error {
-	return r.db.WithContext(ctx).Transaction(
-		func(tx *gorm.DB) error {
-			model := fromDomain(*submission)
-
-			values := model.Values
-			model.Values = nil
-
-			if err := tx.Omit("Topic", "Submitter").Create(&model).Error; err != nil {
+func (r *repository) Create(ctx context.Context, submission *domain.Submission) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		model := fromDomain(*submission)
+		values := model.Values
+		model.Values = nil
+		if err := tx.Omit("Topic", "Submitter", "Files").Create(&model).Error; err != nil {
+			return err
+		}
+		if len(values) > 0 {
+			if err := tx.Omit("Field").Create(&values).Error; err != nil {
 				return err
 			}
-
-			if len(values) > 0 {
-				if err := tx.Omit("Field").Create(&values).Error; err != nil {
-					return err
-				}
-			}
-
-			submission.CreatedAt = model.CreatedAt
-			submission.UpdatedAt = model.UpdatedAt
-
-			for i := range submission.Values {
-				submission.Values[i].CreatedAt =
-					values[i].CreatedAt
-
-				submission.Values[i].UpdatedAt =
-					values[i].UpdatedAt
-			}
-
-			return nil
-		},
-	)
+		}
+		submission.CreatedAt = model.CreatedAt
+		submission.UpdatedAt = model.UpdatedAt
+		for i := range submission.Values {
+			submission.Values[i].CreatedAt = values[i].CreatedAt
+			submission.Values[i].UpdatedAt = values[i].UpdatedAt
+		}
+		return nil
+	})
 }
 
-func (r *repository) FindAllByTopicID(
-	ctx context.Context,
-	topicUID uuid.UUID,
-) ([]domain.Submission, error) {
+func (r *repository) UpdateValues(ctx context.Context, submission *domain.Submission) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		snapshot, _ := json.Marshal(submission.FormSnapshot)
+		result := tx.Model(&SubmissionModel{}).Where("uid = ?", submission.UID).Updates(map[string]interface{}{
+			"form_version":  submission.FormVersion,
+			"form_snapshot": string(snapshot),
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return domain.ErrSubmissionNotFound
+		}
+		if err := tx.Where("submission_uid = ?", submission.UID).Delete(&SubmissionValueModel{}).Error; err != nil {
+			return err
+		}
+		values := make([]SubmissionValueModel, 0, len(submission.Values))
+		for i := range submission.Values {
+			submission.Values[i].UID = uuid.New()
+			submission.Values[i].SubmissionUID = submission.UID
+			values = append(values, fromValueDomain(submission.Values[i]))
+		}
+		if len(values) > 0 {
+			if err := tx.Omit("Field").Create(&values).Error; err != nil {
+				return err
+			}
+		}
+		var updated SubmissionModel
+		if err := tx.First(&updated, "uid = ?", submission.UID).Error; err != nil {
+			return err
+		}
+		submission.UpdatedAt = updated.UpdatedAt
+		return nil
+	})
+}
+
+func (r *repository) Delete(ctx context.Context, submissionUID uuid.UUID) error {
+	result := r.db.WithContext(ctx).Delete(&SubmissionModel{}, "uid = ?", submissionUID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrSubmissionNotFound
+	}
+	return nil
+}
+
+func (r *repository) FindAllByTopicID(ctx context.Context, topicUID uuid.UUID) ([]domain.Submission, error) {
+	return r.findAll(r.db.WithContext(ctx).Where("topic_uid = ?", topicUID))
+}
+
+func (r *repository) FindAllByTopicIDAndSubmittedBy(ctx context.Context, topicUID, submittedBy uuid.UUID) ([]domain.Submission, error) {
+	return r.findAll(r.db.WithContext(ctx).Where("topic_uid = ? AND submitted_by = ?", topicUID, submittedBy))
+}
+
+func (r *repository) findAll(query *gorm.DB) ([]domain.Submission, error) {
 	var models []SubmissionModel
-
-	if err := r.db.
-		WithContext(ctx).
-
-		// โหลดค่าที่กรอก พร้อมข้อมูล field
-		Preload("Values.Field").
-		Where("topic_uid = ?", topicUID).
-		Order("created_at DESC").
-		Find(&models).
-		Error; err != nil {
+	if err := query.Preload("Values.Field").Preload("Files").Order("created_at DESC").Find(&models).Error; err != nil {
 		return nil, err
 	}
-
-	submissions := make(
-		[]domain.Submission,
-		0,
-		len(models),
-	)
-
+	result := make([]domain.Submission, 0, len(models))
 	for _, model := range models {
-		submissions = append(
-			submissions,
-			toDomain(model),
-		)
+		result = append(result, toDomain(model))
 	}
-
-	return submissions, nil
+	return result, nil
 }
 
-func (r *repository) FindAllByTopicIDAndSubmittedBy(
-	ctx context.Context,
-	topicUID uuid.UUID,
-	submittedBy uuid.UUID,
-) ([]domain.Submission, error) {
-	var models []SubmissionModel
-
-	if err := r.db.
-		WithContext(ctx).
-
-		// โหลดค่าที่กรอก พร้อมข้อมูล field
-		Preload("Values.Field").
-		Where(
-			"topic_uid = ? AND submitted_by = ?",
-			topicUID,
-			submittedBy,
-		).
-		Order("created_at DESC").
-		Find(&models).
-		Error; err != nil {
-		return nil, err
-	}
-
-	submissions := make(
-		[]domain.Submission,
-		0,
-		len(models),
-	)
-
-	for _, model := range models {
-		submissions = append(
-			submissions,
-			toDomain(model),
-		)
-	}
-
-	return submissions, nil
+func (r *repository) FindByIDAndTopicID(ctx context.Context, submissionUID, topicUID uuid.UUID) (*domain.Submission, error) {
+	return r.findOne(r.db.WithContext(ctx).Where("uid = ? AND topic_uid = ?", submissionUID, topicUID))
 }
 
-func (r *repository) FindByIDAndTopicID(
-	ctx context.Context,
-	submissionUID uuid.UUID,
-	topicUID uuid.UUID,
-) (*domain.Submission, error) {
+func (r *repository) FindByIDAndTopicIDAndSubmittedBy(ctx context.Context, submissionUID, topicUID, submittedBy uuid.UUID) (*domain.Submission, error) {
+	return r.findOne(r.db.WithContext(ctx).Where("uid = ? AND topic_uid = ? AND submitted_by = ?", submissionUID, topicUID, submittedBy))
+}
+
+func (r *repository) findOne(query *gorm.DB) (*domain.Submission, error) {
 	var model SubmissionModel
-
-	err := r.db.
-		WithContext(ctx).
-		Preload("Values").
-		Preload("Files").
-		Where(
-			"uid = ? AND topic_uid = ?",
-			submissionUID,
-			topicUID,
-		).
-		First(&model).
-		Error
-
+	err := query.Preload("Values.Field").Preload("Files").First(&model).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrSubmissionNotFound
 	}
-
 	if err != nil {
 		return nil, err
 	}
-
 	submission := toDomain(model)
-
 	return &submission, nil
 }
 
-func (r *repository) FindByIDAndTopicIDAndSubmittedBy(
-	ctx context.Context,
-	submissionUID uuid.UUID,
-	topicUID uuid.UUID,
-	submittedBy uuid.UUID,
-) (*domain.Submission, error) {
-	var model SubmissionModel
-
-	err := r.db.
-		WithContext(ctx).
-		Preload("Values").
-		Preload("Files").
-		Where(
-			"uid = ? AND topic_uid = ? AND submitted_by = ?",
-			submissionUID,
-			topicUID,
-			submittedBy,
-		).
-		First(&model).
-		Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, domain.ErrSubmissionNotFound
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	submission := toDomain(model)
-
-	return &submission, nil
-}
-
-func (r *repository) HasAnyByTopicID(
-	ctx context.Context,
-	topicUID uuid.UUID,
-) (bool, error) {
+func (r *repository) HasAnyByTopicID(ctx context.Context, topicUID uuid.UUID) (bool, error) {
 	var count int64
-
-	if err := r.db.
-		WithContext(ctx).
-		Model(&SubmissionModel{}).
-		Where("topic_uid = ?", topicUID).
-		Limit(1).
-		Count(&count).
-		Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&SubmissionModel{}).Where("topic_uid = ?", topicUID).Limit(1).Count(&count).Error; err != nil {
 		return false, err
 	}
-
 	return count > 0, nil
 }

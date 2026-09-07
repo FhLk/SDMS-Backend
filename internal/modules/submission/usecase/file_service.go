@@ -269,9 +269,33 @@ func (s *SubmissionFileService) Delete(
 	return s.storage.Delete(ctx, file.StoragePath)
 }
 
+func (s *SubmissionFileService) DeleteAll(
+	ctx context.Context,
+	topicUID uuid.UUID,
+	submissionUID uuid.UUID,
+) error {
+	if _, err := s.submissionRepo.FindByIDAndTopicID(ctx, submissionUID, topicUID); err != nil {
+		return err
+	}
+	files, err := s.fileRepo.FindAllBySubmissionID(ctx, submissionUID)
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		if err := s.storage.Delete(ctx, file.StoragePath); err != nil {
+			return err
+		}
+		if err := s.fileRepo.Delete(ctx, file.UID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func isAllowedUploadExtension(ext string) bool {
 	switch strings.ToLower(ext) {
-	case ".pdf", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm", ".mov", ".m4v":
+	case ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".csv", ".txt",
+		".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm", ".mov", ".m4v":
 		return true
 	default:
 		return false

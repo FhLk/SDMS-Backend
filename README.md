@@ -1,430 +1,242 @@
-SDMS API
+# SDMS Backend — Phase 1
 
-REST API สำหรับระบบ School Document Management System (SDMS) พัฒนาด้วย Go โดยใช้ Fiber v3, GORM และ PostgreSQL และจัดโครงสร้างโปรเจกต์ตามแนวคิด Clean Architecture
+Backend สำหรับ **School Document Management System (SDMS)** ตามขอบเขต Phase 1 ของเอกสารนำเสนอโครงการ: โรงเรียนกำหนดหัวข้อและแบบฟอร์ม ครูส่งข้อมูลแบบมีโครงสร้างพร้อมหลักฐาน ผู้บริหารตรวจตามหัวข้อ/รายบุคคล และระบบติดตามได้ว่าใครยังไม่ส่งหรือส่งไม่ครบ
 
-Tech Stack
+> Phase 1 ไม่ได้พยายามแทน Google Drive และยังไม่รวม Dashboard, Report/Export, Notification หรือ Advanced Search ซึ่งอยู่ใน Phase 2 ของข้อเสนอโครงการ
 
-Go 1.25+
+## Tech stack
 
-Fiber v3
+- Go **1.26.5** (ตาม `go.mod`)
+- Fiber v3
+- GORM
+- PostgreSQL
+- JWT + bcrypt
+- Local evidence storage (เปลี่ยน storage implementation ภายหลังได้)
 
-GORM
+## Phase-1 capabilities
 
-PostgreSQL
+- Authentication: login, JWT, `/auth/me`
+- Roles: `ADMIN`, `DIRECTOR`, `QA`, `TEACHER`
+- User administration: `ADMIN`
+- Topic/Form management: `ADMIN`, `DIRECTOR`
+- Read-only review: `ADMIN`, `DIRECTOR`, `QA`
+- Teacher-owned submissions/evidence: `TEACHER`
+- Academic-year separation (`academic_year`)
+- Flexible fields: text, textarea, number, date, select, file
+- Unlimited preview fields (`is_preview`)
+- Submission create/update/delete for owner
+- Required-field validation including **required evidence files**
+- Completion states: `NOT_SUBMITTED`, `INCOMPLETE`, `COMPLETE`
+- Topic submission-status API covering every active teacher
+- Form version + per-submission `form_snapshot`
+- File upload/view/download/delete and video byte-range streaming
+- Audit log for authenticated API access
+- Local PostgreSQL + upload backup/restore scripts
+- Production CORS allow-list and production JWT-secret guard
 
-Docker / Docker Compose
+## Project structure
 
-godotenv
+```text
+cmd/
+  api/                 API entry point + prototype HTML
+  seed-admin/          create the first administrator
+  seed-director/       create a director account
+internal/
+  config/
+  modules/
+    auth/
+    health/
+    submission/
+    topic/
+    user/
+  platform/
+    audit/
+    auth/
+    database/
+    http/
+    storage/local/
+docs/
+  PHASE1_API.md
+scripts/
+  backup.sh
+  restore.sh
+```
 
-Project Structure
+The code keeps business rules in Domain/Usecase layers and database/Fiber concerns in Repository/Delivery/Platform layers.
 
-sdms-api/
-├── cmd/
-│   └── api/
-│       └── main.go
-│
-├── internal/
-│   ├── config/
-│   │   └── config.go
-│   │
-│   ├── modules/
-│   │   └── health/
-│   │       └── delivery/
-│   │           └── http/
-│   │               └── handler.go
-│   │
-│   └── platform/
-│       ├── database/
-│       │   └── postgres.go
-│       │
-│       └── http/
-│           └── router.go
-│
-├── .env
-├── .env.example
-├── .gitignore
-├── docker-compose.yml
-├── go.mod
-├── go.sum
-└── README.md
+## Setup
 
-Architecture
-
-โปรเจกต์ใช้แนวคิด Clean Architecture เพื่อแยก Business Logic ออกจาก Framework และ Infrastructure
-
-HTTP / Fiber
-     │
-     ▼
-Delivery
-     │
-     ▼
-Usecase
-     │
-     ▼
-Domain
-     ▲
-     │
-Repository Interface
-     ▲
-     │
-Repository Implementation
-     │
-     ▼
-GORM / PostgreSQL
-
-หลักการสำคัญ:
-
-Domain ไม่ควร import Fiber
-
-Domain ไม่ควร import GORM
-
-Handler ไม่ควร query database โดยตรง
-
-Business Logic ควรอยู่ใน Usecase
-
-Repository interface ควรประกาศใน Domain
-
-GORM implementation ควรอยู่ใน Repository layer
-
-Requirements
-
-ก่อนเริ่มใช้งานควรติดตั้ง:
-
-Go
-
-ตรวจสอบเวอร์ชัน:
-
-go version
-
-ควรเป็น Go 1.25 หรือใหม่กว่า
-
-Docker
-
-ตรวจสอบ:
-
-docker --version
-docker compose version
-
-Getting Started
-
-1. Clone หรือเข้า Project
-
-cd sdms-api
-
-2. Install Dependencies
-
-go mod tidy
-
-หรือถ้ายังไม่ได้ติดตั้ง dependency:
-
-go get github.com/gofiber/fiber/v3
-go get gorm.io/gorm
-go get gorm.io/driver/postgres
-go get github.com/joho/godotenv
-
-Environment Variables
-
-สร้าง .env จาก .env.example
-
+```bash
 cp .env.example .env
-
-ตัวอย่าง .env
-
-APP_ENV=development
-APP_PORT=8080
-
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=sdms
-DB_PASSWORD=sdms_password
-DB_NAME=sdms_db
-DB_SSLMODE=disable
-DB_TIMEZONE=Asia/Bangkok
-
-ห้าม commit .env ที่มี password หรือ secret จริงขึ้น Git repository
-
-PostgreSQL
-
-โปรเจกต์ใช้ PostgreSQL ผ่าน Docker Compose
-
-ตัวอย่าง docker-compose.yml
-
-services:
-  postgres:
-    image: postgres:17
-    container_name: sdms-postgres
-    restart: unless-stopped
-
-    environment:
-      POSTGRES_USER: sdms
-      POSTGRES_PASSWORD: sdms_password
-      POSTGRES_DB: sdms_db
-
-    ports:
-      - "5432:5432"
-
-    volumes:
-      - sdms_postgres_data:/var/lib/postgresql/data
-
-volumes:
-  sdms_postgres_data:
-
-Start PostgreSQL
-
 docker compose up -d
-
-ตรวจสอบสถานะ:
-
-docker compose ps
-
-ดู logs:
-
-docker compose logs postgres
-
-หยุด services:
-
-docker compose down
-
-หยุดและลบ database volume:
-
-docker compose down -v
-
-คำสั่ง docker compose down -v จะลบข้อมูล PostgreSQL ใน volume ด้วย
-
-Run Application
-
-รัน API:
-
+go mod tidy
 go run ./cmd/api
-
-เมื่อสำเร็จควรเห็น log คล้าย:
-
-database connected
-server running on http://localhost:8080
-
-Build
-
-ตรวจสอบว่า project compile ผ่าน:
-
-go build ./...
-
-Format source code:
-
-go fmt ./...
-
-API
+```
 
 Base URL:
 
+```text
 http://localhost:8080/api/v1
+```
 
-Health Check
+Health check:
 
-GET /api/v1/health
-
-ทดสอบด้วย curl:
-
+```bash
 curl http://localhost:8080/api/v1/health
+```
 
-ตัวอย่าง response:
+## Bootstrap the first administrator
 
+Because account mutation is an `ADMIN` responsibility in the Phase-1 role model, create the first admin from the command line:
+
+```bash
+go run ./cmd/seed-admin \
+  -username admin \
+  -password 'change-this-password' \
+  -employee-code ADM001 \
+  -prefix นาย \
+  -first-name ผู้ดูแล \
+  -last-name ระบบ
+```
+
+A director can also be seeded directly:
+
+```bash
+go run ./cmd/seed-director \
+  -username director \
+  -password 'change-this-password' \
+  -employee-code DIR001 \
+  -prefix นาย \
+  -first-name ผู้อำนวยการ \
+  -last-name โรงเรียน
+```
+
+## Role matrix
+
+| Capability | ADMIN | DIRECTOR | QA | TEACHER |
+|---|:---:|:---:|:---:|:---:|
+| Manage user accounts | ✅ | ❌ | ❌ | ❌ |
+| Read user identity for review | ✅ | ✅ | ✅ | ❌ |
+| Create/update topic & form | ✅ | ✅ | ❌ | ❌ |
+| Review all submissions/evidence | ✅ | ✅ | ✅ | ❌ |
+| View submission-status tracking | ✅ | ✅ | ✅ | ❌ |
+| Create/update/delete own submission | ❌ | ❌ | ❌ | ✅ |
+| Upload/delete own evidence | ❌ | ❌ | ❌ | ✅ |
+| Read audit log | ✅ | ❌ | ❌ | ❌ |
+
+## Academic year and form history
+
+A new topic requires `academic_year` and starts at `form_version = 1`.
+
+> **Existing database migration:** `AutoMigrate` adds the new `academic_year` column with `UNSPECIFIED` for rows that existed before this revision. Before pilot/production use, update those old topics to the correct academic year. Existing submissions receive `form_version = 1`; their old values remain readable, but only submissions created/updated after this revision have a full historical `form_snapshot`.
+
+```json
 {
-  "status": "ok",
-  "database": "connected",
-  "service": "sdms-api"
+  "academic_year": "2569",
+  "name": "งานอบรมและพัฒนาตนเอง",
+  "description": "หลักฐานปีการศึกษา 2569"
 }
+```
 
-Planned Modules
+Use:
 
-ระบบจะค่อย ๆ แบ่งออกเป็น module ดังนี้:
+```http
+GET /api/v1/topics?academic_year=2569
+```
 
-internal/modules/
-├── health/
-├── auth/
-├── user/
-├── topic/
-├── form_schema/
-├── submission/
-└── file/
+When a teacher submits, the submission records both `form_version` and a full `form_snapshot`. After submissions exist, changes that could invalidate historical data are blocked: field deletion, type changes, required/select-option changes, adding a new required field, changing the topic's academic year, or deleting the topic.
 
-Topic
+## Submission status tracking
 
-ใช้สำหรับ Folder หรือหัวข้อเอกสารที่ ผอ. สามารถสร้าง แก้ไข และลบได้
+Reviewers can call:
 
-ตัวอย่าง API ที่จะพัฒนา:
+```http
+GET /api/v1/topics/:topicID/submissions/status
+```
 
-POST   /api/v1/topics
-GET    /api/v1/topics
-GET    /api/v1/topics/:id
-PUT    /api/v1/topics/:id
-DELETE /api/v1/topics/:id
+Example states:
 
-Dynamic Form
+```text
+ครู A  COMPLETE
+ครู B  INCOMPLETE
+ครู C  NOT_SUBMITTED
+```
 
-แต่ละ Topic สามารถมี Form Schema ของตัวเอง เช่น:
+`INCOMPLETE` includes missing required file fields; merely creating a submission is no longer treated as complete when evidence is still missing.
 
-Topic
-└── Form Schema
-    ├── Text Field
-    ├── Number Field
-    ├── Date Field
-    ├── Select Field
-    └── File Field
+Phase 1 currently treats **all active TEACHER accounts** as expected submitters for a topic. Per-topic teacher/group assignment can be added later if the school requires different target groups for different topics.
 
-แนะนำให้ใช้ Form Schema Version เพื่อให้ Submission เก่ายังคงอ้างอิงโครงสร้าง Form เดิมได้ แม้ ผอ. จะเปลี่ยน Field ภายหลัง
+## Teacher submission management
 
-ตัวอย่าง:
+```http
+POST   /api/v1/topics/:topicID/submissions
+PUT    /api/v1/topics/:topicID/submissions/:submissionID
+DELETE /api/v1/topics/:topicID/submissions/:submissionID
+```
 
-Topic
-├── Form Schema v1
-└── Form Schema v2
+Ownership is enforced from the authenticated JWT user; the client cannot impersonate another teacher by supplying a different `submitted_by`.
 
-Submission
+## Evidence files
 
-ครูจะกรอก Dynamic Form และส่งข้อมูลเข้า Topic
+Supported extensions:
 
-แนวคิดโครงสร้างข้อมูล:
+```text
+.pdf .doc .docx .xls .xlsx .ppt .pptx .csv .txt
+.png .jpg .jpeg .webp
+.mp4 .webm .mov .m4v
+```
 
-Topic
-  │
-  ▼
-Form Schema
-  │
-  ▼
-Form Fields
+View/download endpoints retain authentication/ownership checks and `/view` supports byte ranges for browser video playback.
 
-Form Schema
-  │
-  ▼
-Submission
-  ├── Submission Values
-  └── Submission Files
+## Audit log
 
-Suggested Development Order
+Authenticated API access is written to `audit_logs` with user ID, method, path, HTTP status, IP and timestamp.
 
-แนะนำให้พัฒนาตามลำดับ:
+```http
+GET /api/v1/audit-logs?limit=100
+GET /api/v1/audit-logs?user_uid=<uuid>&method=GET
+```
 
-Infrastructure
+Only `ADMIN` can query the audit-log endpoint.
 
-Fiber
+## Backup and restore
 
-Config
+For the current local-file deployment model:
 
-PostgreSQL
+```bash
+./scripts/backup.sh
+./scripts/restore.sh backups/<timestamp>
+```
 
-GORM
+A backup contains a PostgreSQL custom dump plus the configured `UPLOAD_DIR`. Test restoration periodically before relying on it for production recovery.
 
-Topic CRUD
+## Security notes
 
-Domain
+- Do not distribute or commit `.env` containing real credentials.
+- Set `CORS_ALLOWED_ORIGINS` to the real frontend origin(s) in production.
+- Set a long random `AUTH_JWT_SECRET`. The API refuses to start in `APP_ENV=production` when the value is a known placeholder or shorter than 32 characters.
+- Upload validation currently uses the allowed extension list plus the browser/server content type; add file-signature (magic-byte) validation and login rate limiting before a public production rollout.
+- Local storage is appropriate for pilot/single-instance use; production deployments should have persistent storage, backup monitoring, and a tested recovery process.
 
-Repository
+## Development commands
 
-Usecase
-
-Handler
-
-User และ Role
-
-Director
-
-Teacher
-
-Authentication
-
-Login
-
-JWT
-
-Refresh Token
-
-Dynamic Form
-
-Form Schema
-
-Form Field
-
-Schema Version
-
-Submission
-
-Dynamic values
-
-Validation
-
-File Upload
-
-S3 หรือ MinIO
-
-File metadata ใน PostgreSQL
-
-Audit Log
-
-Git Ignore
-
-ตัวอย่าง .gitignore
-
-.env
-
-bin/
-tmp/
-dist/
-
-*.log
-
-.DS_Store
-
-.idea/
-.vscode/
-
-Development Commands
-
-# Start PostgreSQL
+```bash
 docker compose up -d
-
-# Stop PostgreSQL
-docker compose down
-
-# Install / clean dependencies
-go mod tidy
-
-# Format code
 go fmt ./...
-
-# Build
+go test ./...
 go build ./...
-
-# Run API
 go run ./cmd/api
+```
 
-Current Status
+See [`docs/PHASE1_API.md`](docs/PHASE1_API.md) for the changed API behavior.
 
-Go project setup
+## Phase 2 (not implemented in this revision)
 
-Fiber v3
+The project proposal places these features in Phase 2:
 
-Environment configuration
+- Dashboard ภาพรวม
+- Report / Export
+- Notification
+- Advanced cross-topic Search / Filter
 
-PostgreSQL with Docker Compose
-
-GORM connection
-
-Health Check API
-
-Topic CRUD
-
-User / Role
-
-Authentication
-
-Dynamic Form
-
-Submission
-
-File Upload
-
-Audit Log
-
-License
-
-Internal project for School Document Management System.
+They are intentionally left out of this Phase-1 backend revision rather than being silently treated as missing Phase-1 work.

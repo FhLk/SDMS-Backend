@@ -13,12 +13,18 @@ import (
 type TopicService interface {
 	CreateTopic(
 		ctx context.Context,
+		academicYear string,
 		name string,
 		description string,
 	) (*domain.Topic, error)
 
 	FindAll(
 		ctx context.Context,
+	) ([]domain.Topic, error)
+
+	FindAllByAcademicYear(
+		ctx context.Context,
+		academicYear string,
 	) ([]domain.Topic, error)
 
 	FindTopicWithFields(
@@ -29,6 +35,7 @@ type TopicService interface {
 	Update(
 		ctx context.Context,
 		id uuid.UUID,
+		academicYear string,
 		name string,
 		description string,
 		isActive bool,
@@ -89,7 +96,7 @@ func (h *TopicHandler) Create(c fiber.Ctx) error {
 		})
 	}
 
-	topic, err := h.service.CreateTopic(c.Context(), req.Name, req.Description)
+	topic, err := h.service.CreateTopic(c.Context(), req.AcademicYear, req.Name, req.Description)
 	if err != nil {
 		return handleError(c, err)
 	}
@@ -97,7 +104,7 @@ func (h *TopicHandler) Create(c fiber.Ctx) error {
 }
 
 func (h *TopicHandler) FindAll(c fiber.Ctx) error {
-	topics, err := h.service.FindAll(c.Context())
+	topics, err := h.service.FindAllByAcademicYear(c.Context(), c.Query("academic_year"))
 	if err != nil {
 		return handleError(c, err)
 	}
@@ -147,7 +154,7 @@ func (h *TopicHandler) Update(c fiber.Ctx) error {
 		})
 	}
 
-	topic, err := h.service.Update(c.Context(), topicID, req.Name, req.Description, req.IsActive)
+	topic, err := h.service.Update(c.Context(), topicID, req.AcademicYear, req.Name, req.Description, req.IsActive)
 
 	if err != nil {
 		return handleError(c, err)
@@ -190,7 +197,7 @@ func (h *TopicHandler) CreateField(c fiber.Ctx) error {
 	}
 
 	field, err := h.service.CreateField(
-		c,
+		c.Context(),
 		topicUID,
 		usecase.CreateFieldInput{
 			Label:     req.Label,
@@ -359,12 +366,17 @@ func handleError(c fiber.Ctx, err error) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"message": err.Error(),
 		})
-	case errors.Is(err, domain.ErrTopicNameEmpty):
+	case errors.Is(err, domain.ErrTopicNameEmpty),
+		errors.Is(err, domain.ErrTopicAcademicYearRequired):
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": err.Error(),
 		})
 	case errors.Is(err, domain.ErrTopicFieldTypeLocked),
-		errors.Is(err, domain.ErrTopicFieldDeleteLocked):
+		errors.Is(err, domain.ErrTopicFieldDeleteLocked),
+		errors.Is(err, domain.ErrTopicFieldSchemaLocked),
+		errors.Is(err, domain.ErrTopicRequiredFieldAddLocked),
+		errors.Is(err, domain.ErrTopicAcademicYearLocked),
+		errors.Is(err, domain.ErrTopicDeleteLocked):
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
 			"message": err.Error(),
 		})

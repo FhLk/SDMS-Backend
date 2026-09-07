@@ -135,7 +135,7 @@ func TestUserServiceCreate(t *testing.T) {
 		{"prefix required", func(in *CreateUserInput) { in.Prefix = " " }, domain.ErrPrefixRequired},
 		{"first name required", func(in *CreateUserInput) { in.FirstName = " " }, domain.ErrFirstNameRequired},
 		{"last name required", func(in *CreateUserInput) { in.LastName = " " }, domain.ErrLastNameRequired},
-		{"invalid role", func(in *CreateUserInput) { in.Role = "ADMIN" }, domain.ErrInvalidRole},
+		{"invalid role", func(in *CreateUserInput) { in.Role = "OWNER" }, domain.ErrInvalidRole},
 		{"password required", func(in *CreateUserInput) { in.Password = " " }, domain.ErrPasswordRequired},
 		{"password too short", func(in *CreateUserInput) { in.Password = "short" }, domain.ErrPasswordTooShort},
 	}

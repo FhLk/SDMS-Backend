@@ -19,22 +19,23 @@ import (
 )
 
 type topicServiceStub struct {
-	createTopicFn         func(context.Context, string, string) (*domain.Topic, error)
-	findAllFn             func(context.Context) ([]domain.Topic, error)
-	findByIDFn            func(context.Context, uuid.UUID) (*domain.Topic, error)
-	findTopicWithFieldsFn func(context.Context, uuid.UUID) (*domain.Topic, []domain.TopicField, error)
-	updateFn              func(context.Context, uuid.UUID, string, string, bool) (*domain.Topic, error)
-	deleteFn              func(context.Context, uuid.UUID) error
-	createFieldFn         func(context.Context, uuid.UUID, usecase.CreateFieldInput) (*domain.TopicField, error)
-	findFieldsByTopicIDFn func(context.Context, uuid.UUID) ([]domain.TopicField, error)
-	findFieldByIDFn       func(context.Context, uuid.UUID, uuid.UUID) (*domain.TopicField, error)
-	updateFieldFn         func(context.Context, uuid.UUID, uuid.UUID, usecase.UpdateFieldInput) (*domain.TopicField, error)
-	deleteFieldFn         func(context.Context, uuid.UUID, uuid.UUID) error
+	createTopicFn           func(context.Context, string, string, string) (*domain.Topic, error)
+	findAllFn               func(context.Context) ([]domain.Topic, error)
+	findAllByAcademicYearFn func(context.Context, string) ([]domain.Topic, error)
+	findByIDFn              func(context.Context, uuid.UUID) (*domain.Topic, error)
+	findTopicWithFieldsFn   func(context.Context, uuid.UUID) (*domain.Topic, []domain.TopicField, error)
+	updateFn                func(context.Context, uuid.UUID, string, string, string, bool) (*domain.Topic, error)
+	deleteFn                func(context.Context, uuid.UUID) error
+	createFieldFn           func(context.Context, uuid.UUID, usecase.CreateFieldInput) (*domain.TopicField, error)
+	findFieldsByTopicIDFn   func(context.Context, uuid.UUID) ([]domain.TopicField, error)
+	findFieldByIDFn         func(context.Context, uuid.UUID, uuid.UUID) (*domain.TopicField, error)
+	updateFieldFn           func(context.Context, uuid.UUID, uuid.UUID, usecase.UpdateFieldInput) (*domain.TopicField, error)
+	deleteFieldFn           func(context.Context, uuid.UUID, uuid.UUID) error
 }
 
-func (s *topicServiceStub) CreateTopic(ctx context.Context, name, description string) (*domain.Topic, error) {
+func (s *topicServiceStub) CreateTopic(ctx context.Context, academicYear, name, description string) (*domain.Topic, error) {
 	if s.createTopicFn != nil {
-		return s.createTopicFn(ctx, name, description)
+		return s.createTopicFn(ctx, academicYear, name, description)
 	}
 	return nil, errors.New("unexpected CreateTopic call")
 }
@@ -44,6 +45,16 @@ func (s *topicServiceStub) FindAll(ctx context.Context) ([]domain.Topic, error) 
 		return s.findAllFn(ctx)
 	}
 	return nil, errors.New("unexpected FindAll call")
+}
+
+func (s *topicServiceStub) FindAllByAcademicYear(ctx context.Context, academicYear string) ([]domain.Topic, error) {
+	if s.findAllByAcademicYearFn != nil {
+		return s.findAllByAcademicYearFn(ctx, academicYear)
+	}
+	if academicYear == "" {
+		return s.FindAll(ctx)
+	}
+	return nil, errors.New("unexpected FindAllByAcademicYear call")
 }
 
 func (s *topicServiceStub) FindByID(ctx context.Context, id uuid.UUID) (*domain.Topic, error) {
@@ -60,9 +71,9 @@ func (s *topicServiceStub) FindTopicWithFields(ctx context.Context, id uuid.UUID
 	return nil, nil, errors.New("unexpected FindTopicWithFields call")
 }
 
-func (s *topicServiceStub) Update(ctx context.Context, id uuid.UUID, name, description string, active bool) (*domain.Topic, error) {
+func (s *topicServiceStub) Update(ctx context.Context, id uuid.UUID, academicYear, name, description string, active bool) (*domain.Topic, error) {
 	if s.updateFn != nil {
-		return s.updateFn(ctx, id, name, description, active)
+		return s.updateFn(ctx, id, academicYear, name, description, active)
 	}
 	return nil, errors.New("unexpected Update call")
 }
@@ -145,18 +156,18 @@ func decodeTopicBody[T any](t *testing.T, resp *nethttp.Response) T {
 func TestTopicHandlerCreate(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		id := uuid.New()
-		service := &topicServiceStub{createTopicFn: func(_ context.Context, name, description string) (*domain.Topic, error) {
-			if name != "งานวิชาการ" || description != "รายละเอียด" {
-				t.Errorf("CreateTopic() arguments = %q, %q", name, description)
+		service := &topicServiceStub{createTopicFn: func(_ context.Context, academicYear, name, description string) (*domain.Topic, error) {
+			if academicYear != "2569" || name != "งานวิชาการ" || description != "รายละเอียด" {
+				t.Errorf("CreateTopic() arguments = %q, %q, %q", academicYear, name, description)
 			}
-			return &domain.Topic{UID: id, Name: name, Description: description, IsActive: true}, nil
+			return &domain.Topic{UID: id, AcademicYear: academicYear, Name: name, Description: description, IsActive: true, FormVersion: 1}, nil
 		}}
-		resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodPost, "/api/v1/topics", []byte(`{"name":"งานวิชาการ","description":"รายละเอียด"}`))
+		resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodPost, "/api/v1/topics", []byte(`{"academic_year":"2569","name":"งานวิชาการ","description":"รายละเอียด"}`))
 		if resp.StatusCode != fiber.StatusCreated {
 			t.Fatalf("status = %d", resp.StatusCode)
 		}
 		body := decodeTopicBody[TopicResponse](t, resp)
-		if body.UID != id || body.Name != "งานวิชาการ" || !body.IsActive {
+		if body.UID != id || body.AcademicYear != "2569" || body.Name != "งานวิชาการ" || !body.IsActive || body.FormVersion != 1 {
 			t.Errorf("response = %+v", body)
 		}
 	})
@@ -173,10 +184,10 @@ func TestTopicHandlerCreate(t *testing.T) {
 	})
 
 	t.Run("validation error", func(t *testing.T) {
-		service := &topicServiceStub{createTopicFn: func(context.Context, string, string) (*domain.Topic, error) {
+		service := &topicServiceStub{createTopicFn: func(context.Context, string, string, string) (*domain.Topic, error) {
 			return nil, domain.ErrTopicNameEmpty
 		}}
-		resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodPost, "/api/v1/topics", []byte(`{"name":""}`))
+		resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodPost, "/api/v1/topics", []byte(`{"academic_year":"2569","name":""}`))
 		if resp.StatusCode != fiber.StatusBadRequest {
 			t.Fatalf("status = %d", resp.StatusCode)
 		}
@@ -187,10 +198,10 @@ func TestTopicHandlerCreate(t *testing.T) {
 	})
 
 	t.Run("internal error", func(t *testing.T) {
-		service := &topicServiceStub{createTopicFn: func(context.Context, string, string) (*domain.Topic, error) {
+		service := &topicServiceStub{createTopicFn: func(context.Context, string, string, string) (*domain.Topic, error) {
 			return nil, errors.New("database failed")
 		}}
-		resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodPost, "/api/v1/topics", []byte(`{"name":"topic"}`))
+		resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodPost, "/api/v1/topics", []byte(`{"academic_year":"2569","name":"topic"}`))
 		if resp.StatusCode != fiber.StatusInternalServerError {
 			t.Fatalf("status = %d", resp.StatusCode)
 		}
@@ -278,13 +289,13 @@ func TestTopicHandlerUpdate(t *testing.T) {
 	id := uuid.New()
 
 	t.Run("success", func(t *testing.T) {
-		service := &topicServiceStub{updateFn: func(_ context.Context, gotID uuid.UUID, name, description string, active bool) (*domain.Topic, error) {
-			if gotID != id || name != "new" || description != "detail" || active {
-				t.Errorf("Update() arguments = %s, %q, %q, %v", gotID, name, description, active)
+		service := &topicServiceStub{updateFn: func(_ context.Context, gotID uuid.UUID, academicYear, name, description string, active bool) (*domain.Topic, error) {
+			if gotID != id || academicYear != "2569" || name != "new" || description != "detail" || active {
+				t.Errorf("Update() arguments = %s, %q, %q, %q, %v", gotID, academicYear, name, description, active)
 			}
-			return &domain.Topic{UID: id, Name: name, Description: description, IsActive: active}, nil
+			return &domain.Topic{UID: id, AcademicYear: academicYear, Name: name, Description: description, IsActive: active, FormVersion: 1}, nil
 		}}
-		resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodPut, "/api/v1/topics/"+id.String(), []byte(`{"name":"new","description":"detail","is_active":false}`))
+		resp := topicRequest(t, newTopicTestApp(service), nethttp.MethodPut, "/api/v1/topics/"+id.String(), []byte(`{"academic_year":"2569","name":"new","description":"detail","is_active":false}`))
 		if resp.StatusCode != fiber.StatusOK {
 			t.Fatalf("status = %d", resp.StatusCode)
 		}

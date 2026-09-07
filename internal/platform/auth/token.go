@@ -63,12 +63,10 @@ func (m *TokenManager) Parse(token string) (uuid.UUID, error) {
 	}
 
 	unsigned := parts[0] + "." + parts[1]
-	expectedSignature, err := base64.RawURLEncoding.DecodeString(m.sign(unsigned))
-	if err != nil {
-		return uuid.Nil, ErrInvalidToken
-	}
-	providedSignature, err := base64.RawURLEncoding.DecodeString(parts[2])
-	if err != nil || !hmac.Equal(expectedSignature, providedSignature) {
+	expectedSignature := m.sign(unsigned)
+	// Compare the canonical base64url signature text directly. This rejects
+	// alternative/non-canonical encodings that could decode to the same bytes.
+	if !hmac.Equal([]byte(expectedSignature), []byte(parts[2])) {
 		return uuid.Nil, ErrInvalidToken
 	}
 

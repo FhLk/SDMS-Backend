@@ -436,7 +436,9 @@ function fullName(user) {
   return [user.prefix, user.first_name, user.last_name].filter(Boolean).join(" ").trim() || user.username;
 }
 
-const ROLE_LABEL = { DIRECTOR: "ผู้อำนวยการ", TEACHER: "ครู" };
+const ROLE_LABEL = {
+  ADMIN: "ผู้ดูแลระบบ", DIRECTOR: "ผู้อำนวยการ", QA: "งานประกันคุณภาพ", TEACHER: "ครู",
+};
 const STATUS_LABEL = { ACTIVE: "ใช้งาน", INACTIVE: "ระงับ" };
 const FIELD_TYPE_LABEL = {
   text: "ข้อความสั้น", textarea: "ข้อความยาว", number: "ตัวเลข",
@@ -446,7 +448,7 @@ const FIELD_TYPE_ICON = {
   text: "🔤", textarea: "📝", number: "🔢", date: "📅", select: "▾", file: "📎",
 };
 /* ต้องตรงกับ isAllowedUploadExtension() ใน usecase/file_service.go */
-const ALLOWED_EXT = [".pdf", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm", ".mov", ".m4v"];
+const ALLOWED_EXT = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".csv", ".txt", ".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm", ".mov", ".m4v"];
 
 function toast(title, detail, kind) {
   const node = el(
@@ -632,12 +634,17 @@ const api = {
 const state = {
   user: null,        // ผู้ใช้ที่ล็อกอินอยู่ (จาก /auth/login หรือ /auth/me)
   topics: [],        // cache รายการหัวข้อ
-  users: [],         // cache รายชื่อผู้ใช้ (เฉพาะ ผอ.)
+  users: [],         // cache รายชื่อผู้ใช้ (บทบาทตรวจสอบ)
   usersById: {},     // uid -> user
 };
 
+const isAdmin = () => state.user && state.user.role === "ADMIN";
 const isDirector = () => state.user && state.user.role === "DIRECTOR";
+const isQA = () => state.user && state.user.role === "QA";
 const isTeacher = () => state.user && state.user.role === "TEACHER";
+const canManageTopics = () => isAdmin() || isDirector();
+const canReview = () => isAdmin() || isDirector() || isQA();
+const canManageUsers = () => isAdmin();
 
 function handleSessionExpired() {
   if (!api.token) return;
@@ -811,26 +818,17 @@ function renderIdentity() {
 }
 
 function navItems() {
-  if (isDirector()) {
-    return [
-      { group: "ภาพรวม" },
-      { href: "#/dashboard", icon: "▦", label: "หน้าแรก" },
-      { group: "งานเอกสาร" },
-      { href: "#/topics", icon: "🗂", label: "หัวข้อเอกสาร" },
-      { group: "ผู้ใช้งาน" },
-      { href: "#/users", icon: "👥", label: "จัดการผู้ใช้" },
-      { group: "บัญชี" },
-      { href: "#/account", icon: "⚙", label: "บัญชีของฉัน" },
-    ];
-  }
-  return [
+  const items = [
     { group: "ภาพรวม" },
     { href: "#/dashboard", icon: "▦", label: "หน้าแรก" },
     { group: "งานเอกสาร" },
-    { href: "#/topics", icon: "🗂", label: "หัวข้อที่เปิดรับ" },
-    { group: "บัญชี" },
-    { href: "#/account", icon: "⚙", label: "บัญชีของฉัน" },
+    { href: "#/topics", icon: "🗂", label: isTeacher() ? "หัวข้อที่เปิดรับ" : "หัวข้อเอกสาร" },
   ];
+  if (canManageUsers()) {
+    items.push({ group: "ผู้ใช้งาน" }, { href: "#/users", icon: "👥", label: "จัดการผู้ใช้" });
+  }
+  items.push({ group: "บัญชี" }, { href: "#/account", icon: "⚙", label: "บัญชีของฉัน" });
+  return items;
 }
 
 function renderNav() {
@@ -909,7 +907,7 @@ async function loadTopics(force) {
 }
 
 async function loadUsers(force) {
-  if (!isDirector()) return [];
+  if (!canReview()) return [];
   if (force || !state.users.length) {
     state.users = (await api.get("/users")) || [];
     state.usersById = {};
@@ -933,9 +931,9 @@ async function viewDashboard() {
   const activeTopics = topics.filter((t) => t.is_active);
 
   let users = [];
-  if (isDirector()) users = await loadUsers(true);
+  if (canReview()) users = await loadUsers(true);
 
-  const countable = isDirector() ? topics : activeTopics;
+  const countable = canReview() ? topics : activeTopics;
   const counts = await Promise.all(
     countable.map((topic) =>
       api.get("/topics/" + topic.uid + "/submissions")
@@ -947,7 +945,7 @@ async function viewDashboard() {
   const countByTopic = {};
   countable.forEach((topic, i) => { countByTopic[topic.uid] = counts[i]; });
 
-  const stats = isDirector()
+  const stats = canReview()
     ? [
         { k: "หัวข้อเอกสารทั้งหมด", v: topics.length, f: activeTopics.length + " หัวข้อเปิดรับอยู่" },
         { k: "รายการที่ครูส่ง", v: totalSubmissions, f: "รวมทุกหัวข้อ" },
@@ -960,7 +958,7 @@ async function viewDashboard() {
         { k: "หัวข้อที่ยังไม่ได้ส่ง", v: activeTopics.filter((t) => !countByTopic[t.uid]).length, f: "ควรดำเนินการ" },
       ];
 
-  const rows = (isDirector() ? topics : activeTopics)
+  const rows = (canReview() ? topics : activeTopics)
     .slice()
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
     .slice(0, 8);
@@ -968,7 +966,7 @@ async function viewDashboard() {
   view().innerHTML =
     '<div class="page-head"><div class="t">' +
       "<h1>สวัสดี " + esc([state.user.prefix, state.user.first_name].filter(Boolean).join(" ")) + "</h1>" +
-      "<p>" + (isDirector()
+      "<p>" + (canReview()
         ? "ภาพรวมหัวข้อเอกสาร บัญชีผู้ใช้ และรายการที่ครูส่งเข้ามา"
         : "หัวข้อที่เปิดรับเอกสารและสถานะการส่งของคุณ") + "</p>" +
     "</div></div>" +
@@ -979,7 +977,7 @@ async function viewDashboard() {
       ).join("") +
     "</div>" +
     '<div class="card"><div class="card-head">' +
-      "<h3>" + (isDirector() ? "หัวข้อเอกสารล่าสุด" : "หัวข้อที่เปิดรับ") + "</h3>" +
+      "<h3>" + (canReview() ? "หัวข้อเอกสารล่าสุด" : "หัวข้อที่เปิดรับ") + "</h3>" +
       '<div class="right"><a class="btn ghost sm" href="#/topics">ดูทั้งหมด</a></div>' +
     '</div><div class="card-body tight">' +
       (rows.length
@@ -998,7 +996,7 @@ async function viewDashboard() {
           ).join("") +
           "</tbody></table></div>"
         : '<div class="empty"><div class="ic">🗂</div><h4>ยังไม่มีหัวข้อเอกสาร</h4><p>' +
-          (isDirector() ? "สร้างหัวข้อแรกเพื่อเริ่มรับเอกสารจากครู" : "รอผู้อำนวยการเปิดหัวข้อ") + "</p></div>") +
+          (canReview() ? "ยังไม่มีหัวข้อเอกสารในระบบ" : "รอผู้บริหารเปิดหัวข้อ") + "</p></div>") +
     "</div></div>";
 }
 
@@ -1008,22 +1006,28 @@ function statusBadge(isActive) {
     : '<span class="badge off"><span class="dot"></span>ปิดรับ</span>';
 }
 
+function completionBadge(status) {
+  if (status === "COMPLETE") return '<span class="badge ok"><span class="dot"></span>ครบ</span>';
+  if (status === "INCOMPLETE") return '<span class="badge warn"><span class="dot"></span>ไม่ครบ</span>';
+  return '<span class="badge off"><span class="dot"></span>ยังไม่ส่ง</span>';
+}
+
 /* ---------------------------------------------------------------------
  * 10) หัวข้อเอกสาร — รายการ
  * ------------------------------------------------------------------ */
 async function viewTopicList() {
   renderLoading("กำลังโหลดหัวข้อเอกสาร…");
   const topics = await loadTopics(true);
-  const list = isDirector() ? topics : topics.filter((t) => t.is_active);
+  const list = canReview() ? topics : topics.filter((t) => t.is_active);
 
   view().innerHTML =
     '<div class="page-head"><div class="t">' +
-      "<h1>" + (isDirector() ? "หัวข้อเอกสาร" : "หัวข้อที่เปิดรับ") + "</h1>" +
-      "<p>" + (isDirector()
+      "<h1>" + (canReview() ? "หัวข้อเอกสาร" : "หัวข้อที่เปิดรับ") + "</h1>" +
+      "<p>" + (canManageTopics()
         ? "สร้างหัวข้อ กำหนดฟิลด์ของฟอร์ม และตรวจรายการที่ครูส่งเข้ามา"
-        : "เลือกหัวข้อเพื่อกรอกแบบฟอร์มและแนบไฟล์") + "</p>" +
+        : (canReview() ? "ตรวจรายการและสถานะการส่งตามหัวข้อ" : "เลือกหัวข้อเพื่อกรอกแบบฟอร์มและแนบไฟล์")) + "</p>" +
     "</div>" +
-    (isDirector()
+    (canManageTopics()
       ? '<div class="actions"><button class="btn" id="btnNewTopic" type="button">+ สร้างหัวข้อใหม่</button></div>'
       : "") +
     "</div>" +
@@ -1045,13 +1049,14 @@ async function viewTopicList() {
       ? filtered.map((topic) =>
           "<tr>" +
             '<td><div class="t-main">' + esc(topic.name) + "</div>" +
+            '<div class="t-sub">ปีการศึกษา ' + esc(topic.academic_year || "—") + ' · แบบฟอร์ม v' + esc(topic.form_version || 1) + '</div>' +
             (topic.description ? '<div class="t-sub">' + esc(topic.description) + "</div>" : "") + "</td>" +
             "<td>" + statusBadge(topic.is_active) + "</td>" +
             "<td>" + esc(fmtDate(topic.created_at)) + "</td>" +
             '<td class="actions">' +
               '<a class="btn ghost sm" href="#/topics/' + topic.uid + '">' +
-                (isDirector() ? "จัดการ" : "ส่งเอกสาร") + "</a>" +
-              (isDirector()
+                (canManageTopics() ? "จัดการ" : (canReview() ? "ตรวจสอบ" : "ส่งเอกสาร")) + "</a>" +
+              (canManageTopics()
                 ? '<button class="btn subtle sm" data-edit="' + topic.uid + '" type="button">แก้ไข</button>' +
                   '<button class="btn subtle sm" data-del="' + topic.uid + '" type="button" style="color:var(--danger)">ลบ</button>'
                 : "") +
@@ -1081,6 +1086,9 @@ function topicFormModal(topic) {
   openModal({
     title: editing ? "แก้ไขหัวข้อเอกสาร" : "สร้างหัวข้อเอกสาร",
     bodyHtml:
+      '<div class="field"><label for="tpYear">ปีการศึกษา<span class="req">*</span></label>' +
+      '<input id="tpYear" type="text" inputmode="numeric" value="' + esc(topic ? topic.academic_year : "") +
+      '" placeholder="เช่น 2569"><span class="hint">ใช้แยกหัวข้อและหลักฐานของแต่ละปีการศึกษา</span></div>' +
       '<div class="field"><label for="tpName">ชื่อหัวข้อ<span class="req">*</span></label>' +
       '<input id="tpName" type="text" value="' + esc(topic ? topic.name : "") +
       '" placeholder="เช่น รายงานผลการปฏิบัติงาน ภาคเรียนที่ 1"></div>' +
@@ -1098,11 +1106,12 @@ function topicFormModal(topic) {
     onMount(root, close) {
       $('[data-act="cancel"]', root).addEventListener("click", close);
       $('[data-act="save"]', root).addEventListener("click", async (e) => {
+        const academicYear = $("#tpYear", root).value.trim();
         const name = $("#tpName", root).value.trim();
-        if (!name) { toast("กรอกไม่ครบ", "กรุณาระบุชื่อหัวข้อ", "err"); return; }
+        if (!academicYear || !name) { toast("กรอกไม่ครบ", "กรุณาระบุปีการศึกษาและชื่อหัวข้อ", "err"); return; }
         await withBusy(e.currentTarget, "กำลังบันทึก…", async () => {
           try {
-            const body = { name, description: $("#tpDesc", root).value.trim() };
+            const body = { academic_year: academicYear, name, description: $("#tpDesc", root).value.trim() };
             if (editing) {
               body.is_active = $("#tpActive", root).checked;
               await api.put("/topics/" + topic.uid, body);
@@ -1127,7 +1136,7 @@ async function deleteTopic(topic) {
   const ok = await confirmDialog({
     title: "ลบหัวข้อเอกสาร",
     message: "ต้องการลบ <b>" + esc(topic.name) + "</b> ใช่หรือไม่?<br>" +
-      '<span style="color:var(--danger)">ฟิลด์ของฟอร์มและรายการที่ครูส่งในหัวข้อนี้จะถูกลบไปด้วย</span>',
+      '<span style="color:var(--danger)">ระบบอนุญาตให้ลบได้เฉพาะหัวข้อที่ยังไม่มีรายการส่งเท่านั้น</span>',
     confirmText: "ลบหัวข้อ",
     danger: true,
   });
@@ -1149,19 +1158,23 @@ async function viewTopicDetail(topicId, tab) {
   renderLoading("กำลังโหลดหัวข้อ…");
   const detail = await api.get("/topics/" + topicId);
   const fields = (detail.fields || []).slice().sort((a, b) => a.position - b.position);
+  detail.fields = fields;
 
-  const tabs = isDirector()
-    ? [{ key: "fields", label: "ฟิลด์ของฟอร์ม" }, { key: "submissions", label: "รายการที่ครูส่ง" }]
-    : [{ key: "submit", label: "ส่งเอกสาร" }, { key: "mine", label: "ประวัติการส่งของฉัน" }];
+  const tabs = canManageTopics()
+    ? [{ key: "fields", label: "ฟิลด์ของฟอร์ม" }, { key: "submissions", label: "รายการที่ครูส่ง" }, { key: "status", label: "สถานะการส่ง" }]
+    : (canReview()
+      ? [{ key: "submissions", label: "รายการที่ครูส่ง" }, { key: "status", label: "สถานะการส่ง" }]
+      : [{ key: "submit", label: "ส่งเอกสาร" }, { key: "mine", label: "ประวัติการส่งของฉัน" }]);
   const activeTab = tabs.some((t) => t.key === tab) ? tab : tabs[0].key;
 
   view().innerHTML =
     '<div class="crumb"><a href="#/topics">หัวข้อเอกสาร</a> / ' + esc(detail.name) + "</div>" +
     '<div class="page-head"><div class="t">' +
       "<h1>" + esc(detail.name) + " " + statusBadge(detail.is_active) + "</h1>" +
-      "<p>" + esc(detail.description || "ไม่มีคำอธิบาย") + "</p>" +
+      "<p>ปีการศึกษา " + esc(detail.academic_year || "—") + " · แบบฟอร์ม v" + esc(detail.form_version || 1) +
+        (detail.description ? " · " + esc(detail.description) : "") + "</p>" +
     "</div>" +
-    (isDirector()
+    (canManageTopics()
       ? '<div class="actions">' +
         '<button class="btn ghost" id="btnEditTopic" type="button">แก้ไขหัวข้อ</button>' +
         '<button class="btn" id="btnNewField" type="button">+ เพิ่มฟิลด์</button></div>'
@@ -1175,13 +1188,14 @@ async function viewTopicDetail(topicId, tab) {
     "</div>" +
     '<div id="tabBody"></div>';
 
-  if (isDirector()) {
+  if (canManageTopics()) {
     $("#btnEditTopic").addEventListener("click", () => topicFormModal(detail));
     $("#btnNewField").addEventListener("click", () => fieldFormModal(topicId, null, fields.length));
   }
 
   if (activeTab === "fields") return renderFieldsTab(topicId, fields);
   if (activeTab === "submissions") return renderDirectorSubmissions(detail, fields);
+  if (activeTab === "status") return renderSubmissionStatus(detail);
   if (activeTab === "submit") return renderTeacherSubmitTab(detail, fields);
   if (activeTab === "mine") return renderTeacherHistory(detail, fields);
 }
@@ -1477,7 +1491,7 @@ async function renderDirectorSubmissions(topic, fields) {
 
     $("#subsBox").innerHTML =
       '<div class="table-scroll"><table><thead><tr>' +
-        "<th>ผู้ส่ง</th>" +
+        "<th>ผู้ส่ง</th><th>ความครบถ้วน</th>" +
         previewFields.map((f) => "<th>" + esc(f.label) + "</th>").join("") +
         "<th>ส่งเมื่อ</th><th></th>" +
       "</tr></thead><tbody>" +
@@ -1487,6 +1501,7 @@ async function renderDirectorSubmissions(topic, fields) {
         return "<tr>" +
           '<td><div class="t-main">' + esc(submitterName(row.submitted_by)) + "</div>" +
           '<div class="t-sub mono">' + esc(row.uid.slice(0, 8)) + "…</div></td>" +
+          "<td>" + completionBadge(row.completion_status) + "</td>" +
           previewFields.map((f) =>
             "<td>" + esc(displayValue(byField[f.uid] ? byField[f.uid].value : null, f)) + "</td>").join("") +
           "<td>" + esc(fmtDateTime(row.created_at)) + "</td>" +
@@ -1504,6 +1519,48 @@ async function renderDirectorSubmissions(topic, fields) {
   $("#filterTeacher").addEventListener("change", (e) => load(e.target.value));
   $("#btnReloadSubs").addEventListener("click", () => load($("#filterTeacher").value));
   await load("");
+}
+
+/* ---------- Tab: สถานะการส่ง (ผู้ตรวจสอบ) ---------- */
+async function renderSubmissionStatus(topic) {
+  const body = $("#tabBody");
+  body.innerHTML = '<div class="card"><div class="card-head"><h3>สถานะการส่งรายบุคคล</h3>' +
+    '<div class="right"><button class="btn ghost sm" id="btnReloadStatus" type="button">รีเฟรช</button></div></div>' +
+    '<div class="card-body tight" id="statusBox"></div></div>' +
+    '<div class="note info" style="margin-top:14px"><span>ℹ</span><div>' +
+      'Phase 1 นับครูที่มีสถานะใช้งานทั้งหมดเป็นผู้ที่ต้องส่งในหัวข้อนี้ ' +
+      'สถานะ <b>ไม่ครบ</b> รวมกรณีขาดไฟล์หลักฐานที่กำหนดเป็นข้อมูลจำเป็น</div></div>';
+
+  const load = async () => {
+    $("#statusBox").innerHTML = '<div class="skeleton"><span class="spinner dark"></span> กำลังโหลด…</div>';
+    try {
+      const rows = (await api.get("/topics/" + topic.uid + "/submissions/status")) || [];
+      if (!rows.length) {
+        $("#statusBox").innerHTML = '<div class="empty"><div class="ic">👥</div><h4>ไม่มีบัญชีครูที่ใช้งานอยู่</h4></div>';
+        return;
+      }
+      $("#statusBox").innerHTML = '<div class="table-scroll"><table><thead><tr>' +
+        '<th>ครู</th><th>เลขประจำตัว</th><th>สถานะ</th><th>ข้อมูล/หลักฐานที่ขาด</th><th>อัปเดตล่าสุด</th><th></th>' +
+        '</tr></thead><tbody>' + rows.map((row) => {
+          const name = [row.prefix, row.first_name, row.last_name].filter(Boolean).join(" ") || row.teacher_uid;
+          const missing = (row.missing_required_fields || []).map((f) => f.label).join(", ") || "—";
+          return '<tr><td><div class="t-main">' + esc(name) + '</div></td>' +
+            '<td>' + esc(row.employee_code || "—") + '</td>' +
+            '<td>' + completionBadge(row.status) + '</td>' +
+            '<td>' + esc(missing) + '</td>' +
+            '<td>' + esc(row.latest_submission_at ? fmtDateTime(row.latest_submission_at) : "—") + '</td>' +
+            '<td class="actions">' + (row.latest_submission_uid
+              ? '<button class="btn ghost sm" data-open="' + row.latest_submission_uid + '" type="button">ดูรายการล่าสุด</button>'
+              : '') + '</td></tr>';
+        }).join("") + '</tbody></table></div>';
+      $$("#statusBox [data-open]").forEach((button) =>
+        button.addEventListener("click", () => submissionDetailModal(topic, topic.fields || [], button.dataset.open)));
+    } catch (err) {
+      $("#statusBox").innerHTML = '<div class="empty"><div class="ic">⚠</div><h4>โหลดไม่สำเร็จ</h4><p>' + esc(err.message) + '</p></div>';
+    }
+  };
+  $("#btnReloadStatus").addEventListener("click", load);
+  await load();
 }
 
 /* field: TopicFieldResponse — ใช้ options เพื่อแปลง value ของ select กลับเป็น label */
@@ -1559,13 +1616,18 @@ async function submissionDetailModal(topic, fields, submissionUid) {
         esc(displayValue(valueByField[field.uid], field)) + "</dd>";
     }).join("");
 
-    const canDelete = isDirector() || (state.user && submission.submitted_by === state.user.uid);
+    const canDelete = isAdmin() || (isTeacher() && state.user && submission.submitted_by === state.user.uid);
 
     $(".modal-body", overlay).innerHTML =
       '<dl class="kv" style="margin-bottom:18px">' +
         "<dt>หัวข้อ</dt><dd>" + esc(topic.name) + "</dd>" +
         "<dt>ผู้ส่ง</dt><dd>" + esc(submitterName(submission.submitted_by)) + "</dd>" +
         "<dt>ส่งเมื่อ</dt><dd>" + esc(fmtDateTime(submission.created_at)) + "</dd>" +
+        "<dt>ความครบถ้วน</dt><dd>" + completionBadge(submission.completion_status) +
+          ((submission.missing_required_fields || []).length
+            ? '<div class="t-sub" style="margin-top:5px">ขาด: ' + esc((submission.missing_required_fields || []).map((f) => f.label).join(", ")) + '</div>'
+            : '') + "</dd>" +
+        "<dt>เวอร์ชันแบบฟอร์ม</dt><dd>v" + esc(submission.form_version || 1) + "</dd>" +
         '<dt>รหัสรายการ</dt><dd class="mono">' + esc(submission.uid) + "</dd>" +
       "</dl>" +
       '<h4 style="font-size:14px;margin-bottom:10px;color:var(--muted)">ข้อมูลในแบบฟอร์ม</h4>' +
@@ -1934,7 +1996,7 @@ async function renderTeacherHistory(topic, fields) {
 
     $("#mineBox").innerHTML =
       '<div class="table-scroll"><table><thead><tr>' +
-        "<th>รหัสรายการ</th>" +
+        "<th>รหัสรายการ</th><th>ความครบถ้วน</th>" +
         previewFields.map((f) => "<th>" + esc(f.label) + "</th>").join("") +
         "<th>ส่งเมื่อ</th><th></th>" +
       "</tr></thead><tbody>" +
@@ -1943,11 +2005,14 @@ async function renderTeacherHistory(topic, fields) {
         (row.preview_values || []).forEach((p) => { byField[p.field_uid] = p; });
         return "<tr>" +
           '<td class="mono">' + esc(row.uid.slice(0, 8)) + "…</td>" +
+          "<td>" + completionBadge(row.completion_status) + "</td>" +
           previewFields.map((f) =>
             "<td>" + esc(displayValue(byField[f.uid] ? byField[f.uid].value : null, f)) + "</td>").join("") +
           "<td>" + esc(fmtDateTime(row.created_at)) + "</td>" +
           '<td class="actions"><button class="btn ghost sm" data-open="' + row.uid +
-          '" type="button">ดู / จัดการไฟล์</button></td>' +
+          '" type="button">ดู / จัดการไฟล์</button>' +
+          (topic.is_active ? '<button class="btn subtle sm" data-editsub="' + row.uid + '" type="button">แก้ไขข้อมูล</button>' : '') +
+          '<button class="btn subtle sm" data-delsub="' + row.uid + '" type="button" style="color:var(--danger)">ลบรายการ</button></td>' +
         "</tr>";
       }).join("") +
       "</tbody></table></div>";
@@ -1955,19 +2020,121 @@ async function renderTeacherHistory(topic, fields) {
     $$("#mineBox [data-open]").forEach((button) =>
       button.addEventListener("click", () =>
         submissionDetailModal(topic, fields, button.dataset.open)));
+    $$("#mineBox [data-editsub]").forEach((button) =>
+      button.addEventListener("click", () =>
+        editSubmissionModal(topic, fields, button.dataset.editsub)));
+    $$("#mineBox [data-delsub]").forEach((button) =>
+      button.addEventListener("click", () =>
+        deleteOwnSubmission(topic, button.dataset.delsub)));
   };
 
   $("#btnReloadMine").addEventListener("click", load);
   await load();
 }
 
+async function editSubmissionModal(topic, fields, submissionUid) {
+  if (!topic.is_active) {
+    toast("แก้ไขไม่ได้", "หัวข้อนี้ปิดรับเอกสารแล้ว", "err");
+    return;
+  }
+  let submission;
+  try {
+    submission = await api.get("/topics/" + topic.uid + "/submissions/" + submissionUid);
+  } catch (err) {
+    toast("โหลดข้อมูลไม่สำเร็จ", err.message, "err");
+    return;
+  }
+
+  const inputFields = fields.filter((f) => f.type !== "file");
+  const current = {};
+  (submission.values || []).forEach((v) => { current[v.field_uid] = v.value; });
+
+  openModal({
+    title: "แก้ไขข้อมูลที่ส่ง",
+    size: "wide",
+    bodyHtml:
+      '<div class="note info" style="margin-bottom:14px"><span>ℹ</span><div>' +
+        'หน้านี้แก้ไขข้อมูลในแบบฟอร์ม ส่วนไฟล์หลักฐานให้จัดการจากปุ่ม “ดู / จัดการไฟล์”</div></div>' +
+      '<form id="editSubForm" novalidate>' + inputFields.map(renderFormField).join("") + '</form>',
+    footHtml:
+      '<button class="btn ghost" data-act="cancel" type="button">ยกเลิก</button>' +
+      '<button class="btn" data-act="save" type="button">บันทึกการแก้ไข</button>',
+    onMount(root, close) {
+      inputFields.forEach((field) => {
+        const input = $('[data-field="' + field.uid + '"]', root);
+        if (!input) return;
+        const value = current[field.uid];
+        input.value = value === null || value === undefined ? "" : String(value);
+      });
+
+      $('[data-act="cancel"]', root).addEventListener("click", close);
+      $('[data-act="save"]', root).addEventListener("click", async (e) => {
+        $$(".invalid", root).forEach((n) => n.classList.remove("invalid"));
+        $$(".field-error", root).forEach((n) => { n.hidden = true; });
+        const values = [];
+        let invalid = false;
+        for (const field of inputFields) {
+          const input = $('[data-field="' + field.uid + '"]', root);
+          const raw = (input.value || "").trim();
+          if (!raw) {
+            if (field.required) {
+              input.classList.add("invalid");
+              const err = $('[data-err="' + field.uid + '"]', root);
+              if (err) { err.textContent = "กรุณากรอกข้อมูลในช่องนี้"; err.hidden = false; }
+              invalid = true;
+            }
+            continue;
+          }
+          if (field.type === "number") {
+            const num = Number(raw);
+            if (Number.isNaN(num)) { invalid = true; input.classList.add("invalid"); continue; }
+            values.push({ field_uid: field.uid, value: num });
+          } else {
+            values.push({ field_uid: field.uid, value: raw });
+          }
+        }
+        if (invalid) { toast("ตรวจสอบแบบฟอร์ม", "ยังมีช่องที่กรอกไม่ถูกต้อง", "err"); return; }
+
+        await withBusy(e.currentTarget, "กำลังบันทึก…", async () => {
+          try {
+            await api.put("/topics/" + topic.uid + "/submissions/" + submissionUid, { values });
+            toast("แก้ไขแล้ว", "อัปเดตข้อมูลเรียบร้อย", "ok");
+            close();
+            router();
+          } catch (err) {
+            toast("แก้ไขไม่สำเร็จ", err.message, "err");
+          }
+        });
+      });
+    },
+  });
+}
+
+async function deleteOwnSubmission(topic, submissionUid) {
+  const ok = await confirmDialog({
+    title: "ลบรายการที่ส่ง",
+    message: "ต้องการลบรายการนี้พร้อมไฟล์หลักฐานทั้งหมดใช่หรือไม่?<br>" +
+      '<span style="color:var(--danger)">การลบนี้ไม่สามารถย้อนกลับได้</span>',
+    confirmText: "ลบรายการ",
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await api.del("/topics/" + topic.uid + "/submissions/" + submissionUid);
+    toast("ลบรายการแล้ว", topic.name, "ok");
+    router();
+  } catch (err) {
+    toast("ลบไม่สำเร็จ", err.message, "err");
+  }
+}
+
 /* ---------------------------------------------------------------------
- * 17) จัดการผู้ใช้ (ผอ.)
+ * 17) จัดการผู้ใช้ (ADMIN)
  * ------------------------------------------------------------------ */
 async function viewUsers() {
-  if (!isDirector()) {
+  if (!canManageUsers()) {
     view().innerHTML = '<div class="card"><div class="empty"><div class="ic">🔒</div>' +
-      "<h4>เฉพาะผู้อำนวยการ</h4><p>บัญชีของคุณไม่มีสิทธิ์เข้าถึงหน้านี้</p></div></div>";
+      "<h4>เฉพาะผู้ดูแลระบบ</h4><p>บัญชีของคุณไม่มีสิทธิ์จัดการผู้ใช้</p></div></div>";
     return;
   }
 
@@ -1981,8 +2148,9 @@ async function viewUsers() {
     '<div class="card"><div class="card-head"><h3>บัญชีทั้งหมด ' + users.length + " รายการ</h3>" +
       '<div class="right">' +
         '<input type="search" id="userSearch" placeholder="ค้นหาชื่อ / username / เลขประจำตัว…" style="width:250px">' +
-        '<select id="userRole" style="width:150px"><option value="">ทุกบทบาท</option>' +
-          '<option value="DIRECTOR">ผู้อำนวยการ</option><option value="TEACHER">ครู</option></select>' +
+        '<select id="userRole" style="width:170px"><option value="">ทุกบทบาท</option>' +
+          '<option value="ADMIN">ผู้ดูแลระบบ</option><option value="DIRECTOR">ผู้อำนวยการ</option>' +
+          '<option value="QA">งานประกันคุณภาพ</option><option value="TEACHER">ครู</option></select>' +
         '<select id="userStatus" style="width:140px"><option value="">ทุกสถานะ</option>' +
           '<option value="ACTIVE">ใช้งาน</option><option value="INACTIVE">ระงับ</option></select>' +
       "</div></div>" +
@@ -2010,7 +2178,7 @@ async function viewUsers() {
             '<div class="t-sub">สร้างเมื่อ ' + esc(fmtDate(user.created_at)) + "</div></td>" +
             '<td class="mono">' + esc(user.username) + "</td>" +
             "<td>" + esc(user.employee_code) + "</td>" +
-            '<td><span class="badge ' + (user.role === "DIRECTOR" ? "gold" : "navy") + '">' +
+            '<td><span class="badge ' + (["ADMIN", "DIRECTOR"].includes(user.role) ? "gold" : "navy") + '">' +
               esc(ROLE_LABEL[user.role] || user.role) + "</span></td>" +
             "<td>" + (user.status === "ACTIVE"
               ? '<span class="badge ok"><span class="dot"></span>ใช้งาน</span>'
@@ -2068,7 +2236,9 @@ function userFormModal(user) {
         '<div class="field"><label for="usRole">บทบาท<span class="req">*</span></label>' +
         '<select id="usRole">' +
           '<option value="TEACHER"' + (editing && user.role === "TEACHER" ? " selected" : "") + ">ครู</option>" +
+          '<option value="QA"' + (editing && user.role === "QA" ? " selected" : "") + ">งานประกันคุณภาพ</option>" +
           '<option value="DIRECTOR"' + (editing && user.role === "DIRECTOR" ? " selected" : "") + ">ผู้อำนวยการ</option>" +
+          '<option value="ADMIN"' + (editing && user.role === "ADMIN" ? " selected" : "") + ">ผู้ดูแลระบบ</option>" +
         "</select></div>" +
       "</div>" +
       (editing

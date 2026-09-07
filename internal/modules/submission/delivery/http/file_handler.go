@@ -66,13 +66,18 @@ type SubmissionFileService interface {
 	) error
 }
 
-type SubmissionFileHandler struct {
-	service          SubmissionFileService
-	submissionAccess SubmissionService
+type SubmissionAccessService interface {
+	FindByID(ctx context.Context, topicUID, submissionUID uuid.UUID) (*submissiondomain.Submission, error)
+	FindByIDForSubmitter(ctx context.Context, topicUID, submissionUID, submittedBy uuid.UUID) (*submissiondomain.Submission, error)
 }
 
-func NewSubmissionFileHandler(service SubmissionFileService, accessServices ...SubmissionService) *SubmissionFileHandler {
-	var access SubmissionService
+type SubmissionFileHandler struct {
+	service          SubmissionFileService
+	submissionAccess SubmissionAccessService
+}
+
+func NewSubmissionFileHandler(service SubmissionFileService, accessServices ...SubmissionAccessService) *SubmissionFileHandler {
+	var access SubmissionAccessService
 	if len(accessServices) > 0 {
 		access = accessServices[0]
 	}
@@ -257,7 +262,7 @@ func (h *SubmissionFileHandler) authorizeSubmissionAccess(
 
 	var err error
 	switch user.Role {
-	case userdomain.RoleDirector:
+	case userdomain.RoleAdmin, userdomain.RoleDirector, userdomain.RoleQA:
 		_, err = h.submissionAccess.FindByID(c.Context(), topicUID, submissionUID)
 	case userdomain.RoleTeacher:
 		_, err = h.submissionAccess.FindByIDForSubmitter(c.Context(), topicUID, submissionUID, user.UID)
@@ -276,7 +281,7 @@ func (h *SubmissionFileHandler) findFileForCurrentUser(c fiber.Ctx, fileUID uuid
 		return nil, errAuthenticationRequired
 	}
 	switch user.Role {
-	case userdomain.RoleDirector:
+	case userdomain.RoleAdmin, userdomain.RoleDirector, userdomain.RoleQA:
 		return h.service.FindByID(c.Context(), fileUID)
 	case userdomain.RoleTeacher:
 		return h.service.FindByIDForSubmitter(c.Context(), fileUID, user.UID)
@@ -291,7 +296,7 @@ func (h *SubmissionFileHandler) openFileForCurrentUser(c fiber.Ctx, fileUID uuid
 		return nil, nil, errAuthenticationRequired
 	}
 	switch user.Role {
-	case userdomain.RoleDirector:
+	case userdomain.RoleAdmin, userdomain.RoleDirector, userdomain.RoleQA:
 		return h.service.Open(c.Context(), fileUID)
 	case userdomain.RoleTeacher:
 		return h.service.OpenForSubmitter(c.Context(), fileUID, user.UID)
@@ -306,7 +311,7 @@ func (h *SubmissionFileHandler) deleteFileForCurrentUser(c fiber.Ctx, fileUID uu
 		return errAuthenticationRequired
 	}
 	switch user.Role {
-	case userdomain.RoleDirector:
+	case userdomain.RoleAdmin:
 		return h.service.Delete(c.Context(), fileUID)
 	case userdomain.RoleTeacher:
 		return h.service.DeleteForSubmitter(c.Context(), fileUID, user.UID)

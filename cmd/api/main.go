@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strings"
 
 	"sdms/internal/config"
 	"sdms/internal/platform/database"
@@ -16,6 +17,12 @@ func main() {
 	}
 
 	cfg := config.Load()
+	if strings.EqualFold(strings.TrimSpace(cfg.App.Env), "production") {
+		secret := strings.TrimSpace(cfg.Auth.JWTSecret)
+		if len(secret) < 32 || secret == "dev-only-change-this-secret" || secret == "change-this-to-a-long-random-secret" {
+			log.Fatal("AUTH_JWT_SECRET must be a non-placeholder secret of at least 32 characters in production")
+		}
+	}
 
 	db, err := database.NewPostgres(cfg.Database)
 	if err != nil {
