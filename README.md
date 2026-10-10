@@ -5,8 +5,8 @@ Technical Design & Development Task Plan
 | | |
 |---|---|
 | ระบบ | SDMS — School Document Management System |
-| รุ่นเอกสาร | 1.0 · 10 ต.ค. 2569 |
-| เทคโนโลยี | Go (API) · Next.js (Web) · PostgreSQL · Google Drive (เก็บไฟล์) |
+| รุ่นเอกสาร | 1.1 · 10 ต.ค. 2569 |
+| เทคโนโลยี | Go (Fiber) · PostgreSQL (GORM) · Next.js (TypeScript) · Google Drive (เก็บไฟล์) |
 | ทีม | 2–3 คน |
 | ต้นแบบอ้างอิง | https://claude.ai/artifact/6j9Vof6oUJjZNQWMWueyp2 (v0.4) |
 | ระยะเวลาโดยประมาณ | 12 สัปดาห์ (ทีม 3 คน) |
@@ -68,7 +68,7 @@ Technical Design & Development Task Plan
 flowchart LR
   B["เบราว์เซอร์<br/>(คอม / มือถือ)"] -->|HTTPS| RP["Reverse proxy<br/>(Caddy)"]
   RP -->|"/"| WEB["Next.js<br/>(web)"]
-  RP -->|"/api"| API["Go API"]
+  RP -->|"/api"| API["Go API<br/>(Fiber)"]
   API --> DB[("PostgreSQL")]
   API -->|"Drive API v3"| GD[("Google Drive กลาง")]
   API -->|"SMTP"| MAIL["อีเมล"]
@@ -79,7 +79,7 @@ flowchart LR
 |---|---|
 | Reverse proxy | HTTPS, ส่ง `/api/*` ไป Go และที่เหลือไป Next.js — ทั้งสองอยู่โดเมนเดียวกัน cookie จึงเป็น first-party |
 | Next.js | หน้าจอทั้งหมด เรียก API จากเบราว์เซอร์ (ไม่เก็บ business logic) |
-| Go API | business logic, สิทธิ์, คุยกับ PostgreSQL / Drive / SMTP, งานตามเวลา |
+| Go API (Fiber) | business logic, สิทธิ์, คุยกับ PostgreSQL (ผ่าน GORM) / Drive / SMTP, งานตามเวลา |
 | PostgreSQL | ข้อมูลทั้งหมด ยกเว้นตัวไฟล์ |
 | Google Drive | เก็บไฟล์จริง ผู้ใช้ไม่เข้าถึง Drive โดยตรง ทุกการเปิดไฟล์ผ่าน API |
 | SMTP | ส่ง OTP และการแจ้งเตือน |
@@ -96,15 +96,15 @@ flowchart LR
 
 | ชั้น | ที่ใช้ | หมายเหตุ |
 |---|---|---|
-| ภาษา backend | Go 1.22 ขึ้นไป | |
-| HTTP router | `go-chi/chi` | middleware: request id, logging, recover, auth |
-| ฐานข้อมูล | PostgreSQL 16 ขึ้นไป + `jackc/pgx` v5 | extension `pgcrypto`, `citext` |
-| Query | `sqlc` | เขียน SQL เอง generate เป็น Go |
-| Migration | `golang-migrate` | ไฟล์ใน `services/api/db/migrations` |
+| ภาษา backend | Go (รุ่นที่ Fiber รุ่นที่เลือกรองรับ) | |
+| Web framework | Go Fiber (`gofiber/fiber`) | middleware ในตัว: `requestid`, `logger`, `recover`, `limiter`, `helmet` · ข้อควรระวังดู 3.1 |
+| ORM | GORM (`gorm.io/gorm`) + `gorm.io/driver/postgres` | JSONB ใช้ `gorm.io/datatypes` · ข้อควรระวังดู 3.1 |
+| ฐานข้อมูล | PostgreSQL 16 ขึ้นไป | extension `pgcrypto`, `citext` |
+| Migration | `golang-migrate` (ไฟล์ SQL) | ไฟล์ใน `services/api/db/migrations` · ไม่ใช้ `AutoMigrate` |
 | Google Drive | `google.golang.org/api/drive/v3` | |
-| Log | `log/slog` (JSON) | |
-| Validation | เขียนเองตามชนิดช่อง + `go-playground/validator` สำหรับ request | |
-| Frontend | Next.js (App Router) + TypeScript | |
+| Log | `log/slog` (JSON) ผ่าน middleware ของ Fiber | |
+| Validation | เขียนเองตามชนิดช่อง + `go-playground/validator` สำหรับ request body | |
+| Frontend | Next.js (App Router) + TypeScript (strict) | |
 | ดึงข้อมูล | TanStack Query | |
 | ฟอร์ม | react-hook-form + zod | ใช้ schema เดียวกับรูปแบบ error ของ API |
 | สไตล์ | CSS variables (design tokens) + CSS Modules | ยกค่าจากต้นแบบ หัวข้อ 9.3 |
@@ -114,6 +114,30 @@ flowchart LR
 | CI | GitHub Actions | |
 | รันระบบ | Docker + Docker Compose, Caddy | ดู D-07 |
 | อีเมลตอน dev | Mailpit | |
+
+### 3.1 ข้อควรระวังเมื่อใช้ Fiber และ GORM
+
+**Fiber** ทำงานบน fasthttp ไม่ใช่ `net/http` จึงมีจุดที่ต่างจาก Go ทั่วไป
+
+| เรื่อง | สิ่งที่ต้องทำ |
+|---|---|
+| อัปโหลดไฟล์ใหญ่ | ค่าเริ่มต้นอ่าน body ทั้งก้อนเข้าหน่วยความจำ ตั้ง `fiber.Config{StreamRequestBody: true, BodyLimit: 55 MB}` แล้วอ่าน multipart แบบ stream ส่งต่อไป Drive ทันที ยืนยันใน P3-03 ว่าหน่วยความจำไม่พุ่งตอนอัปโหลดพร้อมกันหลายไฟล์ |
+| ค่าจาก `fiber.Ctx` | ค่าอย่าง `c.Params()`, `c.Query()`, `c.Body()` ใช้ได้เฉพาะระหว่าง handler ทำงาน ถ้าส่งต่อให้ goroutine หรือเก็บไว้ ต้อง copy ก่อน (หรือเปิด `Immutable: true`) |
+| ดาวน์โหลดและ zip | stream ด้วย `c.SendStream()` หรือ `c.Context().SetBodyStreamWriter()` ห้ามรวมไฟล์ในหน่วยความจำ |
+| Context | ส่ง `c.UserContext()` ต่อให้ GORM และ Drive client เพื่อให้ยกเลิกงานได้เมื่อผู้ใช้ปิดหน้า |
+| Error | ใช้ `ErrorHandler` กลางของ Fiber แปลง error ทุกชนิดเป็นรูปแบบในหัวข้อ 6.1 |
+
+**GORM**
+
+| เรื่อง | สิ่งที่ต้องทำ |
+|---|---|
+| Schema | ตารางสร้างจาก migration SQL เท่านั้น (มี enum, partial index, expression index ที่ `AutoMigrate` สร้างไม่ได้) model ต้องใส่ tag ให้ตรงกับตาราง และมี test เทียบ model กับ schema จริง |
+| Model | ไม่ embed `gorm.Model` เพราะจะได้ `deleted_at` ที่ระบบนี้ไม่ใช้ (ใช้ `deactivated_at` และกติกาการลบในหัวข้อ 7.5 แทน) · ชื่อตารางตามค่าเริ่มต้นของ GORM ตรงกับหัวข้อ 5 อยู่แล้ว |
+| JSONB | `submissions.values` และ `topic_fields.options` ใช้ `datatypes.JSON` แล้วตรวจค่าตามหัวข้อ 7.7 ในโค้ด |
+| Query ซับซ้อน | สถิติ (7.3), ตารางคำตอบ, ค้นหา ใช้ `db.Raw(...).Scan()` ด้วย SQL ที่เขียนเอง เพื่อคุม `LEFT JOIN` / `FILTER` และประสิทธิภาพได้ |
+| N+1 | ดึงช่องของหัวข้อด้วย `Preload("Fields", order by position)` หรือ join ไม่วน query ทีละแถว |
+| Transaction | บันทึกการส่ง + ผูกไฟล์ + audit log อยู่ใน `db.Transaction(...)` เดียว |
+| Log | ตั้ง GORM logger ให้ log เฉพาะ query ช้า (เช่น > 200 ms) และไม่ log ค่าพารามิเตอร์ที่เป็นข้อมูลส่วนบุคคล |
 
 ---
 
@@ -725,7 +749,7 @@ PDF, DOC/DOCX, XLS/XLSX/CSV, PPT/PPTX, JPG/PNG/HEIC/WEBP, MP4/MOV — ตรว�
 ### 10.1 Checklist ความปลอดภัย
 
 - [ ] OTP 6 หลัก เก็บแบบ hash, หมดอายุ 10 นาที, ใส่ผิดได้ 5 ครั้ง
-- [ ] จำกัดการขอ OTP ต่ออีเมลและต่อ IP (เช่น 5 ครั้ง/15 นาที)
+- [ ] จำกัดการขอ OTP ต่ออีเมล (นับใน DB) และต่อ IP (middleware `limiter` ของ Fiber) เช่น 5 ครั้ง/15 นาที
 - [ ] ข้อความเมื่ออีเมลไม่อยู่ในรายชื่อ: ตกลงใน D-01 ว่าจะบอกตรง ๆ (ครูเข้าใจง่าย) หรือบอกกลาง ๆ (ไม่เปิดเผยว่าใครอยู่ในรายชื่อ)
 - [ ] Session token สุ่ม 32 ไบต์, เก็บเฉพาะ hash, อายุ 30 วัน, ยกเลิกเมื่อออกจากระบบหรือบัญชีถูกปิด
 - [ ] ตรวจ `Origin` ทุกคำขอที่เปลี่ยนข้อมูล + SameSite=Lax
@@ -733,7 +757,7 @@ PDF, DOC/DOCX, XLS/XLSX/CSV, PPT/PPTX, JPG/PNG/HEIC/WEBP, MP4/MOV — ตรว�
 - [ ] กรองหัวข้อลับใน SQL ไม่ใช่กรองหลังดึงข้อมูล
 - [ ] อัปโหลด: จำกัดขนาด, allowlist ชนิดไฟล์, sniff MIME, ทำความสะอาดชื่อไฟล์
 - [ ] ดาวน์โหลด: `X-Content-Type-Options: nosniff`
-- [ ] Security headers: CSP, HSTS, `Referrer-Policy`, `frame-ancestors 'none'`
+- [ ] Security headers ด้วย middleware `helmet` ของ Fiber: CSP, HSTS, `Referrer-Policy`, `frame-ancestors 'none'`
 - [ ] Secret (DB, SMTP, Drive) อยู่ใน env/secret store ไม่อยู่ใน repo; refresh token เข้ารหัส
 - [ ] Log ไม่มี OTP, cookie, token
 - [ ] CI รัน `govulncheck` และ `npm audit`
@@ -807,13 +831,15 @@ sdms/
 │   └── api/                     # Go
 │       ├── cmd/api/main.go
 │       ├── internal/
-│       │   ├── config/  http/  auth/  policy/
+│       │   ├── config/
+│       │   ├── server/          # Fiber app, middleware, routes, error handler
+│       │   ├── auth/  policy/
 │       │   ├── topics/  submissions/  files/  drive/
 │       │   ├── stats/  search/  notify/  admin/  audit/
-│       │   └── store/           # sqlc generated + tx helper
+│       │   ├── model/           # GORM models (ตรงกับตารางในหัวข้อ 5)
+│       │   └── repo/            # query ผ่าน GORM + raw SQL สำหรับสถิติ/ค้นหา
 │       └── db/
-│           ├── migrations/
-│           └── queries/
+│           └── migrations/      # golang-migrate (SQL)
 ├── deploy/
 │   ├── docker-compose.yml       # dev
 │   ├── docker-compose.prod.yml
@@ -846,7 +872,7 @@ sdms/
 cp .env.example .env
 docker compose -f deploy/docker-compose.yml up -d     # postgres, mailpit
 make migrate-up seed                                   # ตาราง + 4 ฝ่าย + ผู้ใช้ทดลอง
-make api                                               # Go API :8080 (DRIVE_MODE=fake)
+make api                                               # Go Fiber API :8080 (DRIVE_MODE=fake)
 cd apps/web && npm run dev                             # Next.js :3000 (proxy /api → :8080)
 ```
 
@@ -871,7 +897,7 @@ cd apps/web && npm run dev                             # Next.js :3000 (proxy /a
 | เฟส | ชื่อ | ช่วงเวลา | วัน-คน |
 |---|---|---|:-:|
 | 0 | เตรียมงานและตัดสินใจ | สัปดาห์ 1 | 5 |
-| 1 | โครงพื้นฐาน | สัปดาห์ 1–2 | 10.5 |
+| 1 | โครงพื้นฐาน | สัปดาห์ 1–2 | 11 |
 | 2 | เข้าสู่ระบบและผู้ใช้ | สัปดาห์ 2–3 | 10 |
 | 3 | เชื่อม Google Drive | สัปดาห์ 2–4 | 7.5 |
 | 4 | หัวข้อและตัวสร้างฟอร์ม | สัปดาห์ 4–5 | 8 |
@@ -881,14 +907,14 @@ cd apps/web && npm run dev                             # Next.js :3000 (proxy /a
 | 8 | การแจ้งเตือน | สัปดาห์ 8–9 | 4 |
 | 9 | คุณภาพและความปลอดภัย | สัปดาห์ 9–10 | 9.5 |
 | 10 | นำร่องและเปิดใช้งาน | สัปดาห์ 10–12 | 10.5 |
-| | **รวม** | | **92** |
+| | **รวม** | | **92.5** |
 
 **ภาระงานต่อบทบาท**
 
 | บทบาท | วัน-คน |
 |---|:-:|
 | LEAD | 23 |
-| BE | 36 |
+| BE | 36.5 |
 | FE | 33 |
 
 ตัวเลขเป็นวัน-คนของงานโดยตรง แผน 12 สัปดาห์เผื่อเวลาไว้ประมาณ 40% สำหรับ code review ประชุม แก้บั๊ก และเรื่องที่ไม่คาดคิด
@@ -941,14 +967,14 @@ cd apps/web && npm run dev                             # Next.js :3000 (proxy /a
 |---|---|:-:|:-:|---|---|
 | P1-01 | Docker Compose สำหรับ dev: postgres, api, web, mailpit | LEAD | 1 | P0-03 | `docker compose up` แล้วเปิดเว็บและ API ได้ |
 | P1-02 | Migration ชุดแรกทุกตาราง (หัวข้อ 5) + seed 4 ฝ่าย | BE | 1.5 | P0-05 | `migrate up` / `down` ผ่านบนฐานว่าง |
-| P1-03 | Go API skeleton: config จาก env, slog, router, รูปแบบ error, `/healthz`, graceful shutdown | BE | 1.5 | P1-01 | `GET /healthz` = 200, error ตอบตามรูปแบบหัวข้อ 6.1 |
-| P1-04 | sqlc + repository layer + helper สำหรับ transaction | BE | 1 | P1-02 | query ทุกตัว generate ได้, มี test ต่อฐานจริง |
+| P1-03 | Fiber app: config จาก env, middleware (requestid, logger/slog, recover, helmet), `ErrorHandler` กลาง, `/healthz`, graceful shutdown | BE | 1.5 | P1-01 | `GET /healthz` = 200, error ทุกชนิดตอบตามรูปแบบหัวข้อ 6.1 |
+| P1-04 | GORM: model ทุกตาราง (ไม่ embed `gorm.Model`), repository layer, helper สำหรับ transaction | BE | 1.5 | P1-02 | test เทียบ model กับ schema จริงผ่าน, test ต่อฐานจริงผ่าน |
 | P1-05 | Next.js skeleton: layout (เมนูซ้าย, แถบบน, ลิ้นชักมือถือ), ธีม 3 โหมด, ฟอนต์ | FE | 2 | P0-04 | เทียบต้นแบบได้ที่ 1366/1024/390 px ทั้งสองธีม |
 | P1-06 | API client (fetch wrapper + TanStack Query), จัดการ 401 → หน้าเข้าสู่ระบบ | FE | 1 | P1-05 | เรียก `/api/me` แล้ว redirect ถูกต้องเมื่อไม่มี session |
 | P1-07 | CI: lint, test, build ทั้ง web/api และตรวจ migration | LEAD | 1 | P1-01 | PR ทุกอันรัน CI อัตโนมัติ |
 | P1-08 | Deploy staging + โดเมน + HTTPS (ทำเร็วเพื่อให้ทดสอบบนเครื่องจริงได้ตลอด) | LEAD | 1.5 | P1-07 | staging อัปเดตอัตโนมัติเมื่อ merge เข้า `main` |
 
-รวมเฟส 1: **10.5 วัน-คน**
+รวมเฟส 1: **11 วัน-คน**
 
 ### เฟส 2 — เข้าสู่ระบบและผู้ใช้ (สัปดาห์ 2–3)
 
@@ -969,9 +995,9 @@ cd apps/web && npm run dev                             # Next.js :3000 (proxy /a
 |---|---|:-:|:-:|---|---|
 | P3-01 | Drive client (interface + fake สำหรับ test) รองรับทั้ง 2 โหมดใน D-02 | LEAD | 1.5 | P0-02 | สลับโหมดได้ด้วย env; test ใช้ fake |
 | P3-02 | สร้าง/หาโฟลเดอร์ ฝ่าย → ปี → หัวข้อ และเก็บ folder id ใน DB | LEAD | 1 | P3-01 | เรียกซ้ำไม่สร้างโฟลเดอร์ซ้ำ |
-| P3-03 | อัปโหลดไฟล์: stream ไป Drive (resumable), จำกัด 50 MB, ตรวจชนิดไฟล์, สถานะ staged | LEAD | 2 | P3-02 | ไฟล์ 50 MB ผ่าน; 51 MB ได้ 413; หน่วยความจำ server ไม่พุ่ง |
+| P3-03 | อัปโหลดไฟล์: Fiber `StreamRequestBody` + อ่าน multipart แบบ stream → Drive (resumable), จำกัด 50 MB, ตรวจชนิดไฟล์, สถานะ staged | LEAD | 2 | P3-02 | ไฟล์ 50 MB ผ่าน; 51 MB ได้ 413; อัปโหลด 5 ไฟล์พร้อมกันหน่วยความจำไม่พุ่ง |
 | P3-04 | ดาวน์โหลดผ่าน API (ตรวจสิทธิ์ก่อน stream, ชื่อไฟล์ภาษาไทยถูกต้อง) | LEAD | 1 | P3-03 | คนไม่มีสิทธิ์ได้ 403; ชื่อไฟล์ไทยไม่เพี้ยน |
-| P3-05 | ดาวน์โหลด .zip แบบ stream สำหรับแฟ้มของฉัน (รายปี/ทั้งหมด) | LEAD | 1.5 | P3-04 | zip 200 ไฟล์ดาวน์โหลดได้โดยไม่ timeout |
+| P3-05 | ดาวน์โหลด .zip แบบ stream (`SetBodyStreamWriter` + `archive/zip`) สำหรับแฟ้มของฉัน (รายปี/ทั้งหมด) | LEAD | 1.5 | P3-04 | zip 200 ไฟล์ดาวน์โหลดได้โดยไม่ timeout |
 | P3-06 | งานลบไฟล์ staged ที่ค้างเกิน 24 ชั่วโมง | LEAD | 0.5 | P3-03 | ไฟล์ค้างถูกลบทั้งใน Drive และ DB |
 
 รวมเฟส 3: **7.5 วัน-คน**
