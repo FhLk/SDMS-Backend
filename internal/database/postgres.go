@@ -13,7 +13,10 @@ import (
 // Open creates and verifies a PostgreSQL connection before returning it.
 func Open(ctx context.Context, cfg config.DatabaseConfig) (*gorm.DB, error) {
 	// The PostgreSQL dialector lets GORM use pgx through database/sql.
-	db, err := gorm.Open(postgres.Open(cfg.DSN), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(cfg.DSN), &gorm.Config{
+		// แปลง error เฉพาะฐานข้อมูล เช่น unique violation เป็น error มาตรฐานของ GORM.
+		TranslateError: true,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("connect to PostgreSQL: %w", err)
 	}

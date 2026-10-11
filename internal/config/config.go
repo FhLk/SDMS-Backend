@@ -16,7 +16,7 @@ import (
 
 const (
 	defaultServerHost         = "0.0.0.0"
-	defaultServerPort         = "8080"
+	defaultServerPort         = "8081"
 	defaultDatabasePort       = "5432"
 	defaultDatabaseSSLMode    = "disable"
 	defaultDatabaseTimeZone   = "Asia/Bangkok"

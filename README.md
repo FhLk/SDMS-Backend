@@ -51,10 +51,26 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 
 **เกณฑ์เสร็จ**
 
-- [ ] migration รันบนฐานข้อมูลว่างได้
-- [ ] มีข้อมูล 4 ฝ่าย (วิชาการ งบประมาณ บุคคล ทั่วไป) และปีการศึกษาปัจจุบัน
-- [ ] มีคำสั่งสร้างแอดมินคนแรก
-- [ ] คำตอบ 1 คนต่อ 1 หัวข้อ (unique topic_id + user_id)
+- [x] migration รันบนฐานข้อมูลว่างได้
+- [x] มีข้อมูล 4 ฝ่าย (วิชาการ งบประมาณ บุคคล ทั่วไป) และปีการศึกษาปัจจุบัน
+- [x] มีคำสั่งสร้างแอดมินคนแรก
+- [x] คำตอบ 1 คนต่อ 1 หัวข้อ (unique topic_id + user_id)
+
+**คำสั่งฐานข้อมูล**
+
+รัน migration และข้อมูลตั้งต้น (รันซ้ำได้):
+
+```powershell
+go run ./cmd/migrate
+```
+
+สร้างแอดมินคนแรก โดยส่งรหัสผ่านผ่าน environment variable เพื่อไม่ให้ติดใน command history:
+
+```powershell
+$env:INITIAL_ADMIN_PASSWORD = "sdms-admin!"
+go run ./cmd/create-admin -username admin -name "ผู้ดูแลระบบ" -position "ผู้ดูแลระบบ"
+Remove-Item Env:\INITIAL_ADMIN_PASSWORD
+```
 
 ### BE-03 · Login / Logout / Me
 

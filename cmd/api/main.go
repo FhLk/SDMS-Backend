@@ -51,7 +51,7 @@ func main() {
 	go func() {
 		log.Printf("HTTP server listening on %s", cfg.Server.Address())
 		serverErrors <- app.Listen(cfg.Server.Address(), fiber.ListenConfig{
-			DisableStartupMessage: true,
+			DisableStartupMessage: false,
 		})
 	}()
 
