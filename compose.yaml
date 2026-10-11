@@ -1,0 +1,24 @@
+services:
+  postgres:
+    # Keep this on PostgreSQL 17 unless the volume is migrated with pg_upgrade.
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: sdms
+      POSTGRES_USER: sdms
+      POSTGRES_PASSWORD: sdms
+    ports:
+      # Expose PostgreSQL to the Go process running on the host machine.
+      - "5432:5432"
+    healthcheck:
+      # Compose reports the container healthy only after PostgreSQL accepts connections.
+      test: ["CMD-SHELL", "pg_isready -U sdms -d sdms"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      # PostgreSQL 17 stores its data directly in this directory.
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+
