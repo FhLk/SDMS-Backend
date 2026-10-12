@@ -100,15 +100,11 @@ func (h authHandler) logout(c fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(messageResponse{Message: "Logged out"})
 }
 
-// me resolves the session cookie into the current user's identity and roles.
+// me นำ profile ที่ middleware ตรวจสอบแล้วมาสร้าง response โดยไม่ query ซ้ำ.
 func (h authHandler) me(c fiber.Ctx) error {
-	if h.service == nil {
-		return apperror.New(fiber.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Authentication service unavailable")
-	}
-
-	profile, err := h.service.CurrentUser(c.Context(), c.Cookies(h.config.CookieName))
-	if err != nil {
-		return mapAuthError(err)
+	profile, ok := authenticatedProfile(c)
+	if !ok {
+		return apperror.New(fiber.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
 	}
 	return c.Status(fiber.StatusOK).JSON(newMeResponse(profile))
 }

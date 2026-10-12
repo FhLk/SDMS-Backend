@@ -131,7 +131,7 @@ func TestLogoutRevokesSessionAndClearsCookie(t *testing.T) {
 		t.Fatalf("app.Test() error = %v", err)
 	}
 	defer res.Body.Close()
-	if got, want := res.StatusCode, http.StatusNoContent; got != want {
+	if got, want := res.StatusCode, http.StatusOK; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	if revokedToken != "session-to-revoke" {

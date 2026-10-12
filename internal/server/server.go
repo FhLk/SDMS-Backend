@@ -35,7 +35,9 @@ func New(dependencies ...Dependencies) *fiber.App {
 	authRoutes := api.Group("/auth")
 	authRoutes.Post("/login", auth.login)
 	authRoutes.Post("/logout", auth.logout)
-	api.Get("/me", auth.me)
+	// /me เป็น protected route แรกที่ใช้ middleware กลาง โดย middleware จะ
+	// ตรวจ session และส่ง profile ต่อให้ handler ผ่าน request context.
+	api.Get("/me", auth.authenticate, auth.me)
 
 	return app
 }
