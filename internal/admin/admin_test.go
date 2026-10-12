@@ -8,7 +8,7 @@ import (
 func TestValidate(t *testing.T) {
 	valid := CreateInput{
 		Username: "admin",
-		Password: "strong-password",
+		Password: "sdms-admin!",
 		FullName: "System Administrator",
 		Position: "Administrator",
 	}

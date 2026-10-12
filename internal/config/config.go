@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -24,12 +25,17 @@ const (
 	defaultMaxIdleConnections = 5
 	defaultMaxOpenConnections = 20
 	defaultConnectionLifetime = time.Hour
+	defaultSessionCookieName  = "sdms_session"
+	defaultSessionTTL         = 24 * time.Hour
 )
+
+var cookieNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 // Config contains all settings required to start the application.
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
+	Auth     AuthConfig
 }
 
 // ServerConfig controls which network address the HTTP server listens on.
@@ -50,6 +56,13 @@ type DatabaseConfig struct {
 	MaxIdleConns    int
 	MaxOpenConns    int
 	ConnMaxLifetime time.Duration
+}
+
+// AuthConfig controls server-side session lifetime and browser cookie security.
+type AuthConfig struct {
+	SessionTTL   time.Duration
+	CookieName   string
+	CookieSecure bool
 }
 
 // Load reads .env when present and then resolves the process environment.
@@ -95,6 +108,19 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	sessionTTL, err := durationFromEnv("SESSION_TTL", defaultSessionTTL)
+	if err != nil {
+		return Config{}, err
+	}
+	cookieName := firstNonEmpty(os.Getenv("SESSION_COOKIE_NAME"), defaultSessionCookieName)
+	if !cookieNamePattern.MatchString(cookieName) {
+		return Config{}, errors.New("SESSION_COOKIE_NAME may contain only letters, numbers, underscores, and hyphens")
+	}
+	cookieSecure, err := boolFromEnv("SESSION_COOKIE_SECURE", false)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		Server: ServerConfig{
 			Host: firstNonEmpty(os.Getenv("SERVER_HOST"), defaultServerHost),
@@ -106,6 +132,11 @@ func Load() (Config, error) {
 			MaxIdleConns:    maxIdleConns,
 			MaxOpenConns:    maxOpenConns,
 			ConnMaxLifetime: connMaxLifetime,
+		},
+		Auth: AuthConfig{
+			SessionTTL:   sessionTTL,
+			CookieName:   cookieName,
+			CookieSecure: cookieSecure,
 		},
 	}, nil
 }
@@ -236,6 +267,20 @@ func positiveIntFromEnv(key string, fallback int, allowZero bool) (int, error) {
 		return 0, fmt.Errorf("%s must be a positive integer", key)
 	}
 	return number, nil
+}
+
+// boolFromEnv parses the boolean forms accepted by strconv.ParseBool.
+func boolFromEnv(key string, fallback bool) (bool, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("%s must be a boolean", key)
+	}
+	return parsed, nil
 }
 
 // firstNonEmpty returns the first usable value, allowing simple precedence chains.

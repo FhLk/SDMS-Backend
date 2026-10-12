@@ -1,14 +1,29 @@
 # SDMS — Issue ฝั่ง BE
 
-อัปเดต 11 ต.ค. 2569
+อัปเดต 12 ต.ค. 2569
 
 Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับระบบตาม [Prototype](https://claude.ai/artifact/6j9Vof6oUJjZNQWMWueyp2) เรียงตามลำดับที่ควรทำ คัดลอกไปเปิดเป็น issue ใน GitHub ได้เลย: หัวข้อ = ชื่อ issue ที่เหลือ = เนื้อ issue ใส่ label `backend`
 
 > ข้อที่ต้องปรับให้ตรงกับฐานข้อมูล v2 (BE-02, 05, 08, 10, 12, 13, 15) ดูหัวข้อ 9 ใน [sdms-database.md](sdms-database.md)
 
+## Priority
+
+Priority บอกความสำคัญต่อการส่งมอบระบบ ส่วนลำดับลงมือให้ยึด `ต้องทำก่อน` ของแต่ละงานเสมอ
+
+| Priority | ความหมาย | Task |
+|---|---|---|
+| **P0 — Critical** | งานฐานที่บล็อก API และงานส่วนอื่นทั้งหมด ต้องทำให้เสร็จก่อน | BE-01, BE-02, BE-03, BE-04 |
+| **P1 — High** | workflow หลักของ MVP ตั้งแต่จัดการผู้ใช้ สร้างหัวข้อ ส่งคำตอบ จนถึงเปิดไฟล์ | BE-05, BE-07, BE-08, BE-09, BE-10, BE-11, BE-12, BE-13, BE-14 |
+| **P2 — Medium** | เพิ่มความสะดวกในการนำเข้าข้อมูล ดูภาพรวม และเรียกดูผลงานย้อนหลัง | BE-06, BE-15, BE-16 |
+| **P3 — Low** | ความสามารถเสริมที่ทำหลัง workflow หลักเสถียรแล้ว | BE-17 |
+
+ลำดับแนะนำ: `BE-01 → BE-02 → BE-03 → BE-04` จากนั้นทำ `BE-05`, `BE-07`, `BE-08` และ `BE-11` แบบขนานได้ ก่อนต่อด้วยงานที่อาศัย dependency ของแต่ละสาย
+
 ## ตั้งต้นและเข้าสู่ระบบ
 
 ### BE-01 · ตั้งโปรเจกต์ Go Fiber + เชื่อม PostgreSQL
+
+**Priority: P0 — Critical**
 
 สร้างโครงโปรเจกต์ Fiber อ่านค่าจาก `.env` และเชื่อม PostgreSQL ด้วย GORM
 
@@ -19,6 +34,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 - [ ] error ทุกตัวตอบเป็น JSON รูปแบบเดียวกัน `{"code": "...", "message": "..."}`
 
 ### BE-02 · สร้างตารางฐานข้อมูล + ข้อมูลเริ่มต้น
+
+**Priority: P0 — Critical**
 
 ตาราง users, divisions, user_divisions, academic_years, topics, topic_fields, submissions, files
 
@@ -33,6 +50,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 
 ### BE-03 · Login / Logout / Me
 
+**Priority: P0 — Critical**
+
 `POST /api/auth/login` · `POST /api/auth/logout` · `GET /api/me`
 
 ต้องทำก่อน: BE-02
@@ -46,6 +65,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 - [ ] `/api/me` คืน ชื่อ ตำแหน่ง บทบาท ฝ่ายที่สังกัด และฝ่ายที่เป็นหัวหน้า
 
 ### BE-04 · Middleware ตรวจ login และสิทธิ์
+
+**Priority: P0 — Critical**
 
 ตัวกลางตรวจ login และฟังก์ชันตรวจสิทธิ์ตามบทบาท (ครู · หัวหน้าฝ่าย · ผู้บริหาร · แอดมิน) ทุก API ใช้ชุดเดียวกัน
 
@@ -63,6 +84,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 
 ### BE-05 · API จัดการบุคลากร
 
+**Priority: P1 — High**
+
 `GET` · `POST /api/admin/users` · `PATCH /api/admin/users/{id}` · `POST /api/admin/users/{id}/password`
 
 ต้องทำก่อน: BE-04
@@ -77,6 +100,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 
 ### BE-06 · นำเข้าบุคลากรจาก Excel/CSV
 
+**Priority: P2 — Medium**
+
 `POST /api/admin/users/import`
 
 ต้องทำก่อน: BE-05
@@ -88,6 +113,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 - [ ] มีไฟล์ตัวอย่างให้ดาวน์โหลด
 
 ### BE-07 · หัวหน้าฝ่ายและปีการศึกษา
+
+**Priority: P1 — High**
 
 `PUT /api/admin/divisions/{code}/head` · `GET` · `POST /api/admin/years` · `POST /api/admin/years/{year}/current`
 
@@ -104,6 +131,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 
 ### BE-08 · API สร้างหัวข้อ + ช่องฟอร์ม
 
+**Priority: P1 — High**
+
 `POST /api/topics`
 
 ต้องทำก่อน: BE-04
@@ -118,6 +147,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 
 ### BE-09 · API แก้ / ปิดรับ / เปิดรับ / ลบหัวข้อ
 
+**Priority: P1 — High**
+
 `PATCH /api/topics/{id}` · `POST /api/topics/{id}/close` · `POST /api/topics/{id}/reopen` · `DELETE /api/topics/{id}`
 
 ต้องทำก่อน: BE-08
@@ -130,6 +161,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 - [ ] ลบหัวข้อที่มีคนส่งแล้ว → 409
 
 ### BE-10 · API รายการฝ่ายและหัวข้อ
+
+**Priority: P1 — High**
 
 `GET /api/divisions` · `GET /api/divisions/{code}/topics?year=`
 
@@ -146,6 +179,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 
 ### BE-11 · เชื่อม Google Drive + อัปโหลดไฟล์
 
+**Priority: P1 — High**
+
 `POST /api/uploads` · `DELETE /api/uploads/{id}`
 
 ต้องทำก่อน: BE-04
@@ -159,6 +194,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 - [ ] ตอนพัฒนาใช้โฟลเดอร์ในเครื่องแทน Drive ได้ (สลับด้วยค่าใน `.env`)
 
 ### BE-12 · API ส่ง / แก้คำตอบ
+
+**Priority: P1 — High**
 
 `GET /api/me/pending` · `GET /api/topics/{id}/my-submission` · `PUT /api/topics/{id}/my-submission`
 
@@ -174,6 +211,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 
 ### BE-13 · API ตารางคำตอบของหัวข้อ
 
+**Priority: P1 — High**
+
 `GET /api/topics/{id}?status=` · `GET /api/topics/{id}/pending-names`
 
 ต้องทำก่อน: BE-12
@@ -187,6 +226,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 - [ ] `pending-names` ใช้ได้เฉพาะคนที่แก้หัวข้อได้
 
 ### BE-14 · API เปิดดู / ดาวน์โหลดไฟล์
+
+**Priority: P1 — High**
 
 `GET /api/files/{id}`
 
@@ -202,6 +243,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 
 ### BE-15 · API หน้าแรกและสถิติ
 
+**Priority: P2 — Medium**
+
 `GET /api/home` · `GET /api/divisions/{code}/stats`
 
 ต้องทำก่อน: BE-13
@@ -215,6 +258,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 
 ### BE-16 · API แฟ้มของฉัน + ดาวน์โหลด .zip
 
+**Priority: P2 — Medium**
+
 `GET /api/me/submissions?year=&q=` · `GET /api/me/files.zip?year=`
 
 ต้องทำก่อน: BE-12, BE-14
@@ -226,6 +271,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 - [ ] .zip รายปีและทั้งหมด สตรีมออกได้โดยไม่โหลดไฟล์ทั้งหมดไว้ในหน่วยความจำ
 
 ### BE-17 · API ค้นหา
+
+**Priority: P3 — Low**
 
 `GET /api/search?q=&division=&year=&semester=&by=`
 

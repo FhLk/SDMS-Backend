@@ -11,7 +11,12 @@ type healthResponse struct {
 }
 
 // New builds the Fiber application with middleware and all API routes.
-func New() *fiber.App {
+func New(dependencies ...Dependencies) *fiber.App {
+	var deps Dependencies
+	if len(dependencies) > 0 {
+		deps = dependencies[0]
+	}
+
 	// A single global error handler guarantees that route, middleware, and
 	// application errors all use the same JSON response shape.
 	app := fiber.New(fiber.Config{
@@ -25,6 +30,12 @@ func New() *fiber.App {
 	// Grouping under /api keeps the public API prefix in one place.
 	api := app.Group("/api")
 	api.Get("/health", health)
+
+	auth := authHandler{service: deps.Auth, config: deps.AuthConfig}
+	authRoutes := api.Group("/auth")
+	authRoutes.Post("/login", auth.login)
+	authRoutes.Post("/logout", auth.logout)
+	api.Get("/me", auth.me)
 
 	return app
 }

@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/FhLk/SDMS-Backend/internal/auth"
 	"github.com/FhLk/SDMS-Backend/internal/config"
 	"github.com/FhLk/SDMS-Backend/internal/database"
 	"github.com/FhLk/SDMS-Backend/internal/server"
@@ -44,7 +45,13 @@ func main() {
 		}
 	}()
 
-	app := server.New()
+	// The authentication service shares the application database connection and
+	// owns persistent sessions whose lifetime comes from runtime configuration.
+	authService := auth.New(db, cfg.Auth.SessionTTL)
+	app := server.New(server.Dependencies{
+		Auth:       authService,
+		AuthConfig: cfg.Auth,
+	})
 	// Listen runs in a goroutine so the main goroutine can wait for either a
 	// server failure or an operating-system shutdown signal.
 	serverErrors := make(chan error, 1)

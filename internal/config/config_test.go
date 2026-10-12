@@ -14,6 +14,9 @@ func TestLoadWithDatabaseURL(t *testing.T) {
 	t.Setenv("DB_MAX_IDLE_CONNS", "2")
 	t.Setenv("DB_MAX_OPEN_CONNS", "10")
 	t.Setenv("DB_CONN_MAX_LIFETIME", "30m")
+	t.Setenv("SESSION_TTL", "12h")
+	t.Setenv("SESSION_COOKIE_NAME", "school_session")
+	t.Setenv("SESSION_COOKIE_SECURE", "true")
 
 	cfg, err := Load()
 	if err != nil {
@@ -28,6 +31,15 @@ func TestLoadWithDatabaseURL(t *testing.T) {
 	}
 	if got, want := cfg.Database.ConnMaxLifetime, 30*time.Minute; got != want {
 		t.Fatalf("ConnMaxLifetime = %v, want %v", got, want)
+	}
+	if got, want := cfg.Auth.SessionTTL, 12*time.Hour; got != want {
+		t.Fatalf("Auth.SessionTTL = %v, want %v", got, want)
+	}
+	if got, want := cfg.Auth.CookieName, "school_session"; got != want {
+		t.Fatalf("Auth.CookieName = %q, want %q", got, want)
+	}
+	if !cfg.Auth.CookieSecure {
+		t.Fatal("Auth.CookieSecure = false, want true")
 	}
 	if strings.Contains(cfg.Database.DSN, "Asia%2FBangkok") || !strings.Contains(cfg.Database.DSN, "TimeZone=Asia/Bangkok") {
 		t.Fatalf("Database.DSN = %q, want an unescaped IANA timezone", cfg.Database.DSN)
@@ -67,5 +79,16 @@ func TestLoadRejectsInvalidConfiguration(t *testing.T) {
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), "SERVER_PORT") {
 		t.Fatalf("Load() error = %v, want invalid SERVER_PORT error", err)
+	}
+}
+
+func TestLoadRejectsInvalidAuthConfiguration(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/sdms")
+	t.Setenv("SERVER_PORT", "8080")
+	t.Setenv("SESSION_COOKIE_NAME", "not a cookie")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "SESSION_COOKIE_NAME") {
+		t.Fatalf("Load() error = %v, want invalid SESSION_COOKIE_NAME error", err)
 	}
 }
