@@ -10,6 +10,7 @@ import (
 	"github.com/FhLk/SDMS-Backend/internal/config"
 	"github.com/FhLk/SDMS-Backend/internal/model"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
 type authService interface {
@@ -39,13 +40,14 @@ type messageResponse struct {
 }
 
 type divisionResponse struct {
-	Code      string `json:"code"`
-	Name      string `json:"name"`
-	ShortName string `json:"short_name"`
+	UUID      uuid.UUID `json:"uuid"`
+	Code      string    `json:"code"`
+	Name      string    `json:"name"`
+	ShortName string    `json:"short_name"`
 }
 
 type meResponse struct {
-	ID            uint64             `json:"id"`
+	UUID          uuid.UUID          `json:"uuid"`
 	Username      string             `json:"username"`
 	FullName      string             `json:"full_name"`
 	Position      string             `json:"position"`
@@ -95,7 +97,7 @@ func (h authHandler) logout(c fiber.Ctx) error {
 	if err := h.service.Logout(c.Context(), token); err != nil {
 		return mapAuthError(err)
 	}
-	return c.SendStatus(fiber.StatusNoContent)
+	return c.Status(fiber.StatusOK).JSON(messageResponse{Message: "Logged out"})
 }
 
 // me resolves the session cookie into the current user's identity and roles.
@@ -155,7 +157,7 @@ func mapAuthError(err error) error {
 
 func newMeResponse(profile auth.Profile) meResponse {
 	return meResponse{
-		ID:            profile.User.ID,
+		UUID:          profile.User.UUID,
 		Username:      profile.User.Username,
 		FullName:      profile.User.FullName,
 		Position:      profile.User.Position,
@@ -184,6 +186,7 @@ func divisionResponses(divisions []model.Division) []divisionResponse {
 	responses := make([]divisionResponse, 0, len(divisions))
 	for _, division := range divisions {
 		responses = append(responses, divisionResponse{
+			UUID:      division.UUID,
 			Code:      division.Code,
 			Name:      division.Name,
 			ShortName: division.ShortName,

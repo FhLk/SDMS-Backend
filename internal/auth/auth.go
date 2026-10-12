@@ -95,7 +95,7 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (LoginResult, err
 	expiresAt := now.Add(s.sessionTTL)
 	session := model.Session{
 		TokenHash:  tokenHash,
-		UserID:     user.ID,
+		UserUUID:   user.UUID,
 		ExpiresAt:  expiresAt,
 		LastSeenAt: now,
 		IP:         truncate(input.IP, 45),
@@ -152,7 +152,7 @@ func (s *Service) CurrentUser(ctx context.Context, token string) (Profile, error
 
 	var headDivisions []model.Division
 	if err := s.db.WithContext(ctx).
-		Where("head_user_id = ?", session.UserID).
+		Where("head_user_uuid = ?", session.UserUUID).
 		Order("sort_order").
 		Find(&headDivisions).Error; err != nil {
 		return Profile{}, fmt.Errorf("find headed divisions: %w", err)

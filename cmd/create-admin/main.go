@@ -51,5 +51,5 @@ func main() {
 		log.Fatalf("create admin failed: %v", err)
 	}
 
-	log.Printf("admin %q created successfully (id=%d)", created.Username, created.ID)
+	log.Printf("admin %q created successfully (uuid=%s)", created.Username, created.UUID)
 }

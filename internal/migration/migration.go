@@ -54,6 +54,18 @@ func CurrentAcademicPeriod(now time.Time) (year int16, semester int16) {
 // ทุกขั้นตอนอยู่ใน transaction เดียว จึงไม่ทิ้ง schema ครึ่งหนึ่งเมื่อเกิดข้อผิดพลาด.
 func Up(db *gorm.DB, now time.Time) error {
 	return db.Transaction(func(tx *gorm.DB) error {
+		// Existing installations used bigint and natural primary keys. Convert
+		// them before AutoMigrate sees the UUID-based models so no data is lost.
+		if err := migrateLegacyPrimaryKeys(tx); err != nil {
+			return err
+		}
+
+		// Register the explicit join model so GORM uses its UUID primary key and
+		// the UserUUID/DivisionUUID foreign-key columns.
+		if err := tx.SetupJoinTable(&model.User{}, "Divisions", &model.UserDivision{}); err != nil {
+			return fmt.Errorf("configure user division join table: %w", err)
+		}
+
 		if err := tx.AutoMigrate(
 			&model.User{},
 			&model.Division{},

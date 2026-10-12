@@ -4,19 +4,20 @@ ER diagram พจนานุกรมข้อมูล และ GORM models �
 
 | หัวข้อ | รายละเอียด |
 | --- | --- |
-| ฐานข้อมูล | PostgreSQL 16 |
+| ฐานข้อมูล | PostgreSQL 17 |
 | ORM | GORM (AutoMigrate) |
 | ใช้กับ issue | BE-02 สร้างตาราง + ข้อมูลเริ่มต้น |
 | ต้นแบบอ้างอิง | [SDMS Web App](https://claude.ai/artifact/6j9Vof6oUJjZNQWMWueyp2) |
 
 **11** ตาราง · **16** ความสัมพันธ์ (FK) · **7** กติกาที่ฐานข้อมูลคุมให้ · **6** ชนิดช่องในฟอร์ม
 
-> models ในหน้านี้ผ่านการรัน AutoMigrate จริงบน PostgreSQL 16 สองรอบ (รอบสองไม่มีอะไรเปลี่ยน) และทดสอบแล้วว่ากติกาทั้ง 7 ข้อปฏิเสธข้อมูลผิดได้
+> models และ data-preserving migration ผ่านการรันจริงบน PostgreSQL 17 และทดสอบการรันซ้ำแล้ว
 
 ## 1. ข้อตกลง
 
 - ชื่อตารางและคอลัมน์เป็น snake_case ตารางเป็นพหูพจน์ ตามค่าเริ่มต้นของ GORM จึงไม่ต้องตั้ง `TableName()`
-- คีย์หลักเป็น `bigint` เพิ่มอัตโนมัติ ยกเว้น 4 ตารางที่ใช้ค่าธรรมชาติ: `divisions.code`, `academic_years.year`, `sessions.token_hash`, `drive_folders.path`
+- ทุกตารางใช้ `uuid` ชนิด PostgreSQL `uuid` เป็น primary key โดยแอปสร้าง UUIDv7 ที่เรียงตามเวลา
+- ค่าธรรมชาติ `divisions.code`, `academic_years.year`, `sessions.token_hash` และ `drive_folders.path` ยังคงเป็น unique business key
 - เวลาเก็บเป็น `timestamptz` ส่วน "วันนี้" และการตัดสินว่าส่งช้าคิดตามเวลาไทย (`Asia/Bangkok`)
 - ปีการศึกษาเก็บเป็น พ.ศ. (`2569`) ส่วน `due_date` เก็บเป็น `date` แบบ ค.ศ. แล้วแปลงเป็น พ.ศ. ตอนแสดง
 - ไม่ลบบุคลากรจริง ใช้ `deactivated_at` และไม่ embed `gorm.Model` เพราะระบบนี้ไม่ใช้ `deleted_at`
@@ -44,7 +45,7 @@ erDiagram
   users ||--o{ files : "อัปโหลด"
   users ||--o{ sessions : "เข้าสู่ระบบ"
   users {
-    bigint id PK
+    uuid uuid PK
     varchar username UK
     text password_hash
     varchar full_name
@@ -54,39 +55,43 @@ erDiagram
     timestamptz deactivated_at
   }
   sessions {
-    varchar token_hash PK
-    bigint user_id FK
+    uuid uuid PK
+    varchar token_hash UK
+    uuid user_uuid FK
     timestamptz expires_at
   }
   divisions {
-    varchar code PK
+    uuid uuid PK
+    varchar code UK
     varchar name
     varchar short_name
-    bigint head_user_id FK,UK
+    uuid head_user_uuid FK,UK
   }
   user_divisions {
-    bigint user_id PK,FK
-    varchar division_code PK,FK
+    uuid uuid PK
+    uuid user_uuid FK
+    uuid division_uuid FK
   }
   academic_years {
-    smallint year PK
+    uuid uuid PK
+    smallint year UK
     boolean is_current
     smallint current_semester
   }
   topics {
-    bigint id PK
-    varchar division_code FK
-    smallint year FK
+    uuid uuid PK
+    uuid division_uuid FK
+    uuid academic_year_uuid FK
     smallint semester
     varchar title
     date due_date
     boolean is_open
     boolean is_secret
-    bigint created_by_id FK
+    uuid created_by_uuid FK
   }
   topic_fields {
-    bigint id PK
-    bigint topic_id FK
+    uuid uuid PK
+    uuid topic_uuid FK
     smallint position
     varchar type
     varchar label
@@ -95,26 +100,29 @@ erDiagram
     timestamptz hidden_at
   }
   topic_assignees {
-    bigint topic_id PK,FK
-    bigint user_id PK,FK
+    uuid uuid PK
+    uuid topic_uuid FK
+    uuid user_uuid FK
   }
   submissions {
-    bigint id PK
-    bigint topic_id FK
-    bigint user_id FK
+    uuid uuid PK
+    uuid topic_uuid FK
+    uuid user_uuid FK
     jsonb values
     timestamptz submitted_at
   }
   files {
-    bigint id PK
-    bigint topic_id FK
-    bigint field_id FK
-    bigint submission_id FK
+    uuid uuid PK
+    uuid topic_uuid FK
+    uuid field_uuid FK
+    uuid submission_uuid FK
+    uuid uploaded_by_uuid FK
     varchar drive_file_id
     varchar status
   }
   drive_folders {
-    varchar path PK
+    uuid uuid PK
+    varchar path UK
     varchar folder_id
   }
 ```
@@ -127,7 +135,7 @@ erDiagram
 | --- | --- | --- |
 | 1 คนส่งคำตอบได้ 1 ชุดต่อหัวข้อ | `uq_submissions_topic_user` | `23505` → 409 |
 | ปีการศึกษาปัจจุบันมีได้ปีเดียว | `uq_academic_years_current` | `23505` → 409 |
-| 1 คนเป็นหัวหน้าได้ฝ่ายเดียว | `idx_divisions_head_user_id` | `23505` → 409 |
+| 1 คนเป็นหัวหน้าได้ฝ่ายเดียว | `idx_divisions_head_user_uuid` | `23505` → 409 |
 | ลบหัวข้อที่มีคำตอบแล้วไม่ได้ | `fk_submissions_topic` (RESTRICT) | `23503` → 409 |
 | ชนิดช่องต้องเป็น 1 ใน 6 ชนิด | `chk_topic_fields_type` | `23514` → 400 |
 | ไฟล์ขนาด 1 ไบต์ ถึง 50 MB | `chk_files_size` | `23514` → 413 |
@@ -154,7 +162,7 @@ erDiagram
 
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
-| `id` | bigint | – | `auto` | รหัสบุคลากร |
+| `uuid` | uuid | – | UUIDv7 | รหัสบุคลากร |
 | `username` | varchar(32) | – | – | ชื่อผู้ใช้สำหรับเข้าระบบ ตัวพิมพ์เล็ก a–z 0–9 และ . _ - ยาว 3–32 ตัว เช่น somchai.s |
 | `password_hash` | text | – | – | hash ของรหัสผ่าน (bcrypt) ห้ามส่งออกทาง API |
 | `full_name` | varchar(120) | – | – | ชื่อ-สกุล |
@@ -166,14 +174,14 @@ erDiagram
 
 **คีย์และ index**
 
-- PK id
+- PK uuid
 - UNIQUE username
 - CHECK chk_users_username (รูปแบบชื่อผู้ใช้)
 - INDEX deactivated_at
 
 **หมายเหตุ**
 
-- บทบาท "หัวหน้าฝ่าย" ไม่ได้เก็บที่นี่ ดูจาก divisions.head_user_id
+- บทบาท "หัวหน้าฝ่าย" ไม่ได้เก็บที่นี่ ดูจาก divisions.head_user_uuid
 - ผู้ใช้เปลี่ยนรหัสผ่านเองไม่ได้ แอดมินเป็นคนตั้งให้
 
 #### `sessions`
@@ -182,8 +190,9 @@ erDiagram
 
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
+| `uuid` | uuid | – | UUIDv7 | รหัส session |
 | `token_hash` | varchar(64) | – | – | sha256 (hex) ของ token ใน cookie |
-| `user_id` | bigint | – | – | → users.id |
+| `user_uuid` | uuid | – | – | → users.uuid |
 | `expires_at` | timestamptz | – | – | หมดอายุ (แนะนำ 30 วัน) |
 | `last_seen_at` | timestamptz | – | – | ใช้งานล่าสุด |
 | `ip` | varchar(45) | ✓ | – | IP ตอนเข้าสู่ระบบ (รองรับ IPv6) |
@@ -192,9 +201,10 @@ erDiagram
 
 **คีย์และ index**
 
-- PK token_hash
-- FK user_id → users ON DELETE CASCADE
-- INDEX user_id, expires_at
+- PK uuid
+- UNIQUE token_hash
+- FK user_uuid → users ON DELETE CASCADE
+- INDEX user_uuid, expires_at
 
 **หมายเหตุ**
 
@@ -209,17 +219,19 @@ erDiagram
 
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
+| `uuid` | uuid | – | UUIDv7 | รหัสหลักของฝ่าย |
 | `code` | varchar(8) | – | – | รหัสฝ่าย aca · bud · per · gen ใช้ใน URL |
 | `name` | varchar(120) | – | – | ชื่อเต็ม เช่น ฝ่ายบริหารวิชาการ |
 | `short_name` | varchar(60) | – | – | ชื่อย่อ เช่น วิชาการ |
 | `sort_order` | smallint | – | – | ลำดับการแสดง |
-| `head_user_id` | bigint | ✓ | – | หัวหน้าฝ่าย → users.id ว่าง = ยังไม่ตั้ง |
+| `head_user_uuid` | uuid | ✓ | – | หัวหน้าฝ่าย → users.uuid ว่าง = ยังไม่ตั้ง |
 
 **คีย์และ index**
 
-- PK code
-- UNIQUE head_user_id (1 คนเป็นหัวหน้าได้ฝ่ายเดียว)
-- FK head_user_id → users ON DELETE SET NULL
+- PK uuid
+- UNIQUE code
+- UNIQUE head_user_uuid (1 คนเป็นหัวหน้าได้ฝ่ายเดียว)
+- FK head_user_uuid → users ON DELETE SET NULL
 
 **หมายเหตุ**
 
@@ -231,14 +243,16 @@ erDiagram
 
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
-| `user_id` | bigint | – | – | → users.id |
-| `division_code` | varchar(8) | – | – | → divisions.code |
+| `uuid` | uuid | – | UUIDv7 | รหัสการสังกัดฝ่าย |
+| `user_uuid` | uuid | – | – | → users.uuid |
+| `division_uuid` | uuid | – | – | → divisions.uuid |
 
 **คีย์และ index**
 
-- PK (user_id, division_code)
+- PK uuid
+- UNIQUE (user_uuid, division_uuid)
 - FK ทั้งสองคอลัมน์ ON DELETE CASCADE
-- INDEX division_code
+- INDEX user_uuid, division_uuid
 
 **หมายเหตุ**
 
@@ -250,6 +264,7 @@ erDiagram
 
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
+| `uuid` | uuid | – | UUIDv7 | รหัสหลักของปีการศึกษา |
 | `year` | smallint | – | – | ปีการศึกษา พ.ศ. เช่น 2569 |
 | `is_current` | boolean | – | `false` | ปีปัจจุบัน มีได้ปีเดียว |
 | `current_semester` | smallint | – | `1` | ภาคเรียนปัจจุบันของปีนี้ (1 หรือ 2) |
@@ -257,7 +272,8 @@ erDiagram
 
 **คีย์และ index**
 
-- PK year
+- PK uuid
+- UNIQUE year
 - UNIQUE uq_academic_years_current (is_current) WHERE is_current
 - CHECK current_semester IN (1,2)
 
@@ -274,24 +290,24 @@ erDiagram
 
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
-| `id` | bigint | – | `auto` | รหัสหัวข้อ |
-| `division_code` | varchar(8) | – | – | ฝ่ายเจ้าของ → divisions.code |
-| `year` | smallint | – | – | ปีการศึกษา → academic_years.year |
+| `uuid` | uuid | – | UUIDv7 | รหัสหัวข้อ |
+| `division_uuid` | uuid | – | – | ฝ่ายเจ้าของ → divisions.uuid |
+| `academic_year_uuid` | uuid | – | – | ปีการศึกษา → academic_years.uuid |
 | `semester` | smallint | – | – | ภาคเรียน 1 หรือ 2 (ใส่จากภาคเรียนปัจจุบัน แก้ไม่ได้) |
 | `title` | varchar(200) | – | – | ชื่อหัวข้อ |
 | `due_date` | date | – | – | กำหนดส่ง (เก็บเป็น ค.ศ. แสดงเป็น พ.ศ.) |
 | `is_open` | boolean | – | `true` | เปิดรับอยู่หรือไม่ |
 | `is_secret` | boolean | – | `false` | หัวข้อลับ |
-| `created_by_id` | bigint | – | – | คนสร้าง → users.id |
+| `created_by_uuid` | uuid | – | – | คนสร้าง → users.uuid |
 | `drive_folder_id` | varchar(128) | ✓ | – | id โฟลเดอร์หัวข้อใน Drive สร้างตอนมีไฟล์แรก |
 | `closed_at` | timestamptz | ✓ | – | เวลาปิดรับล่าสุด |
 | `created_at / updated_at` | timestamptz | ✓ | – |  |
 
 **คีย์และ index**
 
-- PK id
-- FK division_code, year, created_by_id ON DELETE RESTRICT
-- INDEX (division_code, year), due_date
+- PK uuid
+- FK division_uuid, academic_year_uuid, created_by_uuid ON DELETE RESTRICT
+- INDEX (division_uuid, academic_year_uuid), due_date
 - CHECK semester IN (1,2)
 
 **หมายเหตุ**
@@ -304,8 +320,8 @@ erDiagram
 
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
-| `id` | bigint | – | `auto` | รหัสช่อง ใช้เป็น key ใน submissions.values |
-| `topic_id` | bigint | – | – | → topics.id |
+| `uuid` | uuid | – | UUIDv7 | รหัสช่อง ใช้เป็น key ใน submissions.values |
+| `topic_uuid` | uuid | – | – | → topics.uuid |
 | `position` | smallint | – | – | ลำดับในฟอร์ม เริ่มที่ 1 |
 | `type` | varchar(10) | – | – | text · para · num · date · choice · file |
 | `label` | varchar(120) | – | – | ชื่อช่อง เช่น จำนวนชั่วโมง |
@@ -316,10 +332,10 @@ erDiagram
 
 **คีย์และ index**
 
-- PK id
-- FK topic_id → topics ON DELETE CASCADE
+- PK uuid
+- FK topic_uuid → topics ON DELETE CASCADE
 - CHECK type IN (6 ชนิด)
-- INDEX topic_id
+- INDEX topic_uuid
 
 **หมายเหตุ**
 
@@ -332,14 +348,16 @@ erDiagram
 
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
-| `topic_id` | bigint | – | – | → topics.id |
-| `user_id` | bigint | – | – | → users.id |
+| `uuid` | uuid | – | UUIDv7 | รหัสผู้รับมอบหมาย |
+| `topic_uuid` | uuid | – | – | → topics.uuid |
+| `user_uuid` | uuid | – | – | → users.uuid |
 
 **คีย์และ index**
 
-- PK (topic_id, user_id)
-- FK topic_id ON DELETE CASCADE · user_id ON DELETE RESTRICT
-- INDEX user_id
+- PK uuid
+- UNIQUE (topic_uuid, user_uuid)
+- FK topic_uuid ON DELETE CASCADE · user_uuid ON DELETE RESTRICT
+- INDEX user_uuid
 
 **หมายเหตุ**
 
@@ -355,19 +373,19 @@ erDiagram
 
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
-| `id` | bigint | – | `auto` | รหัสคำตอบ |
-| `topic_id` | bigint | – | – | → topics.id |
-| `user_id` | bigint | – | – | คนส่ง → users.id |
+| `uuid` | uuid | – | UUIDv7 | รหัสคำตอบ |
+| `topic_uuid` | uuid | – | – | → topics.uuid |
+| `user_uuid` | uuid | – | – | คนส่ง → users.uuid |
 | `values` | jsonb | – | `'{}'` | คำตอบทุกช่อง ดูรูปแบบในหัวข้อ "รูปแบบ JSON" |
 | `submitted_at` | timestamptz | – | – | ส่งครั้งแรก ไม่เปลี่ยนเมื่อแก้ ใช้ตัดสินว่าช้า |
 | `updated_at` | timestamptz | ✓ | – | แก้ล่าสุด |
 
 **คีย์และ index**
 
-- PK id
-- UNIQUE uq_submissions_topic_user (topic_id, user_id)
-- FK topic_id, user_id ON DELETE RESTRICT
-- INDEX user_id
+- PK uuid
+- UNIQUE uq_submissions_topic_user (topic_uuid, user_uuid)
+- FK topic_uuid, user_uuid ON DELETE RESTRICT
+- INDEX user_uuid
 
 **หมายเหตุ**
 
@@ -379,11 +397,11 @@ erDiagram
 
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
-| `id` | bigint | – | `auto` | รหัสไฟล์ ใช้ใน /api/files/{id} |
-| `topic_id` | bigint | – | – | → topics.id |
-| `field_id` | bigint | – | – | ช่องที่แนบ → topic_fields.id |
-| `submission_id` | bigint | ✓ | – | คำตอบที่ผูก ว่าง = ยังไม่ได้ส่ง (staged) |
-| `uploaded_by_id` | bigint | – | – | คนอัปโหลด → users.id |
+| `uuid` | uuid | – | UUIDv7 | รหัสไฟล์ ใช้ใน /api/files/{uuid} |
+| `topic_uuid` | uuid | – | – | → topics.uuid |
+| `field_uuid` | uuid | – | – | ช่องที่แนบ → topic_fields.uuid |
+| `submission_uuid` | uuid | ✓ | – | คำตอบที่ผูก ว่าง = ยังไม่ได้ส่ง (staged) |
+| `uploaded_by_uuid` | uuid | – | – | คนอัปโหลด → users.uuid |
 | `drive_file_id` | varchar(128) | – | – | id ไฟล์ใน Google Drive |
 | `original_name` | varchar(255) | – | – | ชื่อไฟล์เดิมที่ผู้ใช้อัปโหลด |
 | `mime_type` | varchar(120) | – | – | เช่น application/pdf |
@@ -394,10 +412,10 @@ erDiagram
 
 **คีย์และ index**
 
-- PK id
-- FK topic_id, field_id ON DELETE CASCADE · submission_id ON DELETE SET NULL · uploaded_by_id ON DELETE RESTRICT
+- PK uuid
+- FK topic_uuid, field_uuid ON DELETE CASCADE · submission_uuid ON DELETE SET NULL · uploaded_by_uuid ON DELETE RESTRICT
 - CHECK size_bytes BETWEEN 1 AND 52428800 · status IN (3 ค่า)
-- INDEX topic_id, submission_id, status
+- INDEX topic_uuid, submission_uuid, status
 
 **หมายเหตุ**
 
@@ -410,13 +428,15 @@ erDiagram
 
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
+| `uuid` | uuid | – | UUIDv7 | รหัสโฟลเดอร์ |
 | `path` | varchar(64) | – | – | "2569" หรือ "2569/aca" |
 | `folder_id` | varchar(128) | – | – | id โฟลเดอร์ใน Google Drive |
 | `created_at` | timestamptz | ✓ | – |  |
 
 **คีย์และ index**
 
-- PK path
+- PK uuid
+- UNIQUE path
 
 **หมายเหตุ**
 
@@ -435,15 +455,15 @@ erDiagram
 
 ### submissions.values
 
-object ที่ key คือ `topic_fields.id` (เป็นข้อความ) ช่องที่ไม่ได้กรอกไม่ต้องมี key
+object ที่ key คือ `topic_fields.uuid` (เป็นข้อความ) ช่องที่ไม่ได้กรอกไม่ต้องมี key
 
 ```json
 {
-  "11": "PLC ชุมชนการเรียนรู้ทางวิชาชีพ",
-  "12": "2026-09-20",
-  "13": 12,
-  "14": "ม.2",
-  "15": [101, 102]
+  "0199d16f-4f09-7c20-8cc7-e8c3363ea1b0": "PLC ชุมชนการเรียนรู้ทางวิชาชีพ",
+  "0199d16f-4f09-7c20-8cc7-e8c3363ea1b1": "2026-09-20",
+  "0199d16f-4f09-7c20-8cc7-e8c3363ea1b2": 12,
+  "0199d16f-4f09-7c20-8cc7-e8c3363ea1b3": "ม.2",
+  "0199d16f-4f09-7c20-8cc7-e8c3363ea1b4": ["0199d16f-4f09-7c20-8cc7-e8c3363ea1b5"]
 }
 ```
 
@@ -454,7 +474,7 @@ object ที่ key คือ `topic_fields.id` (เป็นข้อควา
 | `num` ตัวเลข | number | เป็นตัวเลข รับทศนิยม |
 | `date` วันที่ | string `"YYYY-MM-DD"` (ค.ศ.) | เป็นวันที่ที่มีจริง |
 | `choice` ตัวเลือก | string | ต้องอยู่ใน `options` |
-| `file` ไฟล์ | array ของ `files.id` | อย่างน้อย 1 ไฟล์ถ้าต้องกรอก · ไฟล์ต้องเป็นของคนส่ง หัวข้อเดียวกัน ช่องเดียวกัน |
+| `file` ไฟล์ | array ของ `files.uuid` | อย่างน้อย 1 ไฟล์ถ้าต้องกรอก · ไฟล์ต้องเป็นของคนส่ง หัวข้อเดียวกัน ช่องเดียวกัน |
 
 ## 6. ค่าที่คำนวณ ไม่ได้เก็บ
 
@@ -468,8 +488,8 @@ object ที่ key คือ `topic_fields.id` (เป็นข้อควา
 | สถานะ **เลยกำหนด** | ไม่มีคำตอบ หัวข้อเปิดรับ และวันนี้ > `due_date` |
 | สถานะ **ไม่ส่ง** | ไม่มีคำตอบ และหัวข้อปิดรับแล้ว |
 | ส่งแล้ว **x/y** | y = จำนวนแถวใน `topic_assignees` ของหัวข้อ · x = จำนวนคนในนั้นที่มีแถวใน `submissions` |
-| บทบาทหัวหน้าฝ่าย | มีแถวใน `divisions` ที่ `head_user_id` = ผู้ใช้ |
-| จำนวนหัวข้อของแต่ละปี | นับ `topics` ตาม `year` |
+| บทบาทหัวหน้าฝ่าย | มีแถวใน `divisions` ที่ `head_user_uuid` = ผู้ใช้ |
+| จำนวนหัวข้อของแต่ละปี | join `topics.academic_year_uuid` แล้วนับตาม `academic_years.year` |
 
 ## 7. ข้อมูลเริ่มต้น
 
@@ -492,7 +512,38 @@ object ที่ key คือ `topic_fields.id` (เป็นข้อควา
 
 ## 8. GORM models
 
-ไฟล์เดียววางใน `internal/model/models.go` ได้เลย ต้องใช้ `gorm.io/gorm`, `gorm.io/driver/postgres` และ `gorm.io/datatypes`
+โมเดลที่ใช้งานจริงอยู่ใน [`internal/model/models.go`](internal/model/models.go) และ migration สำหรับข้อมูลเดิมอยู่ใน [`internal/migration/uuid_migration.go`](internal/migration/uuid_migration.go)
+
+- ทุก model embed `UUIDModel` ซึ่งสร้าง UUIDv7 อัตโนมัติใน `BeforeCreate`
+- ตารางเชื่อม `user_divisions` และ `topic_assignees` มี `uuid` ของตัวเอง พร้อม unique composite key ป้องกันความสัมพันธ์ซ้ำ
+- migration เพิ่ม UUIDv7 และ UUID foreign keys ให้แถวเดิมก่อนถอด bigint/natural primary keys
+- key ภายใน `submissions.values` ถูกแปลงจาก `topic_fields.id` เดิมเป็น `topic_fields.uuid` โดยคง key ที่ไม่รู้จักไว้เพื่อไม่ทำข้อมูลสูญหาย
+- ทุกขั้นตอนทำใน transaction เดียว และรันซ้ำได้
+
+โครงหลักของ primary key:
+
+```go
+type UUIDModel struct {
+	UUID uuid.UUID `gorm:"type:uuid;primaryKey" json:"uuid"`
+}
+
+func (m *UUIDModel) BeforeCreate(_ *gorm.DB) error {
+	if m.UUID != uuid.Nil {
+		return nil
+	}
+	generated, err := uuid.NewV7()
+	if err != nil {
+		return err
+	}
+	m.UUID = generated
+	return nil
+}
+```
+
+<details>
+<summary>โมเดล legacy ก่อนเปลี่ยนเป็น UUID (เก็บไว้อ้างอิง migration)</summary>
+
+ไฟล์เดิมใช้ `bigint` และ natural primary keys ดังนี้
 
 `internal/model/models.go`
 
@@ -686,7 +737,9 @@ func Migrate(db *gorm.DB) error {
 }
 ```
 
-> ทดสอบกับ GORM v1.25.12 และ driver postgres v1.5.11 บน PostgreSQL 16 ตอนทดสอบใช้ `json.RawMessage` แทน `datatypes.JSON` เพราะดาวน์โหลด package นี้ไม่ได้ ทั้งสองแบบได้คอลัมน์ `jsonb` เหมือนกันเพราะกำหนด `type:jsonb` ไว้ หลังรันครั้งแรกในโปรเจกต์จริง ให้เปิด `\d` ใน psql เทียบกับหัวข้อ 4 อีกครั้ง
+> ส่วน legacy นี้ไม่ใช่ schema ปัจจุบัน
+
+</details>
 
 ## 9. สิ่งที่ต้องปรับใน BE issues
 

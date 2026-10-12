@@ -19,6 +19,20 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 ลำดับแนะนำ: `BE-01 → BE-02 → BE-03 → BE-04` จากนั้นทำ `BE-05`, `BE-07`, `BE-08` และ `BE-11` แบบขนานได้ ก่อนต่อด้วยงานที่อาศัย dependency ของแต่ละสาย
 
+## สถานะปัจจุบัน
+
+ทำเสร็จแล้ว **3 จาก 17 tasks** โดยงานถัดไปคือ `BE-04`
+
+| Task | สถานะ | สิ่งที่ทำแล้ว |
+|---|---|---|
+| BE-01 | ✅ เสร็จแล้ว | ตั้งโปรเจกต์ Go Fiber, อ่าน config จาก `.env`, เชื่อม PostgreSQL ผ่าน GORM, health endpoint และ JSON error รูปแบบกลาง |
+| BE-02 | ✅ เสร็จแล้ว | สร้าง schema และ seed, คำสั่ง migrate/create-admin, เปลี่ยน primary/foreign key เป็น UUIDv7 ชื่อ `uuid` พร้อม migration รักษาข้อมูลเดิม |
+| BE-03 | ✅ เสร็จแล้ว | Login, Logout และ Me ด้วย server-side session, HttpOnly cookie, bcrypt และการป้องกัน username enumeration |
+| BE-04 | 🟡 ถัดไป | Middleware ตรวจ session และกฎสิทธิ์ตามบทบาท |
+| BE-05 – BE-17 | ⚪ ยังไม่เริ่ม | รอ dependency ตามที่ระบุในแต่ละ task |
+
+> ฐานข้อมูลยังใช้ PostgreSQL 17 และสร้าง UUIDv7 ฝั่ง Go ด้วย `google/uuid.NewV7()` ตามแนวทางที่เลือกใช้
+
 ## ตั้งต้นและเข้าสู่ระบบ
 
 ### BE-01 · ตั้งโปรเจกต์ Go Fiber + เชื่อม PostgreSQL
@@ -29,9 +43,9 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 **เกณฑ์เสร็จ**
 
-- [ ] `GET /api/health` ตอบ 200
-- [ ] ต่อฐานข้อมูลไม่ได้ → แอปหยุดพร้อมข้อความบอกสาเหตุ
-- [ ] error ทุกตัวตอบเป็น JSON รูปแบบเดียวกัน `{"code": "...", "message": "..."}`
+- [x] `GET /api/health` ตอบ 200
+- [x] ต่อฐานข้อมูลไม่ได้ → แอปหยุดพร้อมข้อความบอกสาเหตุ
+- [x] error ทุกตัวตอบเป็น JSON รูปแบบเดียวกัน `{"code": "...", "message": "..."}`
 
 ### BE-02 · สร้างตารางฐานข้อมูล + ข้อมูลเริ่มต้น
 
@@ -43,10 +57,10 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 **เกณฑ์เสร็จ**
 
-- [ ] รัน migration บนฐานว่างผ่าน
-- [ ] มีข้อมูล 4 ฝ่าย (วิชาการ งบประมาณ บุคคล ทั่วไป) และปีการศึกษาปัจจุบัน
-- [ ] มีคำสั่งสร้างแอดมินคนแรก
-- [ ] คำตอบ 1 คนต่อ 1 หัวข้อ (unique topic_id + user_id)
+- [x] รัน migration บนฐานว่างผ่าน
+- [x] มีข้อมูล 4 ฝ่าย (วิชาการ งบประมาณ บุคคล ทั่วไป) และปีการศึกษาปัจจุบัน
+- [x] มีคำสั่งสร้างแอดมินคนแรก
+- [x] ทุกตารางใช้ UUIDv7 primary key ชื่อ `uuid` และคำตอบไม่ซ้ำด้วย unique (`topic_uuid`, `user_uuid`)
 
 ### BE-03 · Login / Logout / Me
 
@@ -58,11 +72,11 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 **เกณฑ์เสร็จ**
 
-- [ ] username + password ถูก → ได้ session cookie (HttpOnly)
-- [ ] รหัสผิดหรือไม่มีผู้ใช้ → 401 ข้อความเดียวกัน
-- [ ] บัญชีที่ปิดใช้งานแล้วเข้าไม่ได้
-- [ ] รหัสผ่านเก็บเป็น hash (bcrypt)
-- [ ] `/api/me` คืน ชื่อ ตำแหน่ง บทบาท ฝ่ายที่สังกัด และฝ่ายที่เป็นหัวหน้า
+- [x] username + password ถูก → ได้ session cookie (HttpOnly)
+- [x] รหัสผิดหรือไม่มีผู้ใช้ → 401 ข้อความเดียวกัน
+- [x] บัญชีที่ปิดใช้งานแล้วเข้าไม่ได้
+- [x] รหัสผ่านเก็บเป็น hash (bcrypt)
+- [x] `/api/me` คืน ชื่อ ตำแหน่ง บทบาท ฝ่ายที่สังกัด และฝ่ายที่เป็นหัวหน้า
 
 ### BE-04 · Middleware ตรวจ login และสิทธิ์
 
@@ -86,7 +100,7 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 **Priority: P1 — High**
 
-`GET` · `POST /api/admin/users` · `PATCH /api/admin/users/{id}` · `POST /api/admin/users/{id}/password`
+`GET` · `POST /api/admin/users` · `PATCH /api/admin/users/{uuid}` · `POST /api/admin/users/{uuid}/password`
 
 ต้องทำก่อน: BE-04
 
@@ -149,7 +163,7 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 **Priority: P1 — High**
 
-`PATCH /api/topics/{id}` · `POST /api/topics/{id}/close` · `POST /api/topics/{id}/reopen` · `DELETE /api/topics/{id}`
+`PATCH /api/topics/{uuid}` · `POST /api/topics/{uuid}/close` · `POST /api/topics/{uuid}/reopen` · `DELETE /api/topics/{uuid}`
 
 ต้องทำก่อน: BE-08
 
@@ -181,13 +195,13 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 **Priority: P1 — High**
 
-`POST /api/uploads` · `DELETE /api/uploads/{id}`
+`POST /api/uploads` · `DELETE /api/uploads/{uuid}`
 
 ต้องทำก่อน: BE-04
 
 **เกณฑ์เสร็จ**
 
-- [ ] อัปโหลดทีละไฟล์ คืน file id ให้ FE เอาไปใส่ตอนส่งคำตอบ
+- [ ] อัปโหลดทีละไฟล์ คืน file uuid ให้ FE เอาไปใส่ตอนส่งคำตอบ
 - [ ] ไฟล์เกิน 50 MB → 413
 - [ ] ไฟล์ไปอยู่ใน Google Drive ของโรงเรียน แยกโฟลเดอร์ ปี / ฝ่าย / หัวข้อ
 - [ ] ไฟล์ที่อัปโหลดแต่ไม่ได้ส่งเกิน 24 ชั่วโมงถูกลบ
@@ -197,7 +211,7 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 **Priority: P1 — High**
 
-`GET /api/me/pending` · `GET /api/topics/{id}/my-submission` · `PUT /api/topics/{id}/my-submission`
+`GET /api/me/pending` · `GET /api/topics/{uuid}/my-submission` · `PUT /api/topics/{uuid}/my-submission`
 
 ต้องทำก่อน: BE-08, BE-11
 
@@ -213,7 +227,7 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 **Priority: P1 — High**
 
-`GET /api/topics/{id}?status=` · `GET /api/topics/{id}/pending-names`
+`GET /api/topics/{uuid}?status=` · `GET /api/topics/{uuid}/pending-names`
 
 ต้องทำก่อน: BE-12
 
@@ -229,7 +243,7 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 **Priority: P1 — High**
 
-`GET /api/files/{id}`
+`GET /api/files/{uuid}`
 
 ต้องทำก่อน: BE-11, BE-13
 

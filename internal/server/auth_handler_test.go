@@ -13,6 +13,7 @@ import (
 	"github.com/FhLk/SDMS-Backend/internal/auth"
 	"github.com/FhLk/SDMS-Backend/internal/config"
 	"github.com/FhLk/SDMS-Backend/internal/model"
+	"github.com/google/uuid"
 )
 
 type fakeAuthService struct {
@@ -150,13 +151,23 @@ func TestMeReturnsIdentityRoleAndDivisions(t *testing.T) {
 			}
 			return auth.Profile{
 				User: model.User{
-					ID:       7,
-					Username: "head.one",
-					FullName: "หัวหน้าฝ่าย ตัวอย่าง",
-					Position: "ครู",
+					UUIDModel: model.UUIDModel{UUID: uuid.MustParse("0199d16f-4f09-7c20-8cc7-e8c3363ea1b0")},
+					Username:  "head.one",
+					FullName:  "หัวหน้าฝ่าย ตัวอย่าง",
+					Position:  "ครู",
 				},
-				Divisions:     []model.Division{{Code: "aca", Name: "ฝ่ายวิชาการ", ShortName: "วิชาการ"}},
-				HeadDivisions: []model.Division{{Code: "aca", Name: "ฝ่ายวิชาการ", ShortName: "วิชาการ"}},
+				Divisions: []model.Division{{
+					UUIDModel: model.UUIDModel{UUID: uuid.MustParse("0199d16f-4f09-7c20-8cc7-e8c3363ea1b1")},
+					Code:      "aca",
+					Name:      "ฝ่ายวิชาการ",
+					ShortName: "วิชาการ",
+				}},
+				HeadDivisions: []model.Division{{
+					UUIDModel: model.UUIDModel{UUID: uuid.MustParse("0199d16f-4f09-7c20-8cc7-e8c3363ea1b1")},
+					Code:      "aca",
+					Name:      "ฝ่ายวิชาการ",
+					ShortName: "วิชาการ",
+				}},
 			}, nil
 		},
 	}
@@ -179,7 +190,10 @@ func TestMeReturnsIdentityRoleAndDivisions(t *testing.T) {
 	if body.FullName != "หัวหน้าฝ่าย ตัวอย่าง" || body.Position != "ครู" || body.Role != "division_head" {
 		t.Fatalf("identity = %+v, want name, position, and division_head role", body)
 	}
-	if len(body.Divisions) != 1 || body.Divisions[0].Code != "aca" || len(body.HeadDivisions) != 1 {
+	if got, want := body.UUID.String(), "0199d16f-4f09-7c20-8cc7-e8c3363ea1b0"; got != want {
+		t.Fatalf("uuid = %q, want %q", got, want)
+	}
+	if len(body.Divisions) != 1 || body.Divisions[0].Code != "aca" || body.Divisions[0].UUID == uuid.Nil || len(body.HeadDivisions) != 1 {
 		t.Fatalf("divisions = %+v, headed = %+v", body.Divisions, body.HeadDivisions)
 	}
 }

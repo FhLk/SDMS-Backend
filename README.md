@@ -54,7 +54,7 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 - [x] migration รันบนฐานข้อมูลว่างได้
 - [x] มีข้อมูล 4 ฝ่าย (วิชาการ งบประมาณ บุคคล ทั่วไป) และปีการศึกษาปัจจุบัน
 - [x] มีคำสั่งสร้างแอดมินคนแรก
-- [x] คำตอบ 1 คนต่อ 1 หัวข้อ (unique topic_id + user_id)
+- [x] ทุกตารางใช้ UUIDv7 primary key ชื่อ `uuid` และคำตอบไม่ซ้ำด้วย unique (`topic_uuid`, `user_uuid`)
 
 **คำสั่งฐานข้อมูล**
 
@@ -106,7 +106,7 @@ Remove-Item Env:\INITIAL_ADMIN_PASSWORD
 
 ### BE-05 · API จัดการบุคลากร
 
-`GET` · `POST /api/admin/users` · `PATCH /api/admin/users/{id}` · `POST /api/admin/users/{id}/password`
+`GET` · `POST /api/admin/users` · `PATCH /api/admin/users/{uuid}` · `POST /api/admin/users/{uuid}/password`
 
 ต้องทำก่อน: BE-04
 
@@ -163,7 +163,7 @@ Remove-Item Env:\INITIAL_ADMIN_PASSWORD
 
 ### BE-09 · API แก้ / ปิดรับ / เปิดรับ / ลบหัวข้อ
 
-`PATCH /api/topics/{id}` · `POST /api/topics/{id}/close` · `POST /api/topics/{id}/reopen` · `DELETE /api/topics/{id}`
+`PATCH /api/topics/{uuid}` · `POST /api/topics/{uuid}/close` · `POST /api/topics/{uuid}/reopen` · `DELETE /api/topics/{uuid}`
 
 ต้องทำก่อน: BE-08
 
@@ -193,13 +193,13 @@ Remove-Item Env:\INITIAL_ADMIN_PASSWORD
 
 ### BE-11 · เชื่อม Google Drive + อัปโหลดไฟล์
 
-`POST /api/uploads` · `DELETE /api/uploads/{id}`
+`POST /api/uploads` · `DELETE /api/uploads/{uuid}`
 
 ต้องทำก่อน: BE-04
 
 **เกณฑ์เสร็จ**
 
-- [ ] อัปโหลดทีละไฟล์ แล้วคืน file id ให้ FE แนบไปตอนส่งคำตอบ
+- [ ] อัปโหลดทีละไฟล์ แล้วคืน file uuid ให้ FE แนบไปตอนส่งคำตอบ
 - [ ] ไฟล์ใหญ่เกิน 50 MB → 413
 - [ ] ไฟล์ไปอยู่ใน Google Drive ของโรงเรียน แยกโฟลเดอร์ตาม ปี / ฝ่าย / หัวข้อ
 - [ ] ไฟล์ที่อัปโหลดแล้วแต่ไม่ได้ส่งภายใน 24 ชั่วโมงถูกลบอัตโนมัติ
@@ -207,7 +207,7 @@ Remove-Item Env:\INITIAL_ADMIN_PASSWORD
 
 ### BE-12 · API ส่ง / แก้คำตอบ
 
-`GET /api/me/pending` · `GET /api/topics/{id}/my-submission` · `PUT /api/topics/{id}/my-submission`
+`GET /api/me/pending` · `GET /api/topics/{uuid}/my-submission` · `PUT /api/topics/{uuid}/my-submission`
 
 ต้องทำก่อน: BE-08, BE-11
 
@@ -221,7 +221,7 @@ Remove-Item Env:\INITIAL_ADMIN_PASSWORD
 
 ### BE-13 · API ตารางคำตอบของหัวข้อ
 
-`GET /api/topics/{id}?status=` · `GET /api/topics/{id}/pending-names`
+`GET /api/topics/{uuid}?status=` · `GET /api/topics/{uuid}/pending-names`
 
 ต้องทำก่อน: BE-12
 
@@ -235,7 +235,7 @@ Remove-Item Env:\INITIAL_ADMIN_PASSWORD
 
 ### BE-14 · API เปิดดู / ดาวน์โหลดไฟล์
 
-`GET /api/files/{id}`
+`GET /api/files/{uuid}`
 
 ต้องทำก่อน: BE-11, BE-13
 
