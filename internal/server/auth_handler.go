@@ -23,6 +23,7 @@ type authService interface {
 type Dependencies struct {
 	Auth       authService
 	AuthConfig config.AuthConfig
+	UserAdmin  adminUserService
 }
 
 type authHandler struct {

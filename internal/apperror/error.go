@@ -9,6 +9,7 @@ type Error struct {
 	Code    string // Stable machine-readable code used by the frontend.
 	Message string // Human-readable message that is safe to expose.
 	Cause   error  // Internal cause retained for logs, but never sent to the client.
+	Details any    // Optional structured validation details that are safe to expose.
 }
 
 // New creates an API-safe error without an underlying cause.
@@ -19,6 +20,12 @@ func New(status int, code, message string) *Error {
 // Wrap creates an API-safe error while preserving the internal cause for logging.
 func Wrap(status int, code, message string, cause error) *Error {
 	return &Error{Status: status, Code: code, Message: message, Cause: cause}
+}
+
+// WrapWithDetails สร้าง API error ที่มีรายละเอียดแบบมีโครงสร้าง เช่น
+// รายการแถวที่ผิดจากไฟล์ import โดยยังคง code และ message รูปแบบกลางไว้.
+func WrapWithDetails(status int, code, message string, details any, cause error) *Error {
+	return &Error{Status: status, Code: code, Message: message, Cause: cause, Details: details}
 }
 
 // Error implements the standard error interface.

@@ -8,6 +8,11 @@ import (
 	"github.com/google/uuid"
 )
 
+// CanManageUsers อนุญาตเฉพาะผู้ใช้ที่ยืนยันตัวตนและมีบทบาทแอดมิน.
+func CanManageUsers(profile auth.Profile) bool {
+	return isAuthenticated(profile) && profile.User.IsAdmin
+}
+
 // CanManageTopic ตรวจว่าผู้ใช้สร้างหรือแก้หัวข้อของฝ่ายที่ระบุได้หรือไม่.
 // แอดมินจัดการได้ทุกฝ่าย ส่วนหัวหน้าฝ่ายจัดการได้เฉพาะฝ่ายที่ตนเป็นหัวหน้า.
 func CanManageTopic(profile auth.Profile, divisionUUID uuid.UUID) bool {

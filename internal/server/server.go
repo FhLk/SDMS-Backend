@@ -2,6 +2,7 @@
 package server
 
 import (
+	"github.com/FhLk/SDMS-Backend/internal/authorization"
 	"github.com/gofiber/fiber/v3"
 	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
 )
@@ -38,6 +39,18 @@ func New(dependencies ...Dependencies) *fiber.App {
 	// /me เป็น protected route แรกที่ใช้ middleware กลาง โดย middleware จะ
 	// ตรวจ session และส่ง profile ต่อให้ handler ผ่าน request context.
 	api.Get("/me", auth.authenticate, auth.me)
+
+	// ทุก route ใต้ /admin/users ใช้ authentication และ policy ชุดเดียวกัน
+	// จึงไม่ต้องตรวจบทบาทแอดมินซ้ำในแต่ละ handler.
+	users := adminUserHandler{service: deps.UserAdmin}
+	adminRoutes := api.Group("/admin", auth.authenticate, requirePermission(authorization.CanManageUsers))
+	adminRoutes.Get("/users", users.list)
+	adminRoutes.Post("/users", users.create)
+	adminRoutes.Post("/users/import", users.importUsers)
+	adminRoutes.Get("/users/import/template.csv", users.downloadCSVImportTemplate)
+	adminRoutes.Get("/users/import/template.xlsx", users.downloadXLSXImportTemplate)
+	adminRoutes.Patch("/users/:uuid", users.update)
+	adminRoutes.Post("/users/:uuid/password", users.resetPassword)
 
 	return app
 }

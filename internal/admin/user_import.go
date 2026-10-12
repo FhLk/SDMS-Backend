@@ -1,0 +1,460 @@
+package admin
+
+import (
+	"bytes"
+	"context"
+	"encoding/csv"
+	"errors"
+	"fmt"
+	"io"
+	"path/filepath"
+	"strings"
+
+	"github.com/FhLk/SDMS-Backend/internal/model"
+	"github.com/google/uuid"
+	"github.com/xuri/excelize/v2"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+)
+
+const (
+	importHeaderFullName  = "ชื่อ-สกุล"
+	importHeaderUsername  = "username"
+	importHeaderPassword  = "รหัสผ่านเริ่มต้น"
+	importHeaderPosition  = "ตำแหน่ง"
+	importHeaderDivisions = "ฝ่าย"
+	maximumImportRows     = 2000
+)
+
+var ErrUnsupportedImportFile = errors.New("unsupported import file")
+
+// ImportRowError บอกตำแหน่งและสาเหตุของข้อมูลที่ผิดโดยไม่คืนค่าจาก cell
+// เพื่อป้องกันรหัสผ่านเริ่มต้นหลุดกลับไปใน response หรือ log.
+type ImportRowError struct {
+	Row     int    `json:"row"`
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
+// ImportValidationError รวมทุกแถวที่ผิด เพื่อให้ผู้ใช้แก้ไฟล์ครั้งเดียว
+// แทนการอัปโหลดซ้ำแล้วพบ error ทีละแถว.
+type ImportValidationError struct {
+	Rows []ImportRowError
+}
+
+func (e *ImportValidationError) Error() string {
+	return fmt.Sprintf("import contains %d invalid values", len(e.Rows))
+}
+
+// ImportResult สรุปจำนวนบุคลากรที่บันทึกสำเร็จจากไฟล์หนึ่งชุด.
+type ImportResult struct {
+	Imported int `json:"imported"`
+}
+
+type rawImportRow struct {
+	Number int
+	Cells  []string
+}
+
+type validatedImportRow struct {
+	Number int
+	Input  CreateUserInput
+	Hash   string
+}
+
+// ImportUsers อ่าน CSV/XLSX ตรวจทุกแถวก่อน แล้วบันทึกทั้งหมดใน transaction เดียว.
+// ถ้ามีแถวผิดแม้เพียงแถวเดียว ฟังก์ชันจะคืนรายละเอียดและไม่สร้างผู้ใช้ใดเลย.
+func (s *UserService) ImportUsers(ctx context.Context, filename string, content []byte) (ImportResult, error) {
+	rows, err := readImportRows(filename, content)
+	if err != nil {
+		return ImportResult{}, err
+	}
+
+	var divisions []model.Division
+	if err := s.db.WithContext(ctx).Order("sort_order").Find(&divisions).Error; err != nil {
+		return ImportResult{}, fmt.Errorf("list divisions for import: %w", err)
+	}
+	divisionLookup := buildDivisionLookup(divisions)
+
+	validatedRows, rowErrors := validateImportRows(rows, divisionLookup)
+	existing, err := existingUsernames(s.db.WithContext(ctx), importUsernames(validatedRows))
+	if err != nil {
+		return ImportResult{}, err
+	}
+	rowErrors = append(rowErrors, usernameConflictErrors(validatedRows, existing)...)
+	if len(rowErrors) > 0 {
+		return ImportResult{}, &ImportValidationError{Rows: rowErrors}
+	}
+
+	// ทำ bcrypt หลัง validation ผ่านทั้งไฟล์ เพื่อลดงาน CPU เมื่อไฟล์มีข้อผิดพลาด.
+	for index := range validatedRows {
+		hash, err := bcrypt.GenerateFromPassword([]byte(validatedRows[index].Input.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return ImportResult{}, fmt.Errorf("hash imported password at row %d: %w", validatedRows[index].Number, err)
+		}
+		validatedRows[index].Hash = string(hash)
+	}
+
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// ตรวจ username ซ้ำอีกครั้งภายใน transaction เพื่อลด race ระหว่าง
+		// validation กับการ insert; unique index เป็นด่านสุดท้ายอีกชั้นหนึ่ง.
+		existing, err := existingUsernames(tx, importUsernames(validatedRows))
+		if err != nil {
+			return err
+		}
+		if conflicts := usernameConflictErrors(validatedRows, existing); len(conflicts) > 0 {
+			return &ImportValidationError{Rows: conflicts}
+		}
+
+		for _, row := range validatedRows {
+			user := model.User{
+				Username:     row.Input.Username,
+				PasswordHash: row.Hash,
+				FullName:     row.Input.FullName,
+				Position:     row.Input.Position,
+			}
+			if err := tx.Create(&user).Error; err != nil {
+				if errors.Is(err, gorm.ErrDuplicatedKey) {
+					return &ImportValidationError{Rows: []ImportRowError{{
+						Row: row.Number, Field: "username", Message: "username already exists",
+					}}}
+				}
+				return fmt.Errorf("create imported user at row %d: %w", row.Number, err)
+			}
+			if err := replaceUserDivisions(tx, user.UUID, row.Input.DivisionUUIDs); err != nil {
+				return fmt.Errorf("save imported user divisions at row %d: %w", row.Number, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return ImportResult{}, err
+	}
+	return ImportResult{Imported: len(validatedRows)}, nil
+}
+
+// BuildUserImportTemplate สร้างไฟล์ตัวอย่างจาก header ชุดเดียวกับ parser
+// จึงลดโอกาสที่ template กับรูปแบบนำเข้าจริงจะไม่ตรงกันในอนาคต.
+func BuildUserImportTemplate(format string) ([]byte, string, string, error) {
+	rows := [][]string{
+		{importHeaderFullName, importHeaderUsername, importHeaderPassword, importHeaderPosition, importHeaderDivisions},
+		{"สมชาย ใจดี", "somchai.j", "change-me-123", "ครู", "วิชาการ|บุคคล"},
+	}
+
+	switch strings.ToLower(strings.TrimPrefix(format, ".")) {
+	case "csv":
+		var buffer bytes.Buffer
+		// BOM ช่วยให้ Excel บน Windows เปิดข้อความภาษาไทยเป็น UTF-8 ได้ถูกต้อง.
+		buffer.WriteString("\uFEFF")
+		writer := csv.NewWriter(&buffer)
+		writer.WriteAll(rows)
+		if err := writer.Error(); err != nil {
+			return nil, "", "", fmt.Errorf("flush CSV template: %w", err)
+		}
+		return buffer.Bytes(), "text/csv; charset=utf-8", "sdms-users-template.csv", nil
+	case "xlsx":
+		file := excelize.NewFile()
+		defer func() { _ = file.Close() }()
+		const sheet = "บุคลากร"
+		if err := file.SetSheetName("Sheet1", sheet); err != nil {
+			return nil, "", "", fmt.Errorf("name XLSX template sheet: %w", err)
+		}
+		for rowIndex, row := range rows {
+			for columnIndex, value := range row {
+				cell, err := excelize.CoordinatesToCellName(columnIndex+1, rowIndex+1)
+				if err != nil {
+					return nil, "", "", fmt.Errorf("address XLSX template cell: %w", err)
+				}
+				if err := file.SetCellValue(sheet, cell, value); err != nil {
+					return nil, "", "", fmt.Errorf("write XLSX template cell: %w", err)
+				}
+			}
+		}
+		if err := file.SetColWidth(sheet, "A", "A", 24); err != nil {
+			return nil, "", "", fmt.Errorf("size XLSX template column: %w", err)
+		}
+		if err := file.SetColWidth(sheet, "B", "E", 22); err != nil {
+			return nil, "", "", fmt.Errorf("size XLSX template columns: %w", err)
+		}
+		buffer, err := file.WriteToBuffer()
+		if err != nil {
+			return nil, "", "", fmt.Errorf("write XLSX template: %w", err)
+		}
+		return buffer.Bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "sdms-users-template.xlsx", nil
+	default:
+		return nil, "", "", ErrUnsupportedImportFile
+	}
+}
+
+func readImportRows(filename string, content []byte) ([]rawImportRow, error) {
+	extension := strings.ToLower(filepath.Ext(filename))
+	var rows []rawImportRow
+	var err error
+	switch extension {
+	case ".csv":
+		rows, err = readCSVRows(content)
+	case ".xlsx":
+		rows, err = readXLSXRows(content)
+	default:
+		return nil, ErrUnsupportedImportFile
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, &ValidationError{Field: "file", Message: "import file is empty"}
+	}
+	return mapImportColumns(rows)
+}
+
+func readCSVRows(content []byte) ([]rawImportRow, error) {
+	reader := csv.NewReader(bytes.NewReader(content))
+	reader.FieldsPerRecord = -1
+
+	rows := make([]rawImportRow, 0)
+	for {
+		record, err := reader.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, &ValidationError{Field: "file", Message: "invalid CSV file: " + err.Error()}
+		}
+		line := len(rows) + 1
+		if len(record) > 0 {
+			line, _ = reader.FieldPos(0)
+		}
+		rows = append(rows, rawImportRow{Number: line, Cells: record})
+	}
+	return rows, nil
+}
+
+func readXLSXRows(content []byte) ([]rawImportRow, error) {
+	file, err := excelize.OpenReader(bytes.NewReader(content), excelize.Options{
+		UnzipSizeLimit:    64 << 20,
+		UnzipXMLSizeLimit: 16 << 20,
+	})
+	if err != nil {
+		return nil, &ValidationError{Field: "file", Message: "invalid XLSX file"}
+	}
+	defer func() { _ = file.Close() }()
+
+	sheets := file.GetSheetList()
+	if len(sheets) == 0 {
+		return nil, &ValidationError{Field: "file", Message: "XLSX file has no worksheet"}
+	}
+	values, err := file.GetRows(sheets[0])
+	if err != nil {
+		return nil, &ValidationError{Field: "file", Message: "cannot read XLSX worksheet"}
+	}
+	rows := make([]rawImportRow, 0, len(values))
+	for index, row := range values {
+		rows = append(rows, rawImportRow{Number: index + 1, Cells: row})
+	}
+	return rows, nil
+}
+
+func mapImportColumns(rows []rawImportRow) ([]rawImportRow, error) {
+	headerIndexes := make(map[string]int)
+	for index, value := range rows[0].Cells {
+		canonical := canonicalImportHeader(value)
+		if canonical == "" {
+			continue
+		}
+		if _, duplicate := headerIndexes[canonical]; duplicate {
+			return nil, &ValidationError{Field: "header", Message: "duplicate import column: " + canonical}
+		}
+		headerIndexes[canonical] = index
+	}
+	for _, required := range []string{"full_name", "username", "password", "position", "divisions"} {
+		if _, exists := headerIndexes[required]; !exists {
+			return nil, &ValidationError{Field: "header", Message: "missing required import column: " + required}
+		}
+	}
+
+	mapped := make([]rawImportRow, 0, len(rows)-1)
+	for _, row := range rows[1:] {
+		if importRowIsBlank(row.Cells) {
+			continue
+		}
+		mapped = append(mapped, rawImportRow{
+			Number: row.Number,
+			Cells: []string{
+				importCell(row.Cells, headerIndexes["full_name"]),
+				importCell(row.Cells, headerIndexes["username"]),
+				importCell(row.Cells, headerIndexes["password"]),
+				importCell(row.Cells, headerIndexes["position"]),
+				importCell(row.Cells, headerIndexes["divisions"]),
+			},
+		})
+	}
+	if len(mapped) == 0 {
+		return nil, &ValidationError{Field: "file", Message: "import file has no data rows"}
+	}
+	if len(mapped) > maximumImportRows {
+		return nil, &ValidationError{Field: "file", Message: fmt.Sprintf("import file must not exceed %d data rows", maximumImportRows)}
+	}
+	return mapped, nil
+}
+
+func canonicalImportHeader(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(value, "\uFEFF")))
+	switch normalized {
+	case "ชื่อ-สกุล", "ชื่อสกุล", "full_name":
+		return "full_name"
+	case "username", "ชื่อผู้ใช้":
+		return "username"
+	case "รหัสผ่านเริ่มต้น", "password":
+		return "password"
+	case "ตำแหน่ง", "position":
+		return "position"
+	case "ฝ่าย", "division", "divisions":
+		return "divisions"
+	default:
+		return ""
+	}
+}
+
+func validateImportRows(rows []rawImportRow, divisionLookup map[string]model.Division) ([]validatedImportRow, []ImportRowError) {
+	validated := make([]validatedImportRow, 0, len(rows))
+	errorsByRow := make([]ImportRowError, 0)
+	usernameCounts := make(map[string]int)
+
+	for _, row := range rows {
+		input := normalizeCreateUserInput(CreateUserInput{
+			FullName: row.Cells[0],
+			Username: row.Cells[1],
+			Password: row.Cells[2],
+			Position: row.Cells[3],
+		})
+		if err := validateUsername(input.Username); err != nil {
+			errorsByRow = append(errorsByRow, ImportRowError{Row: row.Number, Field: "username", Message: err.Error()})
+		}
+		if err := validatePassword(input.Password); err != nil {
+			errorsByRow = append(errorsByRow, ImportRowError{Row: row.Number, Field: "password", Message: err.Error()})
+		}
+		if err := validateRequiredText("full_name", input.FullName, 120); err != nil {
+			errorsByRow = append(errorsByRow, ImportRowError{Row: row.Number, Field: "full_name", Message: err.Error()})
+		}
+		if err := validateRequiredText("position", input.Position, 120); err != nil {
+			errorsByRow = append(errorsByRow, ImportRowError{Row: row.Number, Field: "position", Message: err.Error()})
+		}
+
+		divisionUUIDs, divisionErrors := resolveImportDivisions(row.Number, row.Cells[4], divisionLookup)
+		if len(divisionErrors) > 0 {
+			errorsByRow = append(errorsByRow, divisionErrors...)
+		}
+		input.DivisionUUIDs = divisionUUIDs
+		validated = append(validated, validatedImportRow{Number: row.Number, Input: input})
+		if input.Username != "" {
+			usernameCounts[input.Username]++
+		}
+	}
+
+	// เดินตามลำดับแถวเดิมอีกครั้งเพื่อให้ error response มีลำดับคงที่
+	// แม้ map ของ Go จะไม่ได้รับประกันลำดับการวนค่า.
+	for _, row := range validated {
+		if usernameCounts[row.Input.Username] < 2 {
+			continue
+		}
+		errorsByRow = append(errorsByRow, ImportRowError{
+			Row: row.Number, Field: "username", Message: "username is duplicated in the import file",
+		})
+	}
+	return validated, errorsByRow
+}
+
+func resolveImportDivisions(rowNumber int, value string, lookup map[string]model.Division) ([]uuid.UUID, []ImportRowError) {
+	parts := strings.FieldsFunc(value, func(r rune) bool {
+		return r == '|' || r == ',' || r == ';' || r == '\n'
+	})
+	if len(parts) == 0 {
+		return nil, []ImportRowError{{Row: rowNumber, Field: "divisions", Message: "at least one division is required"}}
+	}
+
+	ids := make([]uuid.UUID, 0, len(parts))
+	seen := make(map[uuid.UUID]struct{}, len(parts))
+	errorsByRow := make([]ImportRowError, 0)
+	for _, part := range parts {
+		key := strings.ToLower(strings.TrimSpace(part))
+		division, exists := lookup[key]
+		if !exists {
+			errorsByRow = append(errorsByRow, ImportRowError{
+				Row: rowNumber, Field: "divisions", Message: "division does not exist",
+			})
+			continue
+		}
+		if _, duplicate := seen[division.UUID]; duplicate {
+			continue
+		}
+		seen[division.UUID] = struct{}{}
+		ids = append(ids, division.UUID)
+	}
+	return ids, errorsByRow
+}
+
+func buildDivisionLookup(divisions []model.Division) map[string]model.Division {
+	lookup := make(map[string]model.Division, len(divisions)*3)
+	for _, division := range divisions {
+		for _, value := range []string{division.Code, division.Name, division.ShortName} {
+			key := strings.ToLower(strings.TrimSpace(value))
+			if key != "" {
+				lookup[key] = division
+			}
+		}
+	}
+	return lookup
+}
+
+func existingUsernames(db *gorm.DB, usernames []string) (map[string]struct{}, error) {
+	existing := make(map[string]struct{})
+	if len(usernames) == 0 {
+		return existing, nil
+	}
+	var values []string
+	if err := db.Model(&model.User{}).Where("username IN ?", usernames).Pluck("username", &values).Error; err != nil {
+		return nil, fmt.Errorf("check imported usernames: %w", err)
+	}
+	for _, value := range values {
+		existing[value] = struct{}{}
+	}
+	return existing, nil
+}
+
+func usernameConflictErrors(rows []validatedImportRow, existing map[string]struct{}) []ImportRowError {
+	conflicts := make([]ImportRowError, 0)
+	for _, row := range rows {
+		if _, exists := existing[row.Input.Username]; exists {
+			conflicts = append(conflicts, ImportRowError{
+				Row: row.Number, Field: "username", Message: "username already exists",
+			})
+		}
+	}
+	return conflicts
+}
+
+func importUsernames(rows []validatedImportRow) []string {
+	usernames := make([]string, 0, len(rows))
+	for _, row := range rows {
+		usernames = append(usernames, row.Input.Username)
+	}
+	return usernames
+}
+
+func importCell(row []string, index int) string {
+	if index < 0 || index >= len(row) {
+		return ""
+	}
+	// คืนค่าเดิมจาก cell เพราะ password ต้องตรงกับค่าที่ผู้ดูแลกำหนดทุกตัวอักษร;
+	// field อื่นจะ trim ในขั้น normalize/resolve ตามกฎของ field นั้นเอง.
+	return row[index]
+}
+
+func importRowIsBlank(row []string) bool {
+	for _, value := range row {
+		if strings.TrimSpace(value) != "" {
+			return false
+		}
+	}
+	return true
+}

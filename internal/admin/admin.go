@@ -69,21 +69,35 @@ func Create(ctx context.Context, db *gorm.DB, input CreateInput) (*model.User, e
 }
 
 func validate(input CreateInput) error {
-	if !usernamePattern.MatchString(input.Username) {
-		return errors.New("username must be 3-32 characters using lowercase letters, numbers, dot, underscore, or hyphen")
+	if err := validateUsername(input.Username); err != nil {
+		return err
 	}
-	if len(input.Password) < 8 {
-		return errors.New("password must contain at least 8 characters")
-	}
-	// bcrypt รับข้อมูลได้สูงสุด 72 bytes; ตรวจล่วงหน้าเพื่อให้ข้อความชัดเจน.
-	if len([]byte(input.Password)) > 72 {
-		return errors.New("password must not exceed 72 bytes")
+	if err := validatePassword(input.Password); err != nil {
+		return err
 	}
 	if input.FullName == "" {
 		return errors.New("full name is required")
 	}
 	if input.Position == "" {
 		return errors.New("position is required")
+	}
+	return nil
+}
+
+func validateUsername(username string) error {
+	if !usernamePattern.MatchString(username) {
+		return errors.New("username must be 3-32 characters using lowercase letters, numbers, dot, underscore, or hyphen")
+	}
+	return nil
+}
+
+func validatePassword(password string) error {
+	if len(password) < 8 {
+		return errors.New("password must contain at least 8 characters")
+	}
+	// bcrypt รับข้อมูลได้สูงสุด 72 bytes; ตรวจล่วงหน้าเพื่อให้ข้อความชัดเจน.
+	if len([]byte(password)) > 72 {
+		return errors.New("password must not exceed 72 bytes")
 	}
 	return nil
 }

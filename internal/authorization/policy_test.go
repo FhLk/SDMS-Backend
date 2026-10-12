@@ -15,6 +15,27 @@ var (
 	testOtherDivision = uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6f810004")
 )
 
+func TestCanManageUsers(t *testing.T) {
+	tests := []struct {
+		name    string
+		profile auth.Profile
+		want    bool
+	}{
+		{name: "admin is allowed", profile: profileWithRoles(true, false), want: true},
+		{name: "executive is denied", profile: profileWithRoles(false, true)},
+		{name: "teacher is denied", profile: authenticatedProfile()},
+		{name: "empty profile is denied", profile: auth.Profile{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CanManageUsers(tt.profile); got != tt.want {
+				t.Fatalf("CanManageUsers() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCanManageTopic(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -12,6 +12,7 @@ import (
 type errorResponse struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	Details any    `json:"details,omitempty"`
 }
 
 // handleError converts every Fiber/application error into the public
@@ -33,6 +34,7 @@ func handleError(c fiber.Ctx, err error) error {
 		status = appErr.Status
 		response.Code = appErr.Code
 		response.Message = appErr.Message
+		response.Details = appErr.Details
 	case errors.As(err, &fiberErr):
 		// Fiber errors cover framework cases such as 404 and 405.
 		status = fiberErr.Code
