@@ -116,11 +116,16 @@ func seedDivisions(db *gorm.DB) error {
 func seedCurrentAcademicYear(db *gorm.DB, now time.Time) error {
 	year, semester := CurrentAcademicPeriod(now)
 
-	// เคลียร์สถานะเดิมก่อน เพื่อให้ partial unique index ยืนยันได้ว่ามีปีปัจจุบันเพียงปีเดียว.
+	// seed เฉพาะตอนระบบยังไม่มีปีปัจจุบัน เพื่อให้การรัน migration ซ้ำ
+	// ไม่เขียนทับปี/ภาคเรียนที่แอดมินเลือกผ่าน BE-07 ไปแล้ว.
+	var currentCount int64
 	if err := db.Model(&model.AcademicYear{}).
 		Where("is_current = ?", true).
-		Update("is_current", false).Error; err != nil {
-		return fmt.Errorf("clear current academic year: %w", err)
+		Count(&currentCount).Error; err != nil {
+		return fmt.Errorf("check current academic year: %w", err)
+	}
+	if currentCount > 0 {
+		return nil
 	}
 
 	current := model.AcademicYear{

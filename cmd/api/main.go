@@ -14,6 +14,7 @@ import (
 	"github.com/FhLk/SDMS-Backend/internal/config"
 	"github.com/FhLk/SDMS-Backend/internal/database"
 	"github.com/FhLk/SDMS-Backend/internal/server"
+	"github.com/FhLk/SDMS-Backend/internal/topic"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -50,10 +51,14 @@ func main() {
 	// owns persistent sessions whose lifetime comes from runtime configuration.
 	authService := auth.New(db, cfg.Auth.SessionTTL)
 	userAdminService := admin.NewUserService(db)
+	organizationAdminService := admin.NewOrganizationService(db)
+	topicService := topic.NewService(db)
 	app := server.New(server.Dependencies{
-		Auth:       authService,
-		AuthConfig: cfg.Auth,
-		UserAdmin:  userAdminService,
+		Auth:              authService,
+		AuthConfig:        cfg.Auth,
+		UserAdmin:         userAdminService,
+		OrganizationAdmin: organizationAdminService,
+		Topics:            topicService,
 	})
 	// Listen runs in a goroutine so the main goroutine can wait for either a
 	// server failure or an operating-system shutdown signal.

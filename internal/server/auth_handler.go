@@ -21,9 +21,11 @@ type authService interface {
 
 // Dependencies contains services required by HTTP handlers.
 type Dependencies struct {
-	Auth       authService
-	AuthConfig config.AuthConfig
-	UserAdmin  adminUserService
+	Auth              authService
+	AuthConfig        config.AuthConfig
+	UserAdmin         adminUserService
+	OrganizationAdmin adminOrganizationService
+	Topics            topicService
 }
 
 type authHandler struct {

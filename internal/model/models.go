@@ -121,10 +121,11 @@ type Topic struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 
-	Division  Division        `gorm:"foreignKey:DivisionUUID;references:UUID;constraint:OnDelete:RESTRICT"`
-	CreatedBy User            `gorm:"foreignKey:CreatedByUUID;references:UUID;constraint:OnDelete:RESTRICT"`
-	Fields    []TopicField    `gorm:"constraint:OnDelete:CASCADE"`
-	Assignees []TopicAssignee `gorm:"constraint:OnDelete:CASCADE"`
+	Division     Division        `gorm:"foreignKey:DivisionUUID;references:UUID;constraint:OnDelete:RESTRICT"`
+	AcademicYear AcademicYear    `gorm:"foreignKey:AcademicYearUUID;references:UUID;constraint:OnDelete:RESTRICT"`
+	CreatedBy    User            `gorm:"foreignKey:CreatedByUUID;references:UUID;constraint:OnDelete:RESTRICT"`
+	Fields       []TopicField    `gorm:"constraint:OnDelete:CASCADE"`
+	Assignees    []TopicAssignee `gorm:"constraint:OnDelete:CASCADE"`
 }
 
 // TopicField ช่องในฟอร์มของหัวข้อ — ช่องที่มีคำตอบแล้วถูก "ลบ" = ตั้ง HiddenAt
