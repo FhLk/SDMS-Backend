@@ -29,6 +29,7 @@ type Dependencies struct {
 	Uploads           uploadService
 	Submissions       submissionService
 	Home              homeService
+	Portfolio         portfolioService
 }
 
 type authHandler struct {
