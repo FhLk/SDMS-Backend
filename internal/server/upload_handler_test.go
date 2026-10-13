@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -21,11 +22,16 @@ import (
 
 type fakeUploadService struct {
 	upload func(context.Context, upload.UploadInput) (model.File, error)
+	open   func(context.Context, uuid.UUID, auth.Profile) (upload.OpenedFile, error)
 	delete func(context.Context, uuid.UUID, uuid.UUID) error
 }
 
 func (f fakeUploadService) Upload(ctx context.Context, input upload.UploadInput) (model.File, error) {
 	return f.upload(ctx, input)
+}
+
+func (f fakeUploadService) Open(ctx context.Context, fileUUID uuid.UUID, profile auth.Profile) (upload.OpenedFile, error) {
+	return f.open(ctx, fileUUID, profile)
 }
 
 func (f fakeUploadService) Delete(ctx context.Context, fileUUID, userUUID uuid.UUID) error {
@@ -134,6 +140,112 @@ func TestDeleteUploadUsesAuthenticatedOwner(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("Delete service was not called")
+	}
+}
+
+func TestDownloadFileStreamsWithSafeDisposition(t *testing.T) {
+	userUUID := uuid.New()
+	tests := []struct {
+		name            string
+		mimeType        string
+		originalName    string
+		wantDisposition string
+		wantContentType string
+	}{
+		{name: "PDF opens inline", mimeType: "application/pdf", originalName: "รายงาน.pdf", wantDisposition: "inline", wantContentType: "application/pdf"},
+		{name: "raster image opens inline", mimeType: "image/png", originalName: "ภาพ.png", wantDisposition: "inline", wantContentType: "image/png"},
+		{name: "other file downloads", mimeType: "application/zip", originalName: "หลักฐาน.zip", wantDisposition: "attachment", wantContentType: "application/zip"},
+		{name: "SVG downloads for safety", mimeType: "image/svg+xml", originalName: "vector.svg", wantDisposition: "attachment", wantContentType: "image/svg+xml"},
+		{name: "invalid MIME downloads as binary", mimeType: "not a mime", originalName: "unknown.bin", wantDisposition: "attachment", wantContentType: "application/octet-stream"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fileUUID := uuid.New()
+			content := []byte("streamed-content")
+			service := fakeUploadService{
+				open: func(_ context.Context, gotFileUUID uuid.UUID, profile auth.Profile) (upload.OpenedFile, error) {
+					if gotFileUUID != fileUUID || profile.User.UUID != userUUID {
+						t.Fatalf("Open(%s, %s), want (%s, %s)", gotFileUUID, profile.User.UUID, fileUUID, userUUID)
+					}
+					return upload.OpenedFile{
+						File: model.File{
+							UUIDModel:    model.UUIDModel{UUID: fileUUID},
+							OriginalName: tt.originalName,
+							MimeType:     tt.mimeType,
+							SizeBytes:    int64(len(content)),
+						},
+						Content: io.NopCloser(bytes.NewReader(content)),
+					}, nil
+				},
+			}
+			app := uploadTestApp(service, userUUID)
+			req := httptest.NewRequest(http.MethodGet, "/api/files/"+fileUUID.String(), nil)
+			req.AddCookie(&http.Cookie{Name: "sdms_session", Value: "upload-session"})
+
+			res, err := app.Test(req)
+			if err != nil {
+				t.Fatalf("app.Test() error = %v", err)
+			}
+			defer res.Body.Close()
+			if got, want := res.StatusCode, http.StatusOK; got != want {
+				t.Fatalf("status = %d, want %d", got, want)
+			}
+			if got := res.Header.Get("Content-Type"); got != tt.wantContentType {
+				t.Fatalf("Content-Type = %q, want %q", got, tt.wantContentType)
+			}
+			disposition, parameters, err := mime.ParseMediaType(res.Header.Get("Content-Disposition"))
+			if err != nil {
+				t.Fatalf("parse Content-Disposition: %v", err)
+			}
+			if disposition != tt.wantDisposition || parameters["filename"] != tt.originalName {
+				t.Fatalf("Content-Disposition = %q/%q, want %q/%q", disposition, parameters["filename"], tt.wantDisposition, tt.originalName)
+			}
+			if got := res.Header.Get("X-Content-Type-Options"); got != "nosniff" {
+				t.Fatalf("X-Content-Type-Options = %q, want nosniff", got)
+			}
+			body, err := io.ReadAll(res.Body)
+			if err != nil {
+				t.Fatalf("read response body: %v", err)
+			}
+			if !bytes.Equal(body, content) {
+				t.Fatalf("body = %q, want %q", body, content)
+			}
+		})
+	}
+}
+
+func TestDownloadFileMapsAccessErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		serviceErr error
+		wantStatus int
+		wantCode   string
+	}{
+		{name: "forbidden", serviceErr: upload.ErrFileForbidden, wantStatus: http.StatusForbidden, wantCode: "FORBIDDEN"},
+		{name: "missing", serviceErr: upload.ErrFileNotFound, wantStatus: http.StatusNotFound, wantCode: "FILE_NOT_FOUND"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := fakeUploadService{
+				open: func(context.Context, uuid.UUID, auth.Profile) (upload.OpenedFile, error) {
+					return upload.OpenedFile{}, tt.serviceErr
+				},
+			}
+			app := uploadTestApp(service, uuid.New())
+			req := httptest.NewRequest(http.MethodGet, "/api/files/"+uuid.NewString(), nil)
+			req.AddCookie(&http.Cookie{Name: "sdms_session", Value: "upload-session"})
+			res, err := app.Test(req)
+			if err != nil {
+				t.Fatalf("app.Test() error = %v", err)
+			}
+			defer res.Body.Close()
+			if res.StatusCode != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", res.StatusCode, tt.wantStatus)
+			}
+			assertErrorResponse(t, res, tt.wantCode)
+		})
 	}
 }
 

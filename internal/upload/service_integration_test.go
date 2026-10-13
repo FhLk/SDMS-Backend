@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FhLk/SDMS-Backend/internal/auth"
 	"github.com/FhLk/SDMS-Backend/internal/model"
 	"github.com/FhLk/SDMS-Backend/internal/topic"
 	"github.com/google/uuid"
@@ -130,6 +131,77 @@ func TestUploadServiceWithPostgreSQL(t *testing.T) {
 		t.Fatalf("Upload(outsider) error = %v, want ErrNotAssignee", err)
 	}
 
+	downloadable, err := service.Upload(context.Background(), UploadInput{
+		TopicUUID:      createdTopic.UUID,
+		FieldUUID:      createdTopic.Fields[0].UUID,
+		UploadedByUUID: user.UUID,
+		OriginalName:   "download.pdf",
+		MimeType:       "application/pdf",
+		SizeHint:       15,
+		Content:        strings.NewReader("download-stream"),
+	})
+	if err != nil {
+		t.Fatalf("Upload(download fixture) error = %v", err)
+	}
+	submission := model.Submission{
+		TopicUUID:   createdTopic.UUID,
+		UserUUID:    user.UUID,
+		SubmittedAt: time.Now().UTC(),
+	}
+	if err := tx.Create(&submission).Error; err != nil {
+		t.Fatalf("create download submission: %v", err)
+	}
+	if err := tx.Model(&model.File{}).Where("uuid = ?", downloadable.UUID).Updates(map[string]any{
+		"status":          model.FileAttached,
+		"submission_uuid": submission.UUID,
+	}).Error; err != nil {
+		t.Fatalf("attach download file: %v", err)
+	}
+
+	publicDownload, err := service.Open(context.Background(), downloadable.UUID, auth.Profile{User: outsider})
+	if err != nil {
+		t.Fatalf("Open(public file as authenticated outsider) error = %v", err)
+	}
+	publicContent, err := io.ReadAll(publicDownload.Content)
+	if err != nil {
+		t.Fatalf("read public download: %v", err)
+	}
+	if err := publicDownload.Content.Close(); err != nil {
+		t.Fatalf("close public download: %v", err)
+	}
+	if got, want := string(publicContent), "download-stream"; got != want {
+		t.Fatalf("public download = %q, want %q", got, want)
+	}
+
+	if err := tx.Model(&model.Topic{}).Where("uuid = ?", createdTopic.UUID).Update("is_secret", true).Error; err != nil {
+		t.Fatalf("make topic secret: %v", err)
+	}
+	if _, err := service.Open(context.Background(), downloadable.UUID, auth.Profile{User: outsider}); !errors.Is(err, ErrFileForbidden) {
+		t.Fatalf("Open(secret file as outsider) error = %v, want ErrFileForbidden", err)
+	}
+	if _, err := service.Open(context.Background(), downloadable.UUID, auth.Profile{User: model.User{
+		UUIDModel: model.UUIDModel{UUID: outsider.UUID},
+		IsAdmin:   true,
+	}}); !errors.Is(err, ErrFileForbidden) {
+		t.Fatalf("Open(secret file as admin only) error = %v, want ErrFileForbidden", err)
+	}
+	ownerDownload, err := service.Open(context.Background(), downloadable.UUID, auth.Profile{User: user})
+	if err != nil {
+		t.Fatalf("Open(secret own file) error = %v", err)
+	}
+	_ = ownerDownload.Content.Close()
+	executiveDownload, err := service.Open(context.Background(), downloadable.UUID, auth.Profile{User: model.User{
+		UUIDModel: model.UUIDModel{UUID: outsider.UUID},
+		IsExec:    true,
+	}})
+	if err != nil {
+		t.Fatalf("Open(secret file as executive) error = %v", err)
+	}
+	_ = executiveDownload.Content.Close()
+	if _, err := service.Open(context.Background(), uploaded.UUID, auth.Profile{User: user}); !errors.Is(err, ErrFileNotFound) {
+		t.Fatalf("Open(staged file) error = %v, want ErrFileNotFound", err)
+	}
+
 	if err := service.Delete(context.Background(), uploaded.UUID, outsider.UUID); !errors.Is(err, ErrFileForbidden) {
 		t.Fatalf("Delete(outsider) error = %v, want ErrFileForbidden", err)
 	}
@@ -215,6 +287,16 @@ func (s *memoryStore) Put(_ context.Context, folderID, name, _ string, _ int64, 
 	s.files[id] = bytes.Clone(data)
 	s.putNames = append(s.putNames, name)
 	return id, nil
+}
+
+func (s *memoryStore) Open(_ context.Context, fileID string) (io.ReadCloser, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	content, ok := s.files[fileID]
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+	return io.NopCloser(bytes.NewReader(bytes.Clone(content))), nil
 }
 
 func (s *memoryStore) Trash(_ context.Context, fileID string) error {

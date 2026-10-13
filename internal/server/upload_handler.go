@@ -3,11 +3,13 @@ package server
 import (
 	"context"
 	"errors"
+	"mime"
 	"mime/multipart"
 	"strings"
 	"time"
 
 	"github.com/FhLk/SDMS-Backend/internal/apperror"
+	"github.com/FhLk/SDMS-Backend/internal/auth"
 	"github.com/FhLk/SDMS-Backend/internal/model"
 	"github.com/FhLk/SDMS-Backend/internal/upload"
 	"github.com/gofiber/fiber/v3"
@@ -16,6 +18,7 @@ import (
 
 type uploadService interface {
 	Upload(context.Context, upload.UploadInput) (model.File, error)
+	Open(context.Context, uuid.UUID, auth.Profile) (upload.OpenedFile, error)
 	Delete(context.Context, uuid.UUID, uuid.UUID) error
 }
 
@@ -96,6 +99,72 @@ func (h uploadHandler) delete(c fiber.Ctx) error {
 		return mapUploadError(err)
 	}
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// download ส่ง stream จาก storage หลัง service ตรวจสิทธิ์ของผู้ใช้กับเจ้าของ submission แล้ว.
+// fasthttp จะปิด ReadCloser หลังส่ง response เสร็จ จึงห้าม defer Close ก่อนเรียก SendStream.
+func (h uploadHandler) download(c fiber.Ctx) error {
+	if h.service == nil {
+		return apperror.New(fiber.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Upload service unavailable")
+	}
+	profile, ok := authenticatedProfile(c)
+	if !ok {
+		return apperror.New(fiber.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
+	}
+	fileUUID, err := parseUploadUUID(c.Params("uuid"), "file_uuid")
+	if err != nil {
+		return err
+	}
+
+	opened, err := h.service.Open(c.Context(), fileUUID, profile)
+	if err != nil {
+		return mapFileDownloadError(err)
+	}
+
+	mimeType, inline := downloadableMimeType(opened.File.MimeType)
+	disposition := "attachment"
+	if inline {
+		disposition = "inline"
+	}
+	contentDisposition := mime.FormatMediaType(disposition, map[string]string{"filename": opened.File.OriginalName})
+	if contentDisposition == "" {
+		contentDisposition = disposition
+	}
+	c.Set(fiber.HeaderContentType, mimeType)
+	c.Set(fiber.HeaderContentDisposition, contentDisposition)
+	// nosniff ป้องกัน browser ตีความไฟล์ที่ปลอม MIME type เป็น HTML หรือ script.
+	c.Set("X-Content-Type-Options", "nosniff")
+	if err := c.SendStream(opened.Content, int(opened.File.SizeBytes)); err != nil {
+		_ = opened.Content.Close()
+		return err
+	}
+	return nil
+}
+
+func downloadableMimeType(value string) (string, bool) {
+	mediaType, _, err := mime.ParseMediaType(strings.TrimSpace(value))
+	if err != nil || mediaType == "" {
+		return "application/octet-stream", false
+	}
+	mediaType = strings.ToLower(mediaType)
+	if mediaType == "application/pdf" {
+		return mediaType, true
+	}
+	// SVG อาจมี script จึงบังคับดาวน์โหลด ส่วนรูปชนิดอื่นแสดงใน browser พร้อม nosniff ได้.
+	return mediaType, strings.HasPrefix(mediaType, "image/") && mediaType != "image/svg+xml"
+}
+
+func mapFileDownloadError(err error) error {
+	switch {
+	case errors.Is(err, upload.ErrFileNotFound):
+		return apperror.New(fiber.StatusNotFound, "FILE_NOT_FOUND", "File not found")
+	case errors.Is(err, upload.ErrFileForbidden):
+		return apperror.New(fiber.StatusForbidden, "FORBIDDEN", "You do not have permission to view this file")
+	case errors.Is(err, upload.ErrInvalidUpload):
+		return apperror.New(fiber.StatusBadRequest, "VALIDATION_ERROR", "File UUID is invalid")
+	default:
+		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
+	}
 }
 
 func parseUploadUUID(value, field string) (uuid.UUID, error) {

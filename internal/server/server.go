@@ -53,6 +53,7 @@ func New(dependencies ...Dependencies) *fiber.App {
 	uploads := uploadHandler{service: deps.Uploads}
 	api.Post("/uploads", auth.authenticate, uploads.create)
 	api.Delete("/uploads/:uuid", auth.authenticate, uploads.delete)
+	api.Get("/files/:uuid", auth.authenticate, uploads.download)
 	submissions := submissionHandler{service: deps.Submissions}
 	api.Get("/me/pending", auth.authenticate, submissions.listPending)
 	api.Get("/topics/:uuid", auth.authenticate, submissions.listTopicTable)

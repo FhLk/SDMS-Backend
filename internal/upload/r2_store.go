@@ -2,6 +2,7 @@ package upload
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -16,6 +17,7 @@ import (
 
 type r2API interface {
 	PutObject(context.Context, *s3.PutObjectInput, ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+	GetObject(context.Context, *s3.GetObjectInput, ...func(*s3.Options)) (*s3.GetObjectOutput, error)
 	DeleteObject(context.Context, *s3.DeleteObjectInput, ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
 }
 
@@ -87,15 +89,51 @@ func (s *R2Store) Put(ctx context.Context, folderID, name, mimeType string, size
 	return key, nil
 }
 
-func (s *R2Store) Trash(ctx context.Context, objectKey string) error {
-	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+// Open ใช้ GetObject แล้วคืน response body โดยตรงเพื่อให้ HTTP layer อ่านจาก R2 เป็น stream.
+// จึงไม่ต้องสร้าง public URL, signed URL หรือเปิดเผย credential ของ bucket ให้ผู้ใช้.
+func (s *R2Store) Open(ctx context.Context, objectKey string) (io.ReadCloser, error) {
+	key, err := s.validateObjectKey(objectKey)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
-		Key:    aws.String(objectKey),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("download object from Cloudflare R2: %w", err)
+	}
+	if result.Body == nil {
+		return nil, errors.New("download object from Cloudflare R2: response body is empty")
+	}
+	return result.Body, nil
+}
+
+func (s *R2Store) Trash(ctx context.Context, objectKey string) error {
+	key, err := s.validateObjectKey(objectKey)
+	if err != nil {
+		return err
+	}
+	_, err = s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
 	})
 	if err != nil {
 		return fmt.Errorf("delete object from Cloudflare R2: %w", err)
 	}
 	return nil
+}
+
+// validateObjectKey ป้องกันไม่ให้ค่า object_key ที่ผิดรูปแบบชี้ออกนอก prefix ของระบบ.
+func (s *R2Store) validateObjectKey(value string) (string, error) {
+	key := strings.Trim(strings.TrimSpace(value), "/")
+	if key == "" || key == "." || key == ".." || strings.HasPrefix(key, "../") || path.Clean(key) != key {
+		return "", errors.New("R2 object key is invalid")
+	}
+	if s.prefix != "" && key != s.prefix && !strings.HasPrefix(key, s.prefix+"/") {
+		return "", errors.New("R2 object key is outside configured prefix")
+	}
+	return key, nil
 }
 
 func normalizeR2Prefix(value string) (string, error) {

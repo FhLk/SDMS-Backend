@@ -12,5 +12,6 @@ type ObjectStore interface {
 	RootID() string
 	EnsureFolder(context.Context, string, string) (string, error)
 	Put(context.Context, string, string, string, int64, io.Reader) (string, error)
+	Open(context.Context, string) (io.ReadCloser, error)
 	Trash(context.Context, string) error
 }

@@ -36,6 +36,20 @@ func TestLocalStoreCreatesHierarchyAndTrashesFile(t *testing.T) {
 	if got, want := string(content), "evidence"; got != want {
 		t.Fatalf("stored content = %q, want %q", got, want)
 	}
+	stream, err := store.Open(ctx, fileID)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	streamed, err := io.ReadAll(stream)
+	if err != nil {
+		t.Fatalf("read opened stream: %v", err)
+	}
+	if err := stream.Close(); err != nil {
+		t.Fatalf("close opened stream: %v", err)
+	}
+	if got, want := string(streamed), "evidence"; got != want {
+		t.Fatalf("opened content = %q, want %q", got, want)
+	}
 	if err := store.Trash(ctx, fileID); err != nil {
 		t.Fatalf("Trash() error = %v", err)
 	}
@@ -58,6 +72,9 @@ func TestLocalStoreRejectsPathTraversal(t *testing.T) {
 	}
 	if _, err := store.Put(context.Background(), "", "../file.txt", "text/plain", 1, strings.NewReader("x")); err == nil {
 		t.Fatal("Put() unsafe name error = nil, want rejection")
+	}
+	if _, err := store.Open(context.Background(), "../outside.txt"); err == nil {
+		t.Fatal("Open() traversal error = nil, want rejection")
 	}
 }
 

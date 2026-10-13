@@ -82,6 +82,23 @@ func (s *LocalStore) Put(_ context.Context, folderID, name, _ string, _ int64, c
 	return filepath.ToSlash(relative), nil
 }
 
+// Open เปิดไฟล์แบบ stream หลังตรวจว่า object ID ยังอยู่ภายใน storage root.
+// ผู้เรียกไม่ต้องอ่านไฟล์ทั้งหมดเข้า memory และต้องส่งต่อ ReadCloser ให้ HTTP layer ปิดหลังส่งเสร็จ.
+func (s *LocalStore) Open(_ context.Context, fileID string) (io.ReadCloser, error) {
+	path, err := s.resolve(fileID)
+	if err != nil {
+		return nil, err
+	}
+	if path == s.root {
+		return nil, errors.New("local file id must not point to storage root")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open local upload: %w", err)
+	}
+	return file, nil
+}
+
 func (s *LocalStore) Trash(_ context.Context, fileID string) error {
 	path, err := s.resolve(fileID)
 	if err != nil {

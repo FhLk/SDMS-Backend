@@ -39,6 +39,23 @@ func TestR2StoreBuildsPrefixUploadsAndDeletes(t *testing.T) {
 	if string(content) != "document" || aws.ToString(client.put.ContentType) != "application/pdf" {
 		t.Fatalf("uploaded content/type = %q / %q", content, aws.ToString(client.put.ContentType))
 	}
+	download, err := store.Open(context.Background(), objectKey)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	downloaded, err := io.ReadAll(download)
+	if err != nil {
+		t.Fatalf("read downloaded object: %v", err)
+	}
+	if err := download.Close(); err != nil {
+		t.Fatalf("close downloaded object: %v", err)
+	}
+	if got, want := string(downloaded), "stored object"; got != want {
+		t.Fatalf("downloaded content = %q, want %q", got, want)
+	}
+	if client.got == nil || aws.ToString(client.got.Key) != objectKey {
+		t.Fatalf("GetObject input = %+v", client.got)
+	}
 	if err := store.Trash(context.Background(), objectKey); err != nil {
 		t.Fatalf("Trash() error = %v", err)
 	}
@@ -71,12 +88,18 @@ func TestR2PrefixRejectsTraversal(t *testing.T) {
 
 type fakeR2Client struct {
 	put     *s3.PutObjectInput
+	got     *s3.GetObjectInput
 	deleted *s3.DeleteObjectInput
 }
 
 func (f *fakeR2Client) PutObject(_ context.Context, input *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
 	f.put = input
 	return &s3.PutObjectOutput{}, nil
+}
+
+func (f *fakeR2Client) GetObject(_ context.Context, input *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	f.got = input
+	return &s3.GetObjectOutput{Body: io.NopCloser(strings.NewReader("stored object"))}, nil
 }
 
 func (f *fakeR2Client) DeleteObject(_ context.Context, input *s3.DeleteObjectInput, _ ...func(*s3.Options)) (*s3.DeleteObjectOutput, error) {
