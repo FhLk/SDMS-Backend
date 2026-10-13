@@ -19,11 +19,13 @@ import (
 )
 
 type fakeTopicService struct {
-	create  func(context.Context, topic.CreateInput) (model.Topic, error)
-	get     func(context.Context, uuid.UUID) (model.Topic, error)
-	update  func(context.Context, uuid.UUID, topic.UpdateInput) (model.Topic, error)
-	setOpen func(context.Context, uuid.UUID, bool) (model.Topic, error)
-	delete  func(context.Context, uuid.UUID) error
+	create             func(context.Context, topic.CreateInput) (model.Topic, error)
+	get                func(context.Context, uuid.UUID) (model.Topic, error)
+	update             func(context.Context, uuid.UUID, topic.UpdateInput) (model.Topic, error)
+	setOpen            func(context.Context, uuid.UUID, bool) (model.Topic, error)
+	delete             func(context.Context, uuid.UUID) error
+	listDivisions      func(context.Context) ([]model.Division, error)
+	listDivisionTopics func(context.Context, string, *int16, uuid.UUID) (topic.DivisionTopics, error)
 }
 
 func (f fakeTopicService) Create(ctx context.Context, input topic.CreateInput) (model.Topic, error) {
@@ -56,6 +58,20 @@ func (f fakeTopicService) Delete(ctx context.Context, topicUUID uuid.UUID) error
 		return nil
 	}
 	return f.delete(ctx, topicUUID)
+}
+
+func (f fakeTopicService) ListDivisions(ctx context.Context) ([]model.Division, error) {
+	if f.listDivisions == nil {
+		return []model.Division{}, nil
+	}
+	return f.listDivisions(ctx)
+}
+
+func (f fakeTopicService) ListDivisionTopics(ctx context.Context, code string, year *int16, userUUID uuid.UUID) (topic.DivisionTopics, error) {
+	if f.listDivisionTopics == nil {
+		return topic.DivisionTopics{}, nil
+	}
+	return f.listDivisionTopics(ctx, code, year, userUUID)
 }
 
 func TestCreateTopicRequiresDivisionHeadOrAdmin(t *testing.T) {

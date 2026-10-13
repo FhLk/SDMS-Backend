@@ -45,6 +45,8 @@ func New(dependencies ...Dependencies) *fiber.App {
 	api.Post("/topics/:uuid/close", auth.authenticate, topics.close)
 	api.Post("/topics/:uuid/reopen", auth.authenticate, topics.reopen)
 	api.Delete("/topics/:uuid", auth.authenticate, topics.delete)
+	api.Get("/divisions", auth.authenticate, topics.listDivisions)
+	api.Get("/divisions/:code/topics", auth.authenticate, topics.listDivisionTopics)
 
 	// ทุก route ใต้ /admin ใช้ authentication และ policy แอดมินชุดเดียวกัน
 	// จึงไม่ต้องตรวจบทบาทแอดมินซ้ำในแต่ละ handler.

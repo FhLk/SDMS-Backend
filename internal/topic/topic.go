@@ -48,11 +48,12 @@ type CreateInput struct {
 }
 
 type Service struct {
-	db *gorm.DB
+	db  *gorm.DB
+	now func() time.Time
 }
 
 func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+	return &Service{db: db, now: time.Now}
 }
 
 // Create ตรวจและ normalize แบบฟอร์มทั้งหมดก่อนเปิด transaction จากนั้นสร้าง

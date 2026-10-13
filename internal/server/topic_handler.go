@@ -21,6 +21,8 @@ type topicService interface {
 	Update(context.Context, uuid.UUID, topic.UpdateInput) (model.Topic, error)
 	SetOpen(context.Context, uuid.UUID, bool) (model.Topic, error)
 	Delete(context.Context, uuid.UUID) error
+	ListDivisions(context.Context) ([]model.Division, error)
+	ListDivisionTopics(context.Context, string, *int16, uuid.UUID) (topic.DivisionTopics, error)
 }
 
 type topicHandler struct {
@@ -153,6 +155,8 @@ func mapTopicError(err error) error {
 		return apperror.New(fiber.StatusConflict, "TOPIC_FIELD_TYPE_LOCKED", "Field type cannot be changed after a submission")
 	case errors.Is(err, topic.ErrTopicHasSubmissions):
 		return apperror.New(fiber.StatusConflict, "TOPIC_HAS_SUBMISSIONS", "Topic with submissions cannot be deleted")
+	case errors.Is(err, topic.ErrTopicAcademicYearNotFound):
+		return apperror.New(fiber.StatusNotFound, "ACADEMIC_YEAR_NOT_FOUND", "Academic year not found")
 	default:
 		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
 	}
