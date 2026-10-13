@@ -28,6 +28,7 @@ type Dependencies struct {
 	Topics            topicService
 	Uploads           uploadService
 	Submissions       submissionService
+	Home              homeService
 }
 
 type authHandler struct {
