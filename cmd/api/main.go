@@ -15,6 +15,7 @@ import (
 	"github.com/FhLk/SDMS-Backend/internal/database"
 	"github.com/FhLk/SDMS-Backend/internal/home"
 	"github.com/FhLk/SDMS-Backend/internal/portfolio"
+	"github.com/FhLk/SDMS-Backend/internal/search"
 	"github.com/FhLk/SDMS-Backend/internal/server"
 	"github.com/FhLk/SDMS-Backend/internal/submission"
 	"github.com/FhLk/SDMS-Backend/internal/topic"
@@ -69,6 +70,7 @@ func main() {
 	submissionService := submission.NewService(db, objectStore)
 	homeService := home.NewService(db)
 	portfolioService := portfolio.NewService(db, objectStore)
+	searchService := search.NewService(db)
 	app := server.New(server.Dependencies{
 		Auth:              authService,
 		AuthConfig:        cfg.Auth,
@@ -79,6 +81,7 @@ func main() {
 		Submissions:       submissionService,
 		Home:              homeService,
 		Portfolio:         portfolioService,
+		Search:            searchService,
 	})
 	// เริ่มกวาดทันทีหนึ่งครั้ง แล้วทำซ้ำตาม interval โดย error รอบหนึ่งไม่หยุด HTTP server.
 	go runUploadCleanup(runtimeContext, uploadService, cfg.Uploads.CleanupInterval)

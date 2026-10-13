@@ -30,6 +30,7 @@ type Dependencies struct {
 	Submissions       submissionService
 	Home              homeService
 	Portfolio         portfolioService
+	Search            searchService
 }
 
 type authHandler struct {

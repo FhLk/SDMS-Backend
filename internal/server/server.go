@@ -66,6 +66,8 @@ func New(dependencies ...Dependencies) *fiber.App {
 	portfolio := portfolioHandler{service: deps.Portfolio}
 	api.Get("/me/submissions", auth.authenticate, portfolio.list)
 	api.Get("/me/files.zip", auth.authenticate, portfolio.downloadArchive)
+	search := searchHandler{service: deps.Search}
+	api.Get("/search", auth.authenticate, search.search)
 
 	// ทุก route ใต้ /admin ใช้ authentication และ policy แอดมินชุดเดียวกัน
 	// จึงไม่ต้องตรวจบทบาทแอดมินซ้ำในแต่ละ handler.
