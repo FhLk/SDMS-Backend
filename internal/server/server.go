@@ -53,6 +53,12 @@ func New(dependencies ...Dependencies) *fiber.App {
 	uploads := uploadHandler{service: deps.Uploads}
 	api.Post("/uploads", auth.authenticate, uploads.create)
 	api.Delete("/uploads/:uuid", auth.authenticate, uploads.delete)
+	submissions := submissionHandler{service: deps.Submissions}
+	api.Get("/me/pending", auth.authenticate, submissions.listPending)
+	api.Get("/topics/:uuid", auth.authenticate, submissions.listTopicTable)
+	api.Get("/topics/:uuid/my-submission", auth.authenticate, submissions.getMine)
+	api.Put("/topics/:uuid/my-submission", auth.authenticate, submissions.upsert)
+	api.Get("/topics/:uuid/pending-names", auth.authenticate, submissions.listPendingNames)
 
 	// ทุก route ใต้ /admin ใช้ authentication และ policy แอดมินชุดเดียวกัน
 	// จึงไม่ต้องตรวจบทบาทแอดมินซ้ำในแต่ละ handler.

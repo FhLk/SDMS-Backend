@@ -14,6 +14,7 @@ import (
 	"github.com/FhLk/SDMS-Backend/internal/config"
 	"github.com/FhLk/SDMS-Backend/internal/database"
 	"github.com/FhLk/SDMS-Backend/internal/server"
+	"github.com/FhLk/SDMS-Backend/internal/submission"
 	"github.com/FhLk/SDMS-Backend/internal/topic"
 	"github.com/FhLk/SDMS-Backend/internal/upload"
 	"github.com/gofiber/fiber/v3"
@@ -63,6 +64,7 @@ func main() {
 		log.Fatalf("application startup failed: create upload storage: %v", err)
 	}
 	uploadService := upload.NewService(db, objectStore, cfg.Uploads.StagedTTL)
+	submissionService := submission.NewService(db, objectStore)
 	app := server.New(server.Dependencies{
 		Auth:              authService,
 		AuthConfig:        cfg.Auth,
@@ -70,6 +72,7 @@ func main() {
 		OrganizationAdmin: organizationAdminService,
 		Topics:            topicService,
 		Uploads:           uploadService,
+		Submissions:       submissionService,
 	})
 	// เริ่มกวาดทันทีหนึ่งครั้ง แล้วทำซ้ำตาม interval โดย error รอบหนึ่งไม่หยุด HTTP server.
 	go runUploadCleanup(runtimeContext, uploadService, cfg.Uploads.CleanupInterval)
