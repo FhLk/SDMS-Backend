@@ -13,14 +13,26 @@ func CanManageUsers(profile auth.Profile) bool {
 	return isAuthenticated(profile) && profile.User.IsAdmin
 }
 
-// CanManageTopic ตรวจว่าผู้ใช้สร้างหรือแก้หัวข้อของฝ่ายที่ระบุได้หรือไม่.
-// แอดมินจัดการได้ทุกฝ่าย ส่วนหัวหน้าฝ่ายจัดการได้เฉพาะฝ่ายที่ตนเป็นหัวหน้า.
+// CanManageTopic ตรวจว่าผู้ใช้สร้างหัวข้อของฝ่ายที่ระบุได้หรือไม่.
+// แอดมินสร้างได้ทุกฝ่าย ส่วนหัวหน้าฝ่ายสร้างได้เฉพาะฝ่ายที่ตนเป็นหัวหน้า.
 func CanManageTopic(profile auth.Profile, divisionUUID uuid.UUID) bool {
 	if !isAuthenticated(profile) || divisionUUID == uuid.Nil {
 		return false
 	}
 
 	return profile.User.IsAdmin || isHeadOf(profile, divisionUUID)
+}
+
+// CanEditTopic ใช้กับหัวข้อที่มีอยู่แล้ว โดยให้คนสร้างยังจัดการหัวข้อเดิมได้
+// แม้ภายหลังจะไม่ได้เป็นหัวหน้าฝ่ายนั้นแล้ว ตามกติกาของ BE-09.
+func CanEditTopic(profile auth.Profile, topic model.Topic) bool {
+	if !isAuthenticated(profile) || topic.UUID == uuid.Nil {
+		return false
+	}
+
+	return profile.User.IsAdmin ||
+		isHeadOf(profile, topic.DivisionUUID) ||
+		(topic.CreatedByUUID != uuid.Nil && topic.CreatedByUUID == profile.User.UUID)
 }
 
 // CanViewAllTopicSubmissions ตรวจสิทธิ์ดูคำตอบของผู้ส่งทุกคนในหัวข้อ.

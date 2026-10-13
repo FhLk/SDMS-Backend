@@ -162,45 +162,52 @@ func validateCreateInput(input CreateInput) (time.Time, error) {
 	if err != nil || dueDate.Format(dateLayout) != input.DueDate {
 		return time.Time{}, validationError("due_date", "due date must use YYYY-MM-DD and be a valid date")
 	}
-	if len(input.Fields) == 0 {
-		return time.Time{}, validationError("fields", "at least one field is required")
+	if err := validateTopicFields(input.Fields); err != nil {
+		return time.Time{}, err
 	}
-	if len(input.Fields) > maximumTopicFields {
-		return time.Time{}, validationError("fields", fmt.Sprintf("fields must not exceed %d items", maximumTopicFields))
+	return dueDate, nil
+}
+
+func validateTopicFields(fields []FieldInput) error {
+	if len(fields) == 0 {
+		return validationError("fields", "at least one field is required")
+	}
+	if len(fields) > maximumTopicFields {
+		return validationError("fields", fmt.Sprintf("fields must not exceed %d items", maximumTopicFields))
 	}
 
-	positions := make(map[int16]struct{}, len(input.Fields))
-	for index, field := range input.Fields {
+	positions := make(map[int16]struct{}, len(fields))
+	for index, field := range fields {
 		path := fmt.Sprintf("fields[%d]", index)
 		if field.Position < 1 {
-			return time.Time{}, validationError(path+".position", "field position must start at 1")
+			return validationError(path+".position", "field position must start at 1")
 		}
 		if _, duplicate := positions[field.Position]; duplicate {
-			return time.Time{}, validationError(path+".position", "field position must not be duplicated")
+			return validationError(path+".position", "field position must not be duplicated")
 		}
 		positions[field.Position] = struct{}{}
 
 		if !validFieldType(field.Type) {
-			return time.Time{}, validationError(path+".type", "field type must be text, para, num, date, choice, or file")
+			return validationError(path+".type", "field type must be text, para, num, date, choice, or file")
 		}
 		if field.Label == "" {
-			return time.Time{}, validationError(path+".label", "field label is required")
+			return validationError(path+".label", "field label is required")
 		}
 		if utf8.RuneCountInString(field.Label) > 120 {
-			return time.Time{}, validationError(path+".label", "field label must not exceed 120 characters")
+			return validationError(path+".label", "field label must not exceed 120 characters")
 		}
 
 		if field.Type != model.FieldChoice {
 			if len(field.Options) > 0 {
-				return time.Time{}, validationError(path+".options", "options are allowed only for choice fields")
+				return validationError(path+".options", "options are allowed only for choice fields")
 			}
 			continue
 		}
 		if err := validateChoiceOptions(path, field.Options); err != nil {
-			return time.Time{}, err
+			return err
 		}
 	}
-	return dueDate, nil
+	return nil
 }
 
 func validateChoiceOptions(path string, options []string) error {

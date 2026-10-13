@@ -17,6 +17,10 @@ import (
 
 type topicService interface {
 	Create(context.Context, topic.CreateInput) (model.Topic, error)
+	Get(context.Context, uuid.UUID) (model.Topic, error)
+	Update(context.Context, uuid.UUID, topic.UpdateInput) (model.Topic, error)
+	SetOpen(context.Context, uuid.UUID, bool) (model.Topic, error)
+	Delete(context.Context, uuid.UUID) error
 }
 
 type topicHandler struct {
@@ -65,6 +69,7 @@ type topicResponse struct {
 	CreatedByUUID uuid.UUID                 `json:"created_by_uuid"`
 	Fields        []topicFieldResponse      `json:"fields"`
 	AssigneeCount int                       `json:"assignee_count"`
+	ClosedAt      *time.Time                `json:"closed_at"`
 	CreatedAt     time.Time                 `json:"created_at"`
 	UpdatedAt     time.Time                 `json:"updated_at"`
 }
@@ -142,6 +147,12 @@ func mapTopicError(err error) error {
 		return apperror.New(fiber.StatusConflict, "CURRENT_ACADEMIC_YEAR_NOT_SET", "Current academic year is not set")
 	case errors.Is(err, topic.ErrCreatorNotFound):
 		return apperror.New(fiber.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
+	case errors.Is(err, topic.ErrTopicNotFound):
+		return apperror.New(fiber.StatusNotFound, "TOPIC_NOT_FOUND", "Topic not found")
+	case errors.Is(err, topic.ErrFieldTypeLocked):
+		return apperror.New(fiber.StatusConflict, "TOPIC_FIELD_TYPE_LOCKED", "Field type cannot be changed after a submission")
+	case errors.Is(err, topic.ErrTopicHasSubmissions):
+		return apperror.New(fiber.StatusConflict, "TOPIC_HAS_SUBMISSIONS", "Topic with submissions cannot be deleted")
 	default:
 		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
 	}
@@ -186,6 +197,7 @@ func newTopicResponse(value model.Topic) (topicResponse, error) {
 		CreatedByUUID: value.CreatedByUUID,
 		Fields:        fields,
 		AssigneeCount: len(value.Assignees),
+		ClosedAt:      value.ClosedAt,
 		CreatedAt:     value.CreatedAt,
 		UpdatedAt:     value.UpdatedAt,
 	}, nil

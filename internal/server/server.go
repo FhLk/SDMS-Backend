@@ -41,6 +41,10 @@ func New(dependencies ...Dependencies) *fiber.App {
 	api.Get("/me", auth.authenticate, auth.me)
 	topics := topicHandler{service: deps.Topics}
 	api.Post("/topics", auth.authenticate, topics.create)
+	api.Patch("/topics/:uuid", auth.authenticate, topics.update)
+	api.Post("/topics/:uuid/close", auth.authenticate, topics.close)
+	api.Post("/topics/:uuid/reopen", auth.authenticate, topics.reopen)
+	api.Delete("/topics/:uuid", auth.authenticate, topics.delete)
 
 	// ทุก route ใต้ /admin ใช้ authentication และ policy แอดมินชุดเดียวกัน
 	// จึงไม่ต้องตรวจบทบาทแอดมินซ้ำในแต่ละ handler.

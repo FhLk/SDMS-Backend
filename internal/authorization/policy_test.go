@@ -59,6 +59,34 @@ func TestCanManageTopic(t *testing.T) {
 	}
 }
 
+func TestCanEditTopic(t *testing.T) {
+	topic := model.Topic{
+		UUIDModel:     model.UUIDModel{UUID: uuid.New()},
+		DivisionUUID:  testDivisionUUID,
+		CreatedByUUID: testCreatorUUID,
+	}
+	tests := []struct {
+		name    string
+		profile auth.Profile
+		want    bool
+	}{
+		{name: "admin can edit every topic", profile: profileWithRoles(true, false), want: true},
+		{name: "head can edit own division topic", profile: profileWithHead(testDivisionUUID), want: true},
+		{name: "creator can edit own topic", profile: profileWithUser(testCreatorUUID), want: true},
+		{name: "other head cannot edit topic", profile: profileWithHead(testOtherDivision)},
+		{name: "teacher cannot edit another topic", profile: authenticatedProfile()},
+		{name: "empty profile is denied", profile: auth.Profile{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CanEditTopic(tt.profile, topic); got != tt.want {
+				t.Fatalf("CanEditTopic() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCanViewAllTopicSubmissions(t *testing.T) {
 	secretTopic := model.Topic{
 		DivisionUUID:  testDivisionUUID,

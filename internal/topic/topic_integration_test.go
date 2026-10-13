@@ -3,6 +3,7 @@ package topic
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/FhLk/SDMS-Backend/internal/admin"
 	"github.com/FhLk/SDMS-Backend/internal/model"
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -161,6 +163,185 @@ func TestTopicServiceWithPostgreSQL(t *testing.T) {
 		t.Fatalf("Create(no current year) error = %v, want ErrCurrentAcademicYearNotSet", err)
 	}
 	assertTopicRelatedCount(t, tx, &model.Topic{}, "title = ?", 0, noYearTitle)
+}
+
+func TestTopicManagementServiceWithPostgreSQL(t *testing.T) {
+	dsn := os.Getenv("SDMS_INTEGRATION_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("set SDMS_INTEGRATION_DATABASE_URL to run the PostgreSQL integration test")
+	}
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{TranslateError: true})
+	if err != nil {
+		t.Fatalf("open PostgreSQL: %v", err)
+	}
+	tx := db.Begin()
+	if tx.Error != nil {
+		t.Fatalf("begin transaction: %v", tx.Error)
+	}
+	// ทุกการแก้ ปิด เปิด และลบใน test นี้ถูก rollback เพื่อไม่กระทบข้อมูลจริง.
+	t.Cleanup(func() { _ = tx.Rollback().Error })
+
+	var division model.Division
+	if err := tx.Order("sort_order").First(&division).Error; err != nil {
+		t.Fatalf("find division: %v", err)
+	}
+	suffix := uuid.NewString()[:8]
+	creator := model.User{
+		Username:     "be09." + suffix,
+		PasswordHash: "integration-hash",
+		FullName:     "ผู้สร้างหัวข้อ BE-09",
+		Position:     "ครู",
+	}
+	if err := tx.Create(&creator).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if err := tx.Create(&model.UserDivision{UserUUID: creator.UUID, DivisionUUID: division.UUID}).Error; err != nil {
+		t.Fatalf("create membership: %v", err)
+	}
+
+	service := NewService(tx)
+	created, err := service.Create(context.Background(), CreateInput{
+		DivisionUUID:  division.UUID,
+		CreatedByUUID: creator.UUID,
+		Title:         "BE-09 " + suffix,
+		DueDate:       "2026-10-31",
+		IsSecret:      true,
+		Fields: []FieldInput{
+			{Position: 1, Type: model.FieldText, Label: "ช่องที่มีคำตอบ", Required: true},
+			{Position: 2, Type: model.FieldNum, Label: "ช่องที่ยังไม่มีคำตอบ", Required: false},
+			{Position: 3, Type: model.FieldChoice, Label: "ช่องที่เก็บไว้", Required: true, Options: []string{"หนึ่ง", "สอง"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	answeredField := created.Fields[0]
+	unusedField := created.Fields[1]
+	retainedField := created.Fields[2]
+	values := datatypes.JSON([]byte(fmt.Sprintf(`{"%s":"มีคำตอบแล้ว"}`, answeredField.UUID)))
+	if err := tx.Create(&model.Submission{
+		TopicUUID:   created.UUID,
+		UserUUID:    creator.UUID,
+		Values:      values,
+		SubmittedAt: time.Now().UTC(),
+	}).Error; err != nil {
+		t.Fatalf("create submission: %v", err)
+	}
+
+	// เมื่อมีผู้ส่งแล้ว แม้ช่องนั้นยังไม่มีค่า ก็ห้ามเปลี่ยนชนิดของช่องเดิมทั้งฟอร์ม.
+	typeChangedFields := []UpdateFieldInput{
+		{UUID: answeredField.UUID, Position: 1, Type: answeredField.Type, Label: answeredField.Label},
+		{UUID: unusedField.UUID, Position: 2, Type: model.FieldDate, Label: unusedField.Label},
+		{UUID: retainedField.UUID, Position: 3, Type: retainedField.Type, Label: retainedField.Label, Options: []string{"หนึ่ง", "สอง"}},
+	}
+	_, err = service.Update(context.Background(), created.UUID, UpdateInput{Fields: &typeChangedFields})
+	if !errors.Is(err, ErrFieldTypeLocked) {
+		t.Fatalf("Update(type change) error = %v, want ErrFieldTypeLocked", err)
+	}
+	var unchanged model.TopicField
+	if err := tx.Where("uuid = ?", unusedField.UUID).First(&unchanged).Error; err != nil {
+		t.Fatalf("reload field after conflict: %v", err)
+	}
+	if unchanged.Type != model.FieldNum {
+		t.Fatalf("field type after rollback = %s, want %s", unchanged.Type, model.FieldNum)
+	}
+
+	updatedTitle := "BE-09 แก้ไข " + suffix
+	updatedDueDate := "2026-11-30"
+	isSecret := false
+	required := false
+	updatedFields := []UpdateFieldInput{
+		{
+			UUID:     retainedField.UUID,
+			Position: 1,
+			Type:     model.FieldChoice,
+			Label:    "ช่องเดิมที่แก้ชื่อ",
+			Options:  []string{"A", "B", "C"},
+		},
+		{
+			Position: 2,
+			Type:     model.FieldFile,
+			Label:    "ช่องใหม่",
+			Required: &required,
+		},
+	}
+	updated, err := service.Update(context.Background(), created.UUID, UpdateInput{
+		Title:    &updatedTitle,
+		DueDate:  &updatedDueDate,
+		IsSecret: &isSecret,
+		Fields:   &updatedFields,
+	})
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if updated.Title != updatedTitle || updated.DueDate.Format(dateLayout) != updatedDueDate || updated.IsSecret {
+		t.Fatalf("updated topic = %+v", updated)
+	}
+	if len(updated.Fields) != 2 || updated.Fields[0].UUID != retainedField.UUID || updated.Fields[1].Type != model.FieldFile || updated.Fields[1].Required {
+		t.Fatalf("updated fields = %+v", updated.Fields)
+	}
+
+	var hiddenAnswered model.TopicField
+	if err := tx.Where("uuid = ?", answeredField.UUID).First(&hiddenAnswered).Error; err != nil {
+		t.Fatalf("find answered field: %v", err)
+	}
+	if hiddenAnswered.HiddenAt == nil {
+		t.Fatal("answered field was deleted instead of hidden")
+	}
+	assertTopicRelatedCount(t, tx, &model.TopicField{}, "uuid = ?", 0, unusedField.UUID)
+
+	closed, err := service.SetOpen(context.Background(), created.UUID, false)
+	if err != nil {
+		t.Fatalf("SetOpen(false) error = %v", err)
+	}
+	if closed.IsOpen || closed.ClosedAt == nil {
+		t.Fatalf("closed topic = %+v", closed)
+	}
+	lastClosedAt := *closed.ClosedAt
+	closedAgain, err := service.SetOpen(context.Background(), created.UUID, false)
+	if err != nil {
+		t.Fatalf("SetOpen(false again) error = %v", err)
+	}
+	if closedAgain.ClosedAt == nil || !closedAgain.ClosedAt.Equal(lastClosedAt) || !closedAgain.UpdatedAt.Equal(closed.UpdatedAt) {
+		t.Fatalf("idempotent close changed timestamps: first=%+v second=%+v", closed, closedAgain)
+	}
+	reopened, err := service.SetOpen(context.Background(), created.UUID, true)
+	if err != nil {
+		t.Fatalf("SetOpen(true) error = %v", err)
+	}
+	if !reopened.IsOpen || reopened.ClosedAt == nil || !reopened.ClosedAt.Equal(lastClosedAt) {
+		t.Fatalf("reopened topic = %+v", reopened)
+	}
+	reopenedAgain, err := service.SetOpen(context.Background(), created.UUID, true)
+	if err != nil {
+		t.Fatalf("SetOpen(true again) error = %v", err)
+	}
+	if !reopenedAgain.UpdatedAt.Equal(reopened.UpdatedAt) {
+		t.Fatalf("idempotent reopen changed updated_at: first=%s second=%s", reopened.UpdatedAt, reopenedAgain.UpdatedAt)
+	}
+
+	if err := service.Delete(context.Background(), created.UUID); !errors.Is(err, ErrTopicHasSubmissions) {
+		t.Fatalf("Delete(topic with submission) error = %v, want ErrTopicHasSubmissions", err)
+	}
+	assertTopicRelatedCount(t, tx, &model.Topic{}, "uuid = ?", 1, created.UUID)
+
+	deletable, err := service.Create(context.Background(), CreateInput{
+		DivisionUUID:  division.UUID,
+		CreatedByUUID: creator.UUID,
+		Title:         "BE-09 delete " + suffix,
+		DueDate:       "2026-10-31",
+		Fields:        []FieldInput{{Type: model.FieldText, Label: "ลบได้"}},
+	})
+	if err != nil {
+		t.Fatalf("Create(deletable) error = %v", err)
+	}
+	if err := service.Delete(context.Background(), deletable.UUID); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	if _, err := service.Get(context.Background(), deletable.UUID); !errors.Is(err, ErrTopicNotFound) {
+		t.Fatalf("Get(deleted topic) error = %v, want ErrTopicNotFound", err)
+	}
 }
 
 func assertTopicRelatedCount(t *testing.T, db *gorm.DB, value any, query string, want int64, arguments ...any) {

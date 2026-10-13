@@ -19,11 +19,43 @@ import (
 )
 
 type fakeTopicService struct {
-	create func(context.Context, topic.CreateInput) (model.Topic, error)
+	create  func(context.Context, topic.CreateInput) (model.Topic, error)
+	get     func(context.Context, uuid.UUID) (model.Topic, error)
+	update  func(context.Context, uuid.UUID, topic.UpdateInput) (model.Topic, error)
+	setOpen func(context.Context, uuid.UUID, bool) (model.Topic, error)
+	delete  func(context.Context, uuid.UUID) error
 }
 
 func (f fakeTopicService) Create(ctx context.Context, input topic.CreateInput) (model.Topic, error) {
 	return f.create(ctx, input)
+}
+
+func (f fakeTopicService) Get(ctx context.Context, topicUUID uuid.UUID) (model.Topic, error) {
+	if f.get == nil {
+		return model.Topic{}, nil
+	}
+	return f.get(ctx, topicUUID)
+}
+
+func (f fakeTopicService) Update(ctx context.Context, topicUUID uuid.UUID, input topic.UpdateInput) (model.Topic, error) {
+	if f.update == nil {
+		return model.Topic{}, nil
+	}
+	return f.update(ctx, topicUUID, input)
+}
+
+func (f fakeTopicService) SetOpen(ctx context.Context, topicUUID uuid.UUID, open bool) (model.Topic, error) {
+	if f.setOpen == nil {
+		return model.Topic{}, nil
+	}
+	return f.setOpen(ctx, topicUUID, open)
+}
+
+func (f fakeTopicService) Delete(ctx context.Context, topicUUID uuid.UUID) error {
+	if f.delete == nil {
+		return nil
+	}
+	return f.delete(ctx, topicUUID)
 }
 
 func TestCreateTopicRequiresDivisionHeadOrAdmin(t *testing.T) {
@@ -181,6 +213,7 @@ func topicTestApp(service topicService) (*fiber.App, uuid.UUID) {
 	adminUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb30003")
 	headUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb30004")
 	teacherUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb30005")
+	creatorUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb30006")
 	authService := fakeAuthService{
 		currentUser: func(_ context.Context, token string) (auth.Profile, error) {
 			switch token {
@@ -198,6 +231,8 @@ func topicTestApp(service topicService) (*fiber.App, uuid.UUID) {
 				}, nil
 			case "teacher-session":
 				return auth.Profile{User: model.User{UUIDModel: model.UUIDModel{UUID: teacherUUID}}}, nil
+			case "creator-session":
+				return auth.Profile{User: model.User{UUIDModel: model.UUIDModel{UUID: creatorUUID}}}, nil
 			default:
 				return auth.Profile{}, auth.ErrUnauthenticated
 			}
