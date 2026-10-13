@@ -59,6 +59,11 @@ func Up(db *gorm.DB, now time.Time) error {
 		if err := migrateLegacyPrimaryKeys(tx); err != nil {
 			return err
 		}
+		// รุ่น Google Drive ใช้ชื่อ drive_file_id; rename เป็น object_key เพื่อเก็บ
+		// R2 key โดยคงค่าและความสัมพันธ์ของไฟล์เดิมทุกแถวไว้.
+		if err := migrateObjectStorageColumns(tx); err != nil {
+			return err
+		}
 
 		// Register the explicit join model so GORM uses its UUID primary key and
 		// the UserUUID/DivisionUUID foreign-key columns.
@@ -77,7 +82,6 @@ func Up(db *gorm.DB, now time.Time) error {
 			&model.File{},
 			// ตารางต่อไปนี้รองรับความสัมพันธ์ที่ประกาศไว้ใน models และงานถัดไป.
 			&model.TopicAssignee{},
-			&model.DriveFolder{},
 			&model.Session{},
 		); err != nil {
 			return fmt.Errorf("migrate database schema: %w", err)

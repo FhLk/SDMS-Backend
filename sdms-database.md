@@ -9,23 +9,25 @@ ER diagram พจนานุกรมข้อมูล และ GORM models �
 | ใช้กับ issue | BE-02 สร้างตาราง + ข้อมูลเริ่มต้น |
 | ต้นแบบอ้างอิง | [SDMS Web App](https://claude.ai/artifact/6j9Vof6oUJjZNQWMWueyp2) |
 
-**11** ตาราง · **16** ความสัมพันธ์ (FK) · **7** กติกาที่ฐานข้อมูลคุมให้ · **6** ชนิดช่องในฟอร์ม
+**10** ตาราง · **16** ความสัมพันธ์ (FK) · **7** กติกาที่ฐานข้อมูลคุมให้ · **6** ชนิดช่องในฟอร์ม
 
 > models และ data-preserving migration ผ่านการรันจริงบน PostgreSQL 17 และทดสอบการรันซ้ำแล้ว
+>
+> ฐานข้อมูลที่อัปเกรดจากรุ่น Google Drive อาจยังมี `drive_folders` และ `topics.drive_folder_id` เป็น legacy schema; migration ตั้งใจไม่ drop เพื่อรักษาข้อมูลเดิม แต่โค้ดปัจจุบันไม่ใช้งานแล้ว
 
 ## 1. ข้อตกลง
 
 - ชื่อตารางและคอลัมน์เป็น snake_case ตารางเป็นพหูพจน์ ตามค่าเริ่มต้นของ GORM จึงไม่ต้องตั้ง `TableName()`
 - ทุกตารางใช้ `uuid` ชนิด PostgreSQL `uuid` เป็น primary key โดยแอปสร้าง UUIDv7 ที่เรียงตามเวลา
-- ค่าธรรมชาติ `divisions.code`, `academic_years.year`, `sessions.token_hash` และ `drive_folders.path` ยังคงเป็น unique business key
+- ค่าธรรมชาติ `divisions.code`, `academic_years.year` และ `sessions.token_hash` ยังคงเป็น unique business key
 - เวลาเก็บเป็น `timestamptz` ส่วน "วันนี้" และการตัดสินว่าส่งช้าคิดตามเวลาไทย (`Asia/Bangkok`)
 - ปีการศึกษาเก็บเป็น พ.ศ. (`2569`) ส่วน `due_date` เก็บเป็น `date` แบบ ค.ศ. แล้วแปลงเป็น พ.ศ. ตอนแสดง
 - ไม่ลบบุคลากรจริง ใช้ `deactivated_at` และไม่ embed `gorm.Model` เพราะระบบนี้ไม่ใช้ `deleted_at`
-- ตัวไฟล์อยู่ใน Google Drive ฐานข้อมูลเก็บแค่ id และข้อมูลของไฟล์
+- ตัวไฟล์อยู่ใน Cloudflare R2 หรือ local filesystem ฐานข้อมูลเก็บ object key และข้อมูลของไฟล์
 
 ## 2. ER diagram
 
-เส้น `||--o{` อ่านว่า 1 ต่อ 0 หรือหลายแถว · `||--|{` คือ 1 ต่ออย่างน้อย 1 แถว · `|o--o|` คือ 0 หรือ 1 ทั้งสองฝั่ง · `drive_folders` ไม่มี FK กับตารางอื่น
+เส้น `||--o{` อ่านว่า 1 ต่อ 0 หรือหลายแถว · `||--|{` คือ 1 ต่ออย่างน้อย 1 แถว · `|o--o|` คือ 0 หรือ 1 ทั้งสองฝั่ง
 
 ```mermaid
 erDiagram
@@ -117,13 +119,8 @@ erDiagram
     uuid field_uuid FK
     uuid submission_uuid FK
     uuid uploaded_by_uuid FK
-    varchar drive_file_id
+    varchar object_key
     varchar status
-  }
-  drive_folders {
-    uuid uuid PK
-    varchar path UK
-    varchar folder_id
   }
 ```
 
@@ -299,7 +296,6 @@ erDiagram
 | `is_open` | boolean | – | `true` | เปิดรับอยู่หรือไม่ |
 | `is_secret` | boolean | – | `false` | หัวข้อลับ |
 | `created_by_uuid` | uuid | – | – | คนสร้าง → users.uuid |
-| `drive_folder_id` | varchar(128) | ✓ | – | id โฟลเดอร์หัวข้อใน Drive สร้างตอนมีไฟล์แรก |
 | `closed_at` | timestamptz | ✓ | – | เวลาปิดรับล่าสุด |
 | `created_at / updated_at` | timestamptz | ✓ | – |  |
 
@@ -393,7 +389,7 @@ erDiagram
 
 #### `files`
 
-ไฟล์ 1 ไฟล์ ตัวไฟล์อยู่ใน Google Drive ตารางเก็บแค่ข้อมูลอ้างอิง
+ไฟล์ 1 ไฟล์ ตัวไฟล์อยู่ใน Cloudflare R2 หรือ local filesystem ตารางเก็บข้อมูลอ้างอิงและ object key
 
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
@@ -402,7 +398,7 @@ erDiagram
 | `field_uuid` | uuid | – | – | ช่องที่แนบ → topic_fields.uuid |
 | `submission_uuid` | uuid | ✓ | – | คำตอบที่ผูก ว่าง = ยังไม่ได้ส่ง (staged) |
 | `uploaded_by_uuid` | uuid | – | – | คนอัปโหลด → users.uuid |
-| `drive_file_id` | varchar(128) | – | – | id ไฟล์ใน Google Drive |
+| `object_key` | varchar(512) | – | – | key ของ object ใน R2 หรือ path สัมพัทธ์ของ local storage |
 | `original_name` | varchar(255) | – | – | ชื่อไฟล์เดิมที่ผู้ใช้อัปโหลด |
 | `mime_type` | varchar(120) | – | – | เช่น application/pdf |
 | `size_bytes` | bigint | – | – | ขนาด 1 ไบต์ ถึง 50 MB |
@@ -419,29 +415,15 @@ erDiagram
 
 **หมายเหตุ**
 
-- ไฟล์ staged ที่อายุเกิน 24 ชั่วโมง → ย้ายไปถังขยะของ Drive แล้วตั้ง status = trashed
+- ไฟล์ staged ที่อายุเกิน 24 ชั่วโมง → ลบ object จาก storage แล้วตั้ง status = trashed
 - เอาไฟล์ออกระหว่างแก้คำตอบ → status = trashed (ไม่ลบแถว)
 
-#### `drive_folders`
+#### โครงสร้าง object key ใน R2
 
-จำ id โฟลเดอร์ใน Drive ระดับ ปี และ ปี/ฝ่าย ไม่ต้องค้นหาจากชื่อซ้ำ
-
-| คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
-| --- | --- | --- | --- | --- |
-| `uuid` | uuid | – | UUIDv7 | รหัสโฟลเดอร์ |
-| `path` | varchar(64) | – | – | "2569" หรือ "2569/aca" |
-| `folder_id` | varchar(128) | – | – | id โฟลเดอร์ใน Google Drive |
-| `created_at` | timestamptz | ✓ | – |  |
-
-**คีย์และ index**
-
-- PK uuid
-- UNIQUE path
-
-**หมายเหตุ**
-
-- โครงโฟลเดอร์: SDMS / ปี / ฝ่าย / หัวข้อ — โฟลเดอร์หัวข้อเก็บที่ topics.drive_folder_id
-- สร้างโฟลเดอร์ตอนต้องใช้ครั้งแรก
+- รูปแบบ: `<prefix>/<ปีการศึกษา>/<รหัสฝ่าย>/<topic_uuid>/<file_uuid>.<นามสกุล>`
+- ค่าเริ่มต้นของ prefix คือ `sdms` และปรับได้ด้วย `R2_PREFIX`
+- prefix ใน R2 เป็นส่วนหนึ่งของ object key ไม่ใช่โฟลเดอร์จริง จึงไม่ต้องมีตาราง cache โฟลเดอร์
+- migration จะ rename `files.drive_file_id` เดิมเป็น `files.object_key` ใน transaction เพื่อรักษาข้อมูลอ้างอิงเดิม
 
 ## 5. รูปแบบ JSON
 
@@ -571,7 +553,7 @@ const (
 const (
 	FileStaged   = "staged"   // อัปโหลดแล้ว ยังไม่ได้ผูกกับคำตอบ
 	FileAttached = "attached" // ผูกกับคำตอบแล้ว
-	FileTrashed  = "trashed"  // ถูกเอาออก ย้ายไปถังขยะของ Drive แล้ว
+	FileTrashed  = "trashed"  // ถูกเอาออกและลบ object จาก storage แล้ว
 )
 
 // User บุคลากร 1 คน — ไม่ลบจริง ใช้ DeactivatedAt แทน
@@ -622,13 +604,6 @@ type AcademicYear struct {
 	Topics []Topic `gorm:"foreignKey:Year;references:Year;constraint:OnDelete:RESTRICT"`
 }
 
-// DriveFolder จำ id โฟลเดอร์ใน Google Drive ระดับ ปี และ ปี/ฝ่าย (โฟลเดอร์หัวข้ออยู่ที่ topics)
-type DriveFolder struct {
-	Path      string `gorm:"primaryKey;size:64"` // "2569" หรือ "2569/aca"
-	FolderID  string `gorm:"size:128;not null"`
-	CreatedAt time.Time
-}
-
 // Topic หัวข้อที่หัวหน้าฝ่ายเปิดรับ
 type Topic struct {
 	ID            uint64    `gorm:"primaryKey"`
@@ -640,7 +615,6 @@ type Topic struct {
 	IsOpen        bool      `gorm:"not null;default:true"`
 	IsSecret      bool      `gorm:"not null;default:false"`
 	CreatedByID   uint64    `gorm:"not null"`
-	DriveFolderID *string   `gorm:"size:128"`
 	ClosedAt      *time.Time
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
@@ -686,14 +660,14 @@ type Submission struct {
 	Files []File `gorm:"constraint:OnDelete:SET NULL"`
 }
 
-// File ไฟล์ 1 ไฟล์ ตัวไฟล์อยู่ใน Google Drive
+// File ไฟล์ 1 ไฟล์ ตัวไฟล์อยู่ใน Cloudflare R2 หรือ local filesystem
 type File struct {
 	ID           uint64  `gorm:"primaryKey"`
 	TopicID      uint64  `gorm:"not null;index"`
 	FieldID      uint64  `gorm:"not null"`
 	SubmissionID *uint64 `gorm:"index"`
 	UploadedByID uint64  `gorm:"not null"`
-	DriveFileID  string  `gorm:"size:128;not null"`
+	ObjectKey    string  `gorm:"size:512;not null"`
 	OriginalName string  `gorm:"size:255;not null"`
 	MimeType     string  `gorm:"size:120;not null"`
 	SizeBytes    int64   `gorm:"not null;check:chk_files_size,size_bytes BETWEEN 1 AND 52428800"`
@@ -731,7 +705,7 @@ func Migrate(db *gorm.DB) error {
 	}
 	return db.AutoMigrate(
 		&model.User{}, &model.Division{}, &model.UserDivision{}, &model.AcademicYear{},
-		&model.DriveFolder{}, &model.Topic{}, &model.TopicField{}, &model.TopicAssignee{},
+		&model.Topic{}, &model.TopicField{}, &model.TopicAssignee{},
 		&model.Submission{}, &model.File{}, &model.Session{},
 	)
 }
@@ -743,11 +717,11 @@ func Migrate(db *gorm.DB) error {
 
 ## 9. สิ่งที่ต้องปรับใน BE issues
 
-เอกสารนี้เพิ่มตาราง `topic_assignees` (บันทึกรายชื่อผู้ต้องส่งตอนสร้างหัวข้อ) และระบุตาราง `sessions`, `drive_folders` ที่ issue ยังไม่ได้เขียนไว้
+เอกสารนี้เพิ่มตาราง `topic_assignees` (บันทึกรายชื่อผู้ต้องส่งตอนสร้างหัวข้อ) และระบุตาราง `sessions` ที่ issue ยังไม่ได้เขียนไว้
 
 | Issue | ปรับ |
 | --- | --- |
-| BE-02 | รายการตารางเพิ่ม `topic_assignees`, `sessions`, `drive_folders` (รวม 11 ตาราง) |
+| BE-02 | รายการตารางเพิ่ม `topic_assignees`, `sessions` (รวม 10 ตาราง) |
 | BE-05 | ปิดใช้งานหรือตั้งรหัสใหม่ → ลบแถวใน `sessions` ของคนนั้น · แนะนำให้ลบออกจาก `topic_assignees` ของหัวข้อที่ยังเปิดและยังไม่ส่ง |
 | BE-08 | สร้างหัวข้อ + ช่อง + `topic_assignees` ใน transaction เดียว |
 | BE-10, BE-13, BE-15 | y และแถวในตารางคำตอบนับจาก `topic_assignees` ไม่ใช่สมาชิกฝ่ายในวันนี้ |

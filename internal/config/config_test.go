@@ -92,3 +92,61 @@ func TestLoadRejectsInvalidAuthConfiguration(t *testing.T) {
 		t.Fatalf("Load() error = %v, want invalid SESSION_COOKIE_NAME error", err)
 	}
 }
+
+func TestLoadUsesLocalUploadStorageByDefault(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/sdms")
+	t.Setenv("SERVER_PORT", "8080")
+	t.Setenv("FILE_STORAGE_DRIVER", "local")
+	t.Setenv("LOCAL_UPLOAD_DIR", "test-uploads")
+	t.Setenv("STAGED_UPLOAD_TTL", "24h")
+	t.Setenv("UPLOAD_CLEANUP_INTERVAL", "30m")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Uploads.Driver != "local" || cfg.Uploads.LocalDirectory != "test-uploads" {
+		t.Fatalf("Uploads = %+v", cfg.Uploads)
+	}
+	if cfg.Uploads.StagedTTL != 24*time.Hour || cfg.Uploads.CleanupInterval != 30*time.Minute {
+		t.Fatalf("upload durations = %+v", cfg.Uploads)
+	}
+}
+
+func TestLoadRequiresR2Settings(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/sdms")
+	t.Setenv("SERVER_PORT", "8080")
+	t.Setenv("FILE_STORAGE_DRIVER", "r2")
+	t.Setenv("R2_ACCOUNT_ID", "")
+	t.Setenv("R2_ACCESS_KEY_ID", "")
+	t.Setenv("R2_SECRET_ACCESS_KEY", "")
+	t.Setenv("R2_BUCKET", "")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "R2_ACCOUNT_ID") {
+		t.Fatalf("Load() error = %v, want missing R2 account error", err)
+	}
+}
+
+func TestLoadR2UploadStorage(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/sdms")
+	t.Setenv("SERVER_PORT", "8080")
+	t.Setenv("FILE_STORAGE_DRIVER", "r2")
+	t.Setenv("R2_ACCOUNT_ID", "account")
+	t.Setenv("R2_ACCESS_KEY_ID", "access")
+	t.Setenv("R2_SECRET_ACCESS_KEY", "secret")
+	t.Setenv("R2_SESSION_TOKEN", "temporary")
+	t.Setenv("R2_BUCKET", "sdms-files")
+	t.Setenv("R2_PREFIX", "school/sdms")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Uploads.Driver != "r2" || cfg.Uploads.R2.Bucket != "sdms-files" || cfg.Uploads.R2.Prefix != "school/sdms" {
+		t.Fatalf("Uploads.R2 = %+v", cfg.Uploads.R2)
+	}
+	if cfg.Uploads.R2.SessionToken != "temporary" {
+		t.Fatalf("R2.SessionToken = %q, want temporary", cfg.Uploads.R2.SessionToken)
+	}
+}

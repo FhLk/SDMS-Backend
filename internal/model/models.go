@@ -45,7 +45,7 @@ const (
 const (
 	FileStaged   = "staged"   // อัปโหลดแล้ว ยังไม่ได้ผูกกับคำตอบ
 	FileAttached = "attached" // ผูกกับคำตอบแล้ว
-	FileTrashed  = "trashed"  // ถูกเอาออก ย้ายไปถังขยะของ Drive แล้ว
+	FileTrashed  = "trashed"  // ถูกเอาออกและลบ object จาก storage แล้ว
 )
 
 // User บุคลากร 1 คน — ไม่ลบจริง ใช้ DeactivatedAt แทน
@@ -97,14 +97,6 @@ type AcademicYear struct {
 	Topics []Topic `gorm:"foreignKey:AcademicYearUUID;references:UUID;constraint:OnDelete:RESTRICT"`
 }
 
-// DriveFolder จำ id โฟลเดอร์ใน Google Drive ระดับ ปี และ ปี/ฝ่าย (โฟลเดอร์หัวข้ออยู่ที่ topics)
-type DriveFolder struct {
-	UUIDModel
-	Path      string `gorm:"size:64;not null;uniqueIndex"` // "2569" หรือ "2569/aca"
-	FolderID  string `gorm:"size:128;not null"`
-	CreatedAt time.Time
-}
-
 // Topic หัวข้อที่หัวหน้าฝ่ายเปิดรับ
 type Topic struct {
 	UUIDModel
@@ -116,7 +108,6 @@ type Topic struct {
 	IsOpen           bool      `gorm:"not null;default:true"`
 	IsSecret         bool      `gorm:"not null;default:false"`
 	CreatedByUUID    uuid.UUID `gorm:"type:uuid;not null"`
-	DriveFolderID    *string   `gorm:"size:128"`
 	ClosedAt         *time.Time
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -164,14 +155,14 @@ type Submission struct {
 	Files []File `gorm:"constraint:OnDelete:SET NULL"`
 }
 
-// File ไฟล์ 1 ไฟล์ ตัวไฟล์อยู่ใน Google Drive
+// File ไฟล์ 1 ไฟล์ ตัว object อยู่ใน Cloudflare R2 หรือ local storage.
 type File struct {
 	UUIDModel
 	TopicUUID      uuid.UUID  `gorm:"type:uuid;not null;index"`
 	FieldUUID      uuid.UUID  `gorm:"type:uuid;not null"`
 	SubmissionUUID *uuid.UUID `gorm:"type:uuid;index"`
 	UploadedByUUID uuid.UUID  `gorm:"type:uuid;not null"`
-	DriveFileID    string     `gorm:"size:128;not null"`
+	ObjectKey      string     `gorm:"size:512;not null"`
 	OriginalName   string     `gorm:"size:255;not null"`
 	MimeType       string     `gorm:"size:120;not null"`
 	SizeBytes      int64      `gorm:"not null;check:chk_files_size,size_bytes BETWEEN 1 AND 52428800"`

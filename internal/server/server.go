@@ -3,6 +3,7 @@ package server
 
 import (
 	"github.com/FhLk/SDMS-Backend/internal/authorization"
+	"github.com/FhLk/SDMS-Backend/internal/upload"
 	"github.com/gofiber/fiber/v3"
 	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
 )
@@ -22,6 +23,8 @@ func New(dependencies ...Dependencies) *fiber.App {
 	// application errors all use the same JSON response shape.
 	app := fiber.New(fiber.Config{
 		ErrorHandler: handleError,
+		// เผื่อ overhead ของ multipart 2 MiB ขณะที่ service จำกัดตัวไฟล์จริงที่ 50 MiB.
+		BodyLimit: int(upload.MaxFileSize + 2*1024*1024),
 	})
 
 	// Fiber does not recover panics by default. Register recovery before routes
@@ -47,6 +50,9 @@ func New(dependencies ...Dependencies) *fiber.App {
 	api.Delete("/topics/:uuid", auth.authenticate, topics.delete)
 	api.Get("/divisions", auth.authenticate, topics.listDivisions)
 	api.Get("/divisions/:code/topics", auth.authenticate, topics.listDivisionTopics)
+	uploads := uploadHandler{service: deps.Uploads}
+	api.Post("/uploads", auth.authenticate, uploads.create)
+	api.Delete("/uploads/:uuid", auth.authenticate, uploads.delete)
 
 	// ทุก route ใต้ /admin ใช้ authentication และ policy แอดมินชุดเดียวกัน
 	// จึงไม่ต้องตรวจบทบาทแอดมินซ้ำในแต่ละ handler.

@@ -14,7 +14,7 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 | BE-08 | API สร้างหัวข้อ + ช่องฟอร์ม | BE-04 |
 | BE-09 | API แก้ / ปิดรับ / เปิดรับ / ลบหัวข้อ | BE-08 |
 | BE-10 | API รายการฝ่ายและหัวข้อ | BE-08 |
-| BE-11 | เชื่อม Google Drive + อัปโหลดไฟล์ | BE-04 |
+| BE-11 | เชื่อม Cloudflare R2 + อัปโหลดไฟล์ | BE-04 |
 | BE-12 | API ส่ง / แก้คำตอบ | BE-08, BE-11 |
 | BE-13 | API ตารางคำตอบของหัวข้อ | BE-12 |
 | BE-14 | API เปิดดู / ดาวน์โหลดไฟล์ | BE-11, BE-13 |
@@ -236,7 +236,7 @@ Remove-Item Env:\INITIAL_ADMIN_PASSWORD
 
 ## ส่งเอกสารและไฟล์
 
-### BE-11 · เชื่อม Google Drive + อัปโหลดไฟล์
+### BE-11 · เชื่อม Cloudflare R2 + อัปโหลดไฟล์
 
 `POST /api/uploads` · `DELETE /api/uploads/{uuid}`
 
@@ -244,11 +244,19 @@ Remove-Item Env:\INITIAL_ADMIN_PASSWORD
 
 **เกณฑ์เสร็จ**
 
-- [ ] อัปโหลดทีละไฟล์ แล้วคืน file uuid ให้ FE แนบไปตอนส่งคำตอบ
-- [ ] ไฟล์ใหญ่เกิน 50 MB → 413
-- [ ] ไฟล์ไปอยู่ใน Google Drive ของโรงเรียน แยกโฟลเดอร์ตาม ปี / ฝ่าย / หัวข้อ
-- [ ] ไฟล์ที่อัปโหลดแล้วแต่ไม่ได้ส่งภายใน 24 ชั่วโมงถูกลบอัตโนมัติ
-- [ ] ตอนพัฒนาใช้โฟลเดอร์ในเครื่องแทน Drive ได้ (สลับด้วยค่าใน `.env`)
+- [x] อัปโหลดทีละไฟล์ แล้วคืน file uuid ให้ FE แนบไปตอนส่งคำตอบ
+- [x] ไฟล์ใหญ่เกิน 50 MB → 413
+- [x] ไฟล์ไปอยู่ใน Cloudflare R2 แยก object key ตาม ปี / ฝ่าย / หัวข้อ
+- [x] ไฟล์ที่อัปโหลดแล้วแต่ไม่ได้ส่งภายใน 24 ชั่วโมงถูกลบอัตโนมัติ
+- [x] ตอนพัฒนาใช้โฟลเดอร์ในเครื่องแทน R2 ได้ (สลับด้วยค่าใน `.env`)
+
+**รูปแบบอัปโหลดและตั้งค่า storage**
+
+- ส่ง `multipart/form-data` โดยมี `topic_uuid`, `field_uuid` และไฟล์หนึ่งไฟล์ใน field ชื่อ `file`
+- local development ใช้ `FILE_STORAGE_DRIVER=local` และกำหนดตำแหน่งด้วย `LOCAL_UPLOAD_DIR`
+- Cloudflare R2 ใช้ `FILE_STORAGE_DRIVER=r2` และตั้ง `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` ตามตัวอย่างใน `.env.example`
+- ระบบจัด object key เป็น `<prefix>/<ปีการศึกษา>/<รหัสฝ่าย>/<topic_uuid>/<file_uuid>.<นามสกุล>` โดย `R2_PREFIX` มีค่าเริ่มต้นเป็น `sdms`
+- ค่าเริ่มต้นของ staged TTL คือ 24 ชั่วโมง และ cleanup ทำทุก 1 ชั่วโมง ปรับได้ด้วยค่าที่ระบุใน `.env.example`
 
 ### BE-12 · API ส่ง / แก้คำตอบ
 
@@ -288,7 +296,7 @@ Remove-Item Env:\INITIAL_ADMIN_PASSWORD
 
 - [ ] ตรวจสิทธิ์แบบเดียวกับตารางคำตอบ ไม่มีสิทธิ์ → 403
 - [ ] PDF และรูปเปิดในเบราว์เซอร์ได้ ไฟล์ชนิดอื่นให้ดาวน์โหลด
-- [ ] ดึงไฟล์จาก Drive แบบสตรีม ไม่แชร์ลิงก์ Drive ให้ผู้ใช้ตรง ๆ
+- [ ] ดึงไฟล์จาก R2 แบบสตรีม ไม่เปิดเผย R2 URL หรือ credentials ให้ผู้ใช้
 
 ---
 

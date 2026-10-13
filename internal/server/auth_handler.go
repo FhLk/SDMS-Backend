@@ -26,6 +26,7 @@ type Dependencies struct {
 	UserAdmin         adminUserService
 	OrganizationAdmin adminOrganizationService
 	Topics            topicService
+	Uploads           uploadService
 }
 
 type authHandler struct {

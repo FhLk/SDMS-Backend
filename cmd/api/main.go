@@ -15,6 +15,7 @@ import (
 	"github.com/FhLk/SDMS-Backend/internal/database"
 	"github.com/FhLk/SDMS-Backend/internal/server"
 	"github.com/FhLk/SDMS-Backend/internal/topic"
+	"github.com/FhLk/SDMS-Backend/internal/upload"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -28,9 +29,13 @@ func main() {
 		log.Fatalf("application startup failed: load configuration: %v", err)
 	}
 
+	// context นี้ยกเลิกทั้ง cleanup และคำขอเริ่มต้นของ external storage ตอนปิด process.
+	runtimeContext, cancelRuntime := context.WithCancel(context.Background())
+	defer cancelRuntime()
+
 	// database.Open also pings PostgreSQL. The API must not start when the
 	// database is unavailable because every later feature depends on it.
-	db, err := database.Open(context.Background(), cfg.Database)
+	db, err := database.Open(runtimeContext, cfg.Database)
 	if err != nil {
 		log.Fatalf("application startup failed: %v", err)
 	}
@@ -53,13 +58,21 @@ func main() {
 	userAdminService := admin.NewUserService(db)
 	organizationAdminService := admin.NewOrganizationService(db)
 	topicService := topic.NewService(db)
+	objectStore, err := upload.NewObjectStore(runtimeContext, cfg.Uploads)
+	if err != nil {
+		log.Fatalf("application startup failed: create upload storage: %v", err)
+	}
+	uploadService := upload.NewService(db, objectStore, cfg.Uploads.StagedTTL)
 	app := server.New(server.Dependencies{
 		Auth:              authService,
 		AuthConfig:        cfg.Auth,
 		UserAdmin:         userAdminService,
 		OrganizationAdmin: organizationAdminService,
 		Topics:            topicService,
+		Uploads:           uploadService,
 	})
+	// เริ่มกวาดทันทีหนึ่งครั้ง แล้วทำซ้ำตาม interval โดย error รอบหนึ่งไม่หยุด HTTP server.
+	go runUploadCleanup(runtimeContext, uploadService, cfg.Uploads.CleanupInterval)
 	// Listen runs in a goroutine so the main goroutine can wait for either a
 	// server failure or an operating-system shutdown signal.
 	serverErrors := make(chan error, 1)
@@ -88,6 +101,37 @@ func main() {
 		// forever for a stuck connection.
 		if err := app.ShutdownWithTimeout(10 * time.Second); err != nil {
 			log.Printf("HTTP server shutdown failed: %v", err)
+		}
+	}
+}
+
+type expiredUploadCleaner interface {
+	CleanupExpired(context.Context) (int, error)
+}
+
+func runUploadCleanup(ctx context.Context, cleaner expiredUploadCleaner, interval time.Duration) {
+	run := func() {
+		cleaned, err := cleaner.CleanupExpired(ctx)
+		if err != nil {
+			if !errors.Is(err, context.Canceled) {
+				log.Printf("cleanup expired uploads failed: %v", err)
+			}
+			return
+		}
+		if cleaned > 0 {
+			log.Printf("cleaned %d expired staged uploads", cleaned)
+		}
+	}
+
+	run()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			run()
 		}
 	}
 }

@@ -13,5 +13,6 @@ dist/
 
 uploads/
 backups/
+secrets/
 
 .cache/
