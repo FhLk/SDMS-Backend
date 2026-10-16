@@ -14,13 +14,13 @@ import (
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.LUTC)
 
-	// รองรับทั้ง flags และ environment variable เพื่อไม่บังคับให้ใส่รหัสผ่านใน command history.
+	// รองรับทั้ง flag และ environment variable โดยแนะนำให้ส่งรหัสผ่านผ่าน environment
+	// เพื่อไม่ให้รหัสผ่านถูกบันทึกไว้ใน command history.
 	username := flag.String("username", os.Getenv("INITIAL_ADMIN_USERNAME"), "admin username")
-	password := flag.String("password", os.Getenv("INITIAL_ADMIN_PASSWORD"), "admin password (prefer INITIAL_ADMIN_PASSWORD)")
+	password := flag.String("password", os.Getenv("INITIAL_ADMIN_PASSWORD"), "admin password")
 	prefix := flag.String("prefix", os.Getenv("INITIAL_ADMIN_PREFIX"), "admin name prefix")
 	firstName := flag.String("first-name", os.Getenv("INITIAL_ADMIN_FIRST_NAME"), "admin first name")
 	lastName := flag.String("last-name", os.Getenv("INITIAL_ADMIN_LAST_NAME"), "admin last name")
-	fullName := flag.String("name", os.Getenv("INITIAL_ADMIN_NAME"), "legacy full name fallback")
 	position := flag.String("position", os.Getenv("INITIAL_ADMIN_POSITION"), "admin position")
 	flag.Parse()
 
@@ -50,7 +50,6 @@ func main() {
 		Prefix:    *prefix,
 		FirstName: *firstName,
 		LastName:  *lastName,
-		FullName:  *fullName,
 		Position:  *position,
 	})
 	if err != nil {

@@ -4,8 +4,8 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: sdms
-      # user ชื่อ sdms ทำให้ search_path เริ่มต้น ("$user", public) ชี้ไปที่ schema sdms
-      # ซึ่ง `go run ./cmd/migrate` สร้างให้ แบบเดียวกับ schema sdms บน Supabase.
+      # ชื่อผู้ใช้ sdms ทำให้ search_path เริ่มต้นชี้ไป schema sdms
+      # ซึ่งคำสั่ง `go run ./cmd/migrate` จะสร้างให้บนฐานข้อมูลว่าง.
       POSTGRES_USER: sdms
       POSTGRES_PASSWORD: sdms
     ports:

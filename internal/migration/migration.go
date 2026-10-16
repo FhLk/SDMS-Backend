@@ -1,4 +1,4 @@
-// Package migration สร้าง schema และข้อมูลตั้งต้นที่ระบบต้องใช้ก่อนเปิด API.
+// Package migration เตรียมโครงสร้างฐานข้อมูลว่างและข้อมูลตั้งต้นสำหรับ SDMS.
 package migration
 
 import (
@@ -12,7 +12,7 @@ import (
 
 var bangkokLocation = time.FixedZone("Asia/Bangkok", 7*60*60)
 
-// DivisionSeed คือข้อมูลฝ่ายพื้นฐานที่ต้องมีในทุก environment.
+// DivisionSeed คือข้อมูลฝ่ายพื้นฐานที่ทุก environment ต้องมี.
 type DivisionSeed struct {
 	Code      string
 	Name      string
@@ -20,7 +20,7 @@ type DivisionSeed struct {
 	SortOrder int16
 }
 
-// DefaultDivisions คืนข้อมูล 4 ฝ่ายตามข้อกำหนดของระบบ.
+// DefaultDivisions คืนข้อมูลตั้งต้นของฝ่ายทั้ง 4 ฝ่าย.
 func DefaultDivisions() []DivisionSeed {
 	return []DivisionSeed{
 		{Code: "aca", Name: "ฝ่ายวิชาการ", ShortName: "วิชาการ", SortOrder: 1},
@@ -30,15 +30,14 @@ func DefaultDivisions() []DivisionSeed {
 	}
 }
 
-// CurrentAcademicPeriod คำนวณปีการศึกษา พ.ศ. และภาคเรียนตามเวลาไทย:
-// พฤษภาคม-ตุลาคมเป็นภาคเรียน 1 และพฤศจิกายน-เมษายนเป็นภาคเรียน 2.
+// CurrentAcademicPeriod คำนวณปีการศึกษา พ.ศ. และภาคเรียนด้วยเวลาไทย.
+// พฤษภาคมถึงตุลาคมเป็นภาคเรียน 1 ส่วนพฤศจิกายนถึงเมษายนเป็นภาคเรียน 2.
 func CurrentAcademicPeriod(now time.Time) (year int16, semester int16) {
 	localTime := now.In(bangkokLocation)
 	year = int16(localTime.Year() + 543)
 
 	switch {
 	case localTime.Month() < time.May:
-		// มกราคม-เมษายนยังเป็นปีการศึกษาที่เริ่มในปีก่อนหน้า.
 		year--
 		semester = 2
 	case localTime.Month() >= time.November:
@@ -50,40 +49,19 @@ func CurrentAcademicPeriod(now time.Time) (year int16, semester int16) {
 	return year, semester
 }
 
-// Up สร้างหรือปรับ schema ให้ตรงกับ GORM models และเติมข้อมูลตั้งต้น.
-// ทุกขั้นตอนอยู่ใน transaction เดียว จึงไม่ทิ้ง schema ครึ่งหนึ่งเมื่อเกิดข้อผิดพลาด.
+// Up สร้างตารางทั้งหมดจาก GORM models และเติมข้อมูลตั้งต้น.
+// initializer ชุดนี้ออกแบบสำหรับฐานข้อมูลใหม่ จึงไม่มีขั้นตอนแปลง schema รุ่นเก่า.
+// การรันซ้ำทำได้โดยไม่สร้างฝ่ายหรือปีการศึกษาซ้ำ.
 func Up(db *gorm.DB, now time.Time) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		// Existing installations used bigint and natural primary keys. Convert
-		// them before AutoMigrate sees the UUID-based models so no data is lost.
-		if err := migrateLegacyPrimaryKeys(tx); err != nil {
-			return err
-		}
-		// รุ่น Google Drive ใช้ชื่อ drive_file_id; rename เป็น object_key เพื่อเก็บ
-		// R2 key โดยคงค่าและความสัมพันธ์ของไฟล์เดิมทุกแถวไว้.
-		if err := migrateObjectStorageColumns(tx); err != nil {
-			return err
-		}
-		// Replace the denormalized full_name column with the three components
-		// used by the check-in system, preserving every existing display name.
-		if err := migrateUserNameColumns(tx); err != nil {
-			return err
-		}
-
-		// Register the explicit join model so GORM uses its UUID primary key and
-		// the UserUUID/DivisionUUID foreign-key columns.
+		// กำหนด join model เองเพื่อให้ user_divisions มี UUID primary key ตามตารางอื่น.
 		if err := tx.SetupJoinTable(&model.User{}, "Divisions", &model.UserDivision{}); err != nil {
 			return fmt.Errorf("configure user division join table: %w", err)
 		}
 
-		models := SchemaModels()
-		if err := tx.AutoMigrate(models...); err != nil {
-			return fmt.Errorf("migrate database schema: %w", err)
+		if err := tx.AutoMigrate(SchemaModels()...); err != nil {
+			return fmt.Errorf("create database schema: %w", err)
 		}
-		if err := enableRowLevelSecurity(tx, models); err != nil {
-			return err
-		}
-
 		if err := seedDivisions(tx); err != nil {
 			return err
 		}
@@ -95,8 +73,7 @@ func Up(db *gorm.DB, now time.Time) error {
 	})
 }
 
-// SchemaModels คืน model ทุกตัวที่ migration ดูแล เรียงตามลำดับที่ AutoMigrate ต้องสร้าง.
-// รายการเดียวกันใช้เปิด RLS ด้วย จึงไม่มีตารางใหม่ที่หลุดการป้องกัน.
+// SchemaModels รวมเฉพาะตารางที่ระบบปัจจุบันใช้งานจริงตามลำดับการสร้าง.
 func SchemaModels() []any {
 	return []any{
 		&model.User{},
@@ -105,33 +82,11 @@ func SchemaModels() []any {
 		&model.AcademicYear{},
 		&model.Topic{},
 		&model.TopicField{},
+		&model.TopicAssignee{},
 		&model.Submission{},
 		&model.File{},
-		// ตารางต่อไปนี้รองรับความสัมพันธ์ที่ประกาศไว้ใน models และงานถัดไป.
-		&model.TopicAssignee{},
 		&model.Session{},
-		// ลิงก์บัญชีที่นำเข้าจากระบบ check-in (cmd/import-checkin-teachers).
-		&model.CheckinUserLink{},
 	}
-}
-
-// enableRowLevelSecurity เปิด RLS โดยไม่สร้าง policy ให้ทุกตารางของ SDMS แบบเดียวกับ
-// migration ของ check-in. role เจ้าของตาราง (sdms_app หรือผู้ใช้ docker ในเครื่อง)
-// ไม่ถูก RLS บังคับ แอปจึงทำงานเหมือนเดิม ส่วน role อื่นของ Supabase เช่น anon
-// และ authenticated จะอ่านแถวไม่ได้แม้มีคนเผลอ expose schema นี้ผ่าน Data API.
-// คำสั่งนี้รันซ้ำได้ เพราะการเปิด RLS ที่เปิดอยู่แล้วไม่มีผลอะไร.
-func enableRowLevelSecurity(db *gorm.DB, models []any) error {
-	for _, value := range models {
-		statement := &gorm.Statement{DB: db}
-		if err := statement.Parse(value); err != nil {
-			return fmt.Errorf("resolve table name for row level security: %w", err)
-		}
-		table := statement.Schema.Table
-		if err := db.Exec("ALTER TABLE " + db.Statement.Quote(table) + " ENABLE ROW LEVEL SECURITY").Error; err != nil {
-			return fmt.Errorf("enable row level security on %s: %w", table, err)
-		}
-	}
-	return nil
 }
 
 func seedDivisions(db *gorm.DB) error {
@@ -146,7 +101,7 @@ func seedDivisions(db *gorm.DB) error {
 		})
 	}
 
-	// DoNothing ทำให้ migration รันซ้ำได้โดยไม่เขียนทับชื่อฝ่ายที่ผู้ดูแลแก้ภายหลัง.
+	// ไม่เขียนทับชื่อฝ่ายหากแอดมินแก้ไขไปแล้วและสั่ง initializer ซ้ำ.
 	if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&divisions).Error; err != nil {
 		return fmt.Errorf("seed divisions: %w", err)
 	}
@@ -154,10 +109,6 @@ func seedDivisions(db *gorm.DB) error {
 }
 
 func seedCurrentAcademicYear(db *gorm.DB, now time.Time) error {
-	year, semester := CurrentAcademicPeriod(now)
-
-	// seed เฉพาะตอนระบบยังไม่มีปีปัจจุบัน เพื่อให้การรัน migration ซ้ำ
-	// ไม่เขียนทับปี/ภาคเรียนที่แอดมินเลือกผ่าน BE-07 ไปแล้ว.
 	var currentCount int64
 	if err := db.Model(&model.AcademicYear{}).
 		Where("is_current = ?", true).
@@ -168,6 +119,7 @@ func seedCurrentAcademicYear(db *gorm.DB, now time.Time) error {
 		return nil
 	}
 
+	year, semester := CurrentAcademicPeriod(now)
 	current := model.AcademicYear{
 		Year:            year,
 		IsCurrent:       true,

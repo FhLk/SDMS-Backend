@@ -194,17 +194,3 @@ type Session struct {
 
 	User User `gorm:"foreignKey:UserUUID;references:UUID;constraint:OnDelete:CASCADE"`
 }
-
-// CheckinUserLink ผูกบัญชี SDMS กับครูในระบบ check-in ที่ใช้ฐานข้อมูลเดียวกัน.
-// แถวถูกสร้างโดยคำสั่ง import-checkin-teachers เท่านั้น จึงใช้แยกบัญชีที่นำเข้า
-// ออกจากบัญชีที่แอดมินสร้างเอง และทำให้การนำเข้าซ้ำไม่สร้างบัญชีซ้ำ.
-// teacher_uid ไม่มี foreign key ข้าม schema เพื่อไม่ผูก migration ของสองระบบเข้าด้วยกัน.
-type CheckinUserLink struct {
-	UUIDModel
-	UserUUID          uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
-	CheckinTeacherUID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
-	PasswordSyncedAt  time.Time `gorm:"not null"` // เวลาที่คัดลอก password hash จาก check-in ล่าสุด
-	CreatedAt         time.Time
-
-	User User `gorm:"foreignKey:UserUUID;references:UUID;constraint:OnDelete:CASCADE"`
-}

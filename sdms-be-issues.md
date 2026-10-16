@@ -26,7 +26,7 @@ Priority บอกความสำคัญต่อการส่งมอ�
 | Task | สถานะ | สิ่งที่ทำแล้ว |
 |---|---|---|
 | BE-01 | ✅ เสร็จแล้ว | ตั้งโปรเจกต์ Go Fiber, อ่าน config จาก `.env`, เชื่อม PostgreSQL ผ่าน GORM, health endpoint และ JSON error รูปแบบกลาง |
-| BE-02 | ✅ เสร็จแล้ว | สร้าง schema และ seed, คำสั่ง migrate/create-admin, เปลี่ยน primary/foreign key เป็น UUIDv7 ชื่อ `uuid` พร้อม migration รักษาข้อมูลเดิม |
+| BE-02 | ✅ เสร็จแล้ว | สร้าง schema บนฐานข้อมูลว่างและ seed, คำสั่ง migrate/create-admin และ primary/foreign key แบบ UUIDv7 ชื่อ `uuid` |
 | BE-03 | ✅ เสร็จแล้ว | Login, Logout และ Me ด้วย server-side session, HttpOnly cookie, bcrypt และการป้องกัน username enumeration |
 | BE-04 | ✅ เสร็จแล้ว | Middleware ตรวจ session, request context และ policy สิทธิ์สำหรับหัวข้อ คำตอบลับ และสถิติฝ่าย |
 | BE-05 | ✅ เสร็จแล้ว | API รายการ/เพิ่ม/แก้บุคลากร, ปิดบัญชี, ตั้งรหัสผ่านใหม่ และยกเลิก session เดิม |

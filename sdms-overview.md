@@ -93,7 +93,7 @@ flowchart LR
 | --- | --- |
 | Backend | Go (Fiber) + GORM |
 | Frontend | Next.js (TypeScript) |
-| ฐานข้อมูล | PostgreSQL บน Supabase ตัวเดียวกับระบบ check-in · ตารางอยู่ใน schema `sdms` ต่อด้วย role `sdms_app` · 11 ตาราง ([รายละเอียด](sdms-shared-database.md)) |
+| ฐานข้อมูล | PostgreSQL 17 บนเครื่องผ่าน Docker Compose · ตารางอยู่ใน schema `sdms` · 10 ตาราง ([รายละเอียด](sdms-database.md)) |
 | ที่รันระบบ | Cloudflare |
 | เก็บไฟล์ | Cloudflare R2 แยก object key ตาม ปี / ฝ่าย / หัวข้อ |
 | เข้าสู่ระบบ | Username + Password · session cookie |
@@ -105,11 +105,10 @@ flowchart LR
 
 **ตัดสินใจแล้ว**
 
-- ใช้ฐานข้อมูลร่วมกับระบบ check-in (14 ต.ค. 2569) — แยก schema `sdms` และ role `sdms_app` ไม่แตะตารางของ check-in บัญชีผู้ใช้สองระบบยังแยกกัน แต่นำเข้าครูจาก check-in พร้อมรหัสผ่านเดิมได้ ดู [sdms-shared-database.md](sdms-shared-database.md)
+- ใช้ PostgreSQL local ระหว่างพัฒนา (17 ต.ค. 2569) — เริ่มจากฐานข้อมูลว่าง สร้าง schema `sdms` และข้อมูลตั้งต้นด้วย `go run ./cmd/migrate`
 
 ## เอกสารที่เกี่ยวข้อง
 
 - [Prototype หน้าจอระบบ](https://claude.ai/artifact/6j9Vof6oUJjZNQWMWueyp2) — ต้นแบบที่เอกสารนี้ยึด
 - [sdms-database.md](sdms-database.md) — ER diagram และรายละเอียด 11 ตาราง
-- [sdms-shared-database.md](sdms-shared-database.md) — ตั้งค่าฐานข้อมูลร่วมกับ check-in และนำเข้าครู
 - [sdms-be-issues.md](sdms-be-issues.md) — งาน BE 17 ข้อแบบ GitHub issue เรียงตามลำดับที่ควรทำ

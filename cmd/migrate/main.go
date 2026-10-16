@@ -15,19 +15,18 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("migration failed: load configuration: %v", err)
+		log.Fatalf("initialize database failed: load configuration: %v", err)
 	}
 
-	// OpenForMigration สร้าง schema ให้เองเมื่อ role มีสิทธิ์ (เช่น docker ในเครื่อง)
-	// และตรวจว่า search_path ชี้ไปที่ schema ของ SDMS ก่อนแตะตารางใด ๆ.
+	// OpenForMigration สร้าง schema sdms ให้เองเมื่อใช้ PostgreSQL local.
 	db, err := database.OpenForMigration(context.Background(), cfg.Database)
 	if err != nil {
-		log.Fatalf("migration failed: %v", err)
+		log.Fatalf("initialize database failed: %v", err)
 	}
 
 	sqlDB, err := db.DB()
 	if err != nil {
-		log.Fatalf("migration failed: access database connection: %v", err)
+		log.Fatalf("initialize database failed: access database connection: %v", err)
 	}
 	defer func() {
 		if err := sqlDB.Close(); err != nil {
@@ -35,10 +34,10 @@ func main() {
 		}
 	}()
 
-	// ส่งเวลาปัจจุบันเข้า migration เพื่อเลือกปีการศึกษาและภาคเรียนตามเวลาไทย.
+	// สร้างตารางและ seed ด้วยเวลาปัจจุบันเพื่อเลือกปีการศึกษาและภาคเรียน.
 	if err := migration.Up(db, time.Now()); err != nil {
-		log.Fatalf("migration failed: %v", err)
+		log.Fatalf("initialize database failed: %v", err)
 	}
 
-	log.Printf("migration completed successfully (schema %q)", cfg.Database.Schema)
+	log.Printf("database initialized successfully (schema %q)", cfg.Database.Schema)
 }

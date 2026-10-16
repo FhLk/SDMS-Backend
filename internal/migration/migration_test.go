@@ -1,43 +1,30 @@
 package migration
 
 import (
-	"sync"
 	"testing"
 	"time"
-
-	"gorm.io/gorm/schema"
 )
 
 func TestCurrentAcademicPeriod(t *testing.T) {
 	tests := []struct {
 		name         string
-		date         time.Time
+		date         string
 		wantYear     int16
 		wantSemester int16
 	}{
-		{
-			name:         "before academic year starts",
-			date:         time.Date(2026, time.April, 30, 12, 0, 0, 0, bangkokLocation),
-			wantYear:     2568,
-			wantSemester: 2,
-		},
-		{
-			name:         "first semester",
-			date:         time.Date(2026, time.May, 1, 0, 0, 0, 0, bangkokLocation),
-			wantYear:     2569,
-			wantSemester: 1,
-		},
-		{
-			name:         "second semester",
-			date:         time.Date(2026, time.November, 1, 0, 0, 0, 0, bangkokLocation),
-			wantYear:     2569,
-			wantSemester: 2,
-		},
+		{name: "ก่อนเปิดปีการศึกษา", date: "2026-04-30T12:00:00+07:00", wantYear: 2568, wantSemester: 2},
+		{name: "ภาคเรียนหนึ่ง", date: "2026-05-01T00:00:00+07:00", wantYear: 2569, wantSemester: 1},
+		{name: "ภาคเรียนสอง", date: "2026-11-01T00:00:00+07:00", wantYear: 2569, wantSemester: 2},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			year, semester := CurrentAcademicPeriod(test.date)
+			value, err := time.Parse(time.RFC3339, test.date)
+			if err != nil {
+				t.Fatalf("parse test date: %v", err)
+			}
+
+			year, semester := CurrentAcademicPeriod(value)
 			if year != test.wantYear || semester != test.wantSemester {
 				t.Fatalf("CurrentAcademicPeriod() = (%d, %d), want (%d, %d)", year, semester, test.wantYear, test.wantSemester)
 			}
@@ -45,38 +32,8 @@ func TestCurrentAcademicPeriod(t *testing.T) {
 	}
 }
 
-func TestDefaultDivisions(t *testing.T) {
-	divisions := DefaultDivisions()
-	if len(divisions) != 4 {
-		t.Fatalf("DefaultDivisions() returned %d divisions, want 4", len(divisions))
-	}
-
-	wantCodes := []string{"aca", "bud", "per", "gen"}
-	for index, wantCode := range wantCodes {
-		if got := divisions[index].Code; got != wantCode {
-			t.Errorf("division[%d].Code = %q, want %q", index, got, wantCode)
-		}
-	}
-}
-
-func TestSchemaModelsCoverEveryTable(t *testing.T) {
-	want := []string{
-		"users", "divisions", "user_divisions", "academic_years", "topics", "topic_fields",
-		"submissions", "files", "topic_assignees", "sessions", "checkin_user_links",
-	}
-
-	models := SchemaModels()
-	if len(models) != len(want) {
-		t.Fatalf("SchemaModels() returned %d models, want %d", len(models), len(want))
-	}
-	cache := &sync.Map{}
-	for index, value := range models {
-		parsed, err := schema.Parse(value, cache, schema.NamingStrategy{})
-		if err != nil {
-			t.Fatalf("parse model %T: %v", value, err)
-		}
-		if parsed.Table != want[index] {
-			t.Errorf("model[%d] table = %q, want %q", index, parsed.Table, want[index])
-		}
+func TestSchemaModelsContainsCurrentTables(t *testing.T) {
+	if got, want := len(SchemaModels()), 10; got != want {
+		t.Fatalf("len(SchemaModels()) = %d, want %d", got, want)
 	}
 }

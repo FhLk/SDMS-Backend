@@ -19,10 +19,8 @@ func Open(ctx context.Context, cfg config.DatabaseConfig) (*gorm.DB, error) {
 	return open(ctx, cfg, false)
 }
 
-// OpenForMigration works like Open but first creates cfg.Schema when it does
-// not exist yet and the database role is allowed to create schemas (for
-// example the local docker user). On Supabase the schema is created by
-// deploy/supabase/sdms-schema.sql because the application role cannot.
+// OpenForMigration ทำงานเหมือน Open แต่สร้าง schema ให้ก่อนเมื่อยังไม่มี.
+// ผู้ใช้ PostgreSQL local จาก compose.yaml เป็นเจ้าของฐานข้อมูลจึงสร้างได้ทันที.
 func OpenForMigration(ctx context.Context, cfg config.DatabaseConfig) (*gorm.DB, error) {
 	return open(ctx, cfg, true)
 }
@@ -87,8 +85,7 @@ func EnsureSchema(ctx context.Context, db *sql.DB, schema string) error {
 	}
 
 	if _, err := db.ExecContext(ctx, "CREATE SCHEMA "+pgx.Identifier{schema}.Sanitize()); err != nil {
-		return fmt.Errorf("database schema %q does not exist and this role cannot create it (%v); "+
-			"on Supabase run deploy/supabase/sdms-schema.sql as postgres first", schema, err)
+		return fmt.Errorf("database schema %q does not exist and this role cannot create it: %w", schema, err)
 	}
 	return nil
 }
@@ -111,17 +108,12 @@ func VerifySchema(ctx context.Context, db *sql.DB, schema string) error {
 	}
 
 	if !exists {
-		return fmt.Errorf("database schema %q does not exist; run `go run ./cmd/migrate` "+
-			"(on Supabase run deploy/supabase/sdms-schema.sql first, see sdms-shared-database.md)", schema)
+		return fmt.Errorf("database schema %q does not exist; run `go run ./cmd/migrate` first", schema)
 	}
 	got := "no existing schema"
 	if current.Valid {
 		got = fmt.Sprintf("schema %q", current.String)
 	}
-	// ไม่แนะนำให้ ALTER ROLE ของ role ที่ต่ออยู่ เพราะอาจเป็น postgres ที่ระบบ check-in ใช้
-	// การเปลี่ยน search_path ของ role นั้นจะทำให้ check-in หาตารางของตัวเองไม่เจอ.
-	return fmt.Errorf("database role %q resolves tables to %s instead of %q; connect as the dedicated SDMS role "+
-		"created by deploy/supabase/sdms-schema.sql (its search_path is already %s) or add search_path=%s to DATABASE_URL. "+
-		"Do not change the search_path of a role that other applications use (see sdms-shared-database.md)",
-		role, got, schema, schema, schema)
+	return fmt.Errorf("database role %q resolves tables to %s instead of %q; add search_path=%s to DATABASE_URL or use the local compose user",
+		role, got, schema, schema)
 }
