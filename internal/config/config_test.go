@@ -150,3 +150,46 @@ func TestLoadR2UploadStorage(t *testing.T) {
 		t.Fatalf("R2.SessionToken = %q, want temporary", cfg.Uploads.R2.SessionToken)
 	}
 }
+
+func TestLoadUsesSDMSDatabaseSchemaByDefault(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/sdms")
+	t.Setenv("SERVER_PORT", "8080")
+	t.Setenv("DB_SCHEMA", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Database.Schema != "sdms" {
+		t.Fatalf("Database.Schema = %q, want sdms", cfg.Database.Schema)
+	}
+}
+
+func TestLoadNormalizesDatabaseSchema(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/sdms")
+	t.Setenv("SERVER_PORT", "8080")
+	t.Setenv("DB_SCHEMA", " School_Docs ")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Database.Schema != "school_docs" {
+		t.Fatalf("Database.Schema = %q, want school_docs", cfg.Database.Schema)
+	}
+}
+
+func TestLoadRejectsInvalidDatabaseSchema(t *testing.T) {
+	for _, schema := range []string{"sdms-app", "1sdms", "sdms;drop", `"sdms"`, "pg_catalog", "information_schema"} {
+		t.Run(schema, func(t *testing.T) {
+			t.Setenv("DATABASE_URL", "postgres://localhost/sdms")
+			t.Setenv("SERVER_PORT", "8080")
+			t.Setenv("DB_SCHEMA", schema)
+
+			_, err := Load()
+			if err == nil || !strings.Contains(err.Error(), "DB_SCHEMA") {
+				t.Fatalf("Load() error = %v, want invalid DB_SCHEMA error", err)
+			}
+		})
+	}
+}

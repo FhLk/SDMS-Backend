@@ -4,12 +4,12 @@ ER diagram พจนานุกรมข้อมูล และ GORM models �
 
 | หัวข้อ | รายละเอียด |
 | --- | --- |
-| ฐานข้อมูล | PostgreSQL 17 |
+| ฐานข้อมูล | PostgreSQL บน Supabase ตัวเดียวกับระบบ check-in · schema `sdms` ([ตั้งค่า](sdms-shared-database.md)) |
 | ORM | GORM (AutoMigrate) |
 | ใช้กับ issue | BE-02 สร้างตาราง + ข้อมูลเริ่มต้น |
 | ต้นแบบอ้างอิง | [SDMS Web App](https://claude.ai/artifact/6j9Vof6oUJjZNQWMWueyp2) |
 
-**10** ตาราง · **16** ความสัมพันธ์ (FK) · **7** กติกาที่ฐานข้อมูลคุมให้ · **6** ชนิดช่องในฟอร์ม
+**11** ตาราง · **17** ความสัมพันธ์ (FK) · **7** กติกาที่ฐานข้อมูลคุมให้ · **6** ชนิดช่องในฟอร์ม
 
 > models และ data-preserving migration ผ่านการรันจริงบน PostgreSQL 17 และทดสอบการรันซ้ำแล้ว
 >
@@ -17,6 +17,8 @@ ER diagram พจนานุกรมข้อมูล และ GORM models �
 
 ## 1. ข้อตกลง
 
+- ทุกตารางอยู่ใน schema `sdms` (ตั้งด้วย `DB_SCHEMA`) แยกจากตารางของระบบ check-in ใน `public` โค้ดอ้างชื่อตารางแบบไม่ใส่ schema และอาศัย search_path ของ role แอปจึงตรวจตอนเริ่มว่า `current_schema()` ตรงกับ `DB_SCHEMA`
+- ทุกตารางเปิด RLS แบบไม่มี policy เหมือน check-in role เจ้าของตาราง (`sdms_app` หรือ user ของ docker) ไม่ถูกบังคับ ส่วน role ของ Data API อ่านไม่ได้
 - ชื่อตารางและคอลัมน์เป็น snake_case ตารางเป็นพหูพจน์ ตามค่าเริ่มต้นของ GORM จึงไม่ต้องตั้ง `TableName()`
 - ทุกตารางใช้ `uuid` ชนิด PostgreSQL `uuid` เป็น primary key โดยแอปสร้าง UUIDv7 ที่เรียงตามเวลา
 - ค่าธรรมชาติ `divisions.code`, `academic_years.year` และ `sessions.token_hash` ยังคงเป็น unique business key
@@ -46,11 +48,14 @@ erDiagram
   topic_fields ||--o{ files : "ของช่อง"
   users ||--o{ files : "อัปโหลด"
   users ||--o{ sessions : "เข้าสู่ระบบ"
+  users ||--o| checkin_user_links : "นำเข้าจาก check-in"
   users {
     uuid uuid PK
     varchar username UK
     text password_hash
-    varchar full_name
+    varchar prefix
+    varchar first_name
+    varchar last_name
     varchar position
     boolean is_exec
     boolean is_admin
@@ -122,6 +127,12 @@ erDiagram
     varchar object_key
     varchar status
   }
+  checkin_user_links {
+    uuid uuid PK
+    uuid user_uuid FK,UK
+    uuid checkin_teacher_uid UK
+    timestamptz password_synced_at
+  }
 ```
 
 ## 3. กติกาที่ฐานข้อมูลคุมให้
@@ -162,7 +173,9 @@ erDiagram
 | `uuid` | uuid | – | UUIDv7 | รหัสบุคลากร |
 | `username` | varchar(32) | – | – | ชื่อผู้ใช้สำหรับเข้าระบบ ตัวพิมพ์เล็ก a–z 0–9 และ . _ - ยาว 3–32 ตัว เช่น somchai.s |
 | `password_hash` | text | – | – | hash ของรหัสผ่าน (bcrypt) ห้ามส่งออกทาง API |
-| `full_name` | varchar(120) | – | – | ชื่อ-สกุล |
+| `prefix` | varchar(30) | – | `''` | คำนำหน้า เช่น นาย นาง นางสาว |
+| `first_name` | varchar(120) | – | – | ชื่อ |
+| `last_name` | varchar(120) | – | `''` | นามสกุล; ว่างได้ในเชิงธุรกิจสำหรับบัญชีระบบ แต่เก็บเป็นข้อความว่างแทน NULL |
 | `position` | varchar(120) | – | – | ตำแหน่ง เช่น ครู ภาษาไทย |
 | `is_exec` | boolean | – | `false` | ผู้บริหาร: ไม่ต้องส่ง เห็นภาพรวมทุกฝ่าย |
 | `is_admin` | boolean | – | `false` | แอดมินกลาง: จัดการบุคลากร ฝ่าย ปีการศึกษา |
@@ -425,6 +438,32 @@ erDiagram
 - prefix ใน R2 เป็นส่วนหนึ่งของ object key ไม่ใช่โฟลเดอร์จริง จึงไม่ต้องมีตาราง cache โฟลเดอร์
 - migration จะ rename `files.drive_file_id` เดิมเป็น `files.object_key` ใน transaction เพื่อรักษาข้อมูลอ้างอิงเดิม
 
+### การเชื่อมกับระบบ check-in
+
+#### `checkin_user_links`
+
+บัญชี SDMS ที่นำเข้าจากครูในระบบ check-in ด้วย `go run ./cmd/import-checkin-teachers` 1 แถวต่อ 1 บัญชี
+
+| คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
+| --- | --- | --- | --- | --- |
+| `uuid` | uuid | – | UUIDv7 | รหัสลิงก์ |
+| `user_uuid` | uuid | – | – | บัญชี SDMS → users.uuid |
+| `checkin_teacher_uid` | uuid | – | – | `teachers.uid` ของ check-in |
+| `password_synced_at` | timestamptz | – | – | เวลาที่คัดลอก password hash จาก check-in ล่าสุด |
+| `created_at` | timestamptz | ✓ | – | เวลานำเข้า |
+
+**คีย์และ index**
+
+- PK uuid
+- UNIQUE user_uuid · UNIQUE checkin_teacher_uid
+- FK user_uuid → users ON DELETE CASCADE
+
+**หมายเหตุ**
+
+- `checkin_teacher_uid` ไม่มี FK ข้าม schema เพื่อไม่ผูก migration ของสองระบบเข้าด้วยกัน
+- บัญชีที่แอดมินสร้างเองไม่มีแถวในตารางนี้ คำสั่งนำเข้าจึงไม่แตะบัญชีเหล่านั้น
+- ข้อมูลครูอ่านผ่าน view `sdms.checkin_teacher_accounts` ซึ่งไม่ได้สร้างโดย migration ของ SDMS แต่สร้างด้วย `deploy/supabase/checkin-teacher-view.sql`
+
 ## 5. รูปแบบ JSON
 
 ### topic_fields.options
@@ -501,6 +540,7 @@ object ที่ key คือ `topic_fields.uuid` (เป็นข้อคว�
 - migration เพิ่ม UUIDv7 และ UUID foreign keys ให้แถวเดิมก่อนถอด bigint/natural primary keys
 - key ภายใน `submissions.values` ถูกแปลงจาก `topic_fields.id` เดิมเป็น `topic_fields.uuid` โดยคง key ที่ไม่รู้จักไว้เพื่อไม่ทำข้อมูลสูญหาย
 - ทุกขั้นตอนทำใน transaction เดียว และรันซ้ำได้
+- รายการ model ทั้งหมดอยู่ใน `migration.SchemaModels()` ใช้ทั้งกับ AutoMigrate และการเปิด RLS จึงไม่มีตารางใหม่หลุดการป้องกัน
 
 โครงหลักของ primary key:
 
@@ -561,7 +601,10 @@ type User struct {
 	ID            uint64     `gorm:"primaryKey"`
 	Username      string     `gorm:"size:32;not null;uniqueIndex;check:chk_users_username,username ~ '^[a-z0-9._-]{3,32}$'"`
 	PasswordHash  string     `gorm:"not null" json:"-"`
-	FullName      string     `gorm:"size:120;not null"`
+	Prefix        string     `gorm:"size:30;not null;default:''"`
+	FirstName     string     `gorm:"size:120;not null"`
+	LastName      string     `gorm:"size:120;not null;default:''"`
+	FullName      string     `gorm:"-" json:"-"` // ค่าแสดงผลที่ประกอบจาก 3 ช่อง ไม่เก็บซ้ำในฐานข้อมูล
 	Position      string     `gorm:"size:120;not null"`
 	IsExec        bool       `gorm:"not null;default:false"`
 	IsAdmin       bool       `gorm:"not null;default:false"`

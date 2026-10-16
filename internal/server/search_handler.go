@@ -35,10 +35,13 @@ type searchTopicResponse struct {
 }
 
 type searchUserResponse struct {
-	UUID     uuid.UUID `json:"uuid"`
-	Username string    `json:"username"`
-	FullName string    `json:"full_name"`
-	Position string    `json:"position"`
+	UUID      uuid.UUID `json:"uuid"`
+	Username  string    `json:"username"`
+	Prefix    string    `json:"prefix"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+	FullName  string    `json:"full_name"`
+	Position  string    `json:"position"`
 }
 
 type searchFileResponse struct {
@@ -219,10 +222,13 @@ func newSearchResponse(result searchdomain.Result) searchResponse {
 				IsSecret:     item.Topic.IsSecret,
 			},
 			SubmittedBy: searchUserResponse{
-				UUID:     item.SubmittedBy.UUID,
-				Username: item.SubmittedBy.Username,
-				FullName: item.SubmittedBy.FullName,
-				Position: item.SubmittedBy.Position,
+				UUID:      item.SubmittedBy.UUID,
+				Username:  item.SubmittedBy.Username,
+				Prefix:    item.SubmittedBy.Prefix,
+				FirstName: item.SubmittedBy.FirstName,
+				LastName:  item.SubmittedBy.LastName,
+				FullName:  item.SubmittedBy.DisplayName(),
+				Position:  item.SubmittedBy.Position,
 			},
 			Values:      item.Values,
 			Files:       files,

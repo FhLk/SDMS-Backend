@@ -2,6 +2,8 @@
 
 Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับระบบตาม [Prototype](https://claude.ai/artifact/6j9Vof6oUJjZNQWMWueyp2) เรียงตามลำดับที่ควรทำ คัดลอกไปเปิดเป็น issue ใน GitHub ได้เลย หัวข้อใช้เป็นชื่อ issue ส่วนที่เหลือใช้เป็นเนื้อ issue และใส่ label `backend`
 
+> **ฐานข้อมูล:** SDMS ใช้ PostgreSQL บน Supabase ตัวเดียวกับระบบ check-in โดยเก็บตารางใน schema `sdms` และต่อด้วย role `sdms_app` ของตัวเอง วิธีตั้งค่าและการนำเข้าครูจาก check-in อยู่ใน [sdms-shared-database.md](sdms-shared-database.md)
+
 | # | Issue | ต้องทำก่อน |
 |---|---|---|
 | BE-01 | ตั้งโปรเจกต์ Go Fiber + เชื่อม PostgreSQL | – |
@@ -39,9 +41,12 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 **รันในเครื่อง**
 
 1. คัดลอก `.env.example` เป็น `.env`
-2. เปิด PostgreSQL ด้วย `docker compose up -d postgres` หรือแก้ค่าเชื่อมต่อใน `.env` ให้ตรงกับฐานข้อมูลที่มีอยู่
-3. รัน API ด้วย `go run ./cmd/api`
-4. ตรวจสอบด้วย `GET http://localhost:8080/api/health`
+2. เปิด PostgreSQL ด้วย `docker compose up -d postgres` หรือแก้ค่าเชื่อมต่อใน `.env` ให้ตรงกับฐานข้อมูลที่มีอยู่ (ถ้าต่อ Supabase ของ check-in ดู [sdms-shared-database.md](sdms-shared-database.md))
+3. สร้างตารางด้วย `go run ./cmd/migrate` (ในเครื่องจะสร้าง schema `sdms` ให้เอง)
+4. รัน API ด้วย `go run ./cmd/api`
+5. ตรวจสอบด้วย `GET http://localhost:8080/api/health`
+
+แอปตรวจตอนเริ่มว่า role ที่ต่อเห็นตารางใน schema ตาม `DB_SCHEMA` (ค่าเริ่มต้น `sdms`) ถ้าไม่ตรงจะหยุดพร้อมบอกวิธีแก้
 
 ### BE-02 · สร้างตารางฐานข้อมูล + ข้อมูลเริ่มต้น
 
@@ -68,8 +73,15 @@ go run ./cmd/migrate
 
 ```powershell
 $env:INITIAL_ADMIN_PASSWORD = "sdms-admin!"
-go run ./cmd/create-admin -username admin -name "ผู้ดูแลระบบ" -position "ผู้ดูแลระบบ"
+go run ./cmd/create-admin -username admin -first-name "ผู้ดูแลระบบ" -position "ผู้ดูแลระบบ"
 Remove-Item Env:\INITIAL_ADMIN_PASSWORD
+```
+
+นำเข้าครูจากระบบ check-in ที่ใช้ฐานข้อมูลเดียวกัน ครูเข้าด้วย username และรหัสผ่านเดิมได้ทันที (ไม่ใส่ `-apply` = ดูแผนอย่างเดียว):
+
+```powershell
+go run ./cmd/import-checkin-teachers -division aca
+go run ./cmd/import-checkin-teachers -division aca -apply
 ```
 
 ### BE-03 · Login / Logout / Me
@@ -113,16 +125,18 @@ Remove-Item Env:\INITIAL_ADMIN_PASSWORD
 **เกณฑ์เสร็จ**
 
 - [x] ใช้ได้เฉพาะแอดมิน
-- [x] เพิ่มบุคลากรด้วยชื่อ-สกุล username รหัสผ่านเริ่มต้น ตำแหน่ง ฝ่าย (หลายฝ่ายได้) และบทบาทผู้บริหาร/แอดมิน
+- [x] เพิ่มบุคลากรด้วยคำนำหน้า ชื่อ นามสกุล username รหัสผ่านเริ่มต้น ตำแหน่ง ฝ่าย (หลายฝ่ายได้) และบทบาทผู้บริหาร/แอดมิน
 - [x] username ซ้ำ → 409
 - [x] ปิดใช้งานแทนการลบ คำตอบเดิมของคนนั้นยังอยู่
 - [x] ตั้งรหัสผ่านใหม่แล้ว session เดิมของคนนั้นใช้ไม่ได้
 
 **Request fields**
 
-- `POST /api/admin/users`: `username`, `password`, `full_name`, `position`, `division_uuids`, `is_exec`, `is_admin`
+- `POST /api/admin/users`: `username`, `password`, `prefix`, `first_name`, `last_name`, `position`, `division_uuids`, `is_exec`, `is_admin`
 - `PATCH /api/admin/users/{uuid}`: ส่งเฉพาะ field ที่ต้องแก้ โดยใช้ `is_active: false` เพื่อปิดบัญชี
 - `POST /api/admin/users/{uuid}/password`: `password`
+
+ทุก response ที่มีข้อมูลบุคลากรคืนทั้ง `prefix`, `first_name`, `last_name` และ `full_name` ที่ประกอบขึ้นเพื่อให้ frontend รุ่นเดิมยังใช้งานได้ ส่วน request ยังรับ `full_name` แบบเดิมชั่วคราว แต่ห้ามส่งพร้อมช่องชื่อแบบใหม่
 
 ### BE-06 · นำเข้าบุคลากรจาก Excel/CSV
 
@@ -132,7 +146,7 @@ Remove-Item Env:\INITIAL_ADMIN_PASSWORD
 
 **เกณฑ์เสร็จ**
 
-- [x] รับไฟล์ .xlsx และ .csv คอลัมน์: ชื่อ-สกุล, username, รหัสผ่านเริ่มต้น, ตำแหน่ง, ฝ่าย
+- [x] รับไฟล์ .xlsx และ .csv คอลัมน์: คำนำหน้า, ชื่อ, นามสกุล, username, รหัสผ่านเริ่มต้น, ตำแหน่ง, ฝ่าย
 - [x] ตรวจทุกแถวก่อนบันทึก ถ้ามีแถวผิดให้คืนรายการผิดทีละบรรทัด และไม่บันทึกเลยสักแถว
 - [x] มีไฟล์ตัวอย่างให้ดาวน์โหลด
 

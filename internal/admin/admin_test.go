@@ -7,10 +7,11 @@ import (
 
 func TestValidate(t *testing.T) {
 	valid := CreateInput{
-		Username: "admin",
-		Password: "sdms-admin!",
-		FullName: "System Administrator",
-		Position: "Administrator",
+		Username:  "admin",
+		Password:  "sdms-admin!",
+		FirstName: "System",
+		LastName:  "Administrator",
+		Position:  "Administrator",
 	}
 	if err := validate(valid); err != nil {
 		t.Fatalf("validate(valid) error = %v", err)
@@ -23,7 +24,8 @@ func TestValidate(t *testing.T) {
 		{name: "invalid username", input: withUsername(valid, "A")},
 		{name: "short password", input: withPassword(valid, "short")},
 		{name: "bcrypt password limit", input: withPassword(valid, strings.Repeat("x", 73))},
-		{name: "missing full name", input: withFullName(valid, "")},
+		{name: "mixed name formats", input: CreateInput{Username: "admin", Password: "sdms-admin!", FirstName: "System", FullName: "System Administrator", Position: "Administrator"}},
+		{name: "missing first name", input: withFirstName(valid, "")},
 		{name: "missing position", input: withPosition(valid, "")},
 	}
 
@@ -46,8 +48,8 @@ func withPassword(input CreateInput, password string) CreateInput {
 	return input
 }
 
-func withFullName(input CreateInput, fullName string) CreateInput {
-	input.FullName = fullName
+func withFirstName(input CreateInput, firstName string) CreateInput {
+	input.FirstName = firstName
 	return input
 }
 

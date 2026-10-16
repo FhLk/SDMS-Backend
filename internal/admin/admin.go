@@ -20,8 +20,12 @@ var (
 
 // CreateInput คือข้อมูลที่จำเป็นสำหรับสร้างบัญชีแอดมิน.
 type CreateInput struct {
-	Username string
-	Password string
+	Username  string
+	Password  string
+	Prefix    string
+	FirstName string
+	LastName  string
+	// FullName is retained as a CLI compatibility fallback.
 	FullName string
 	Position string
 }
@@ -29,7 +33,14 @@ type CreateInput struct {
 // Create ตรวจข้อมูล, hash รหัสผ่านด้วย bcrypt และบันทึกบัญชีแอดมิน.
 func Create(ctx context.Context, db *gorm.DB, input CreateInput) (*model.User, error) {
 	input.Username = strings.ToLower(strings.TrimSpace(input.Username))
+	input.Prefix = strings.TrimSpace(input.Prefix)
+	input.FirstName = strings.TrimSpace(input.FirstName)
+	input.LastName = strings.TrimSpace(input.LastName)
 	input.FullName = strings.TrimSpace(input.FullName)
+	if input.FullName != "" && input.Prefix == "" && input.FirstName == "" && input.LastName == "" {
+		input.FirstName = input.FullName
+		input.FullName = ""
+	}
 	input.Position = strings.TrimSpace(input.Position)
 
 	if err := validate(input); err != nil {
@@ -54,7 +65,9 @@ func Create(ctx context.Context, db *gorm.DB, input CreateInput) (*model.User, e
 	user := model.User{
 		Username:     input.Username,
 		PasswordHash: string(passwordHash),
-		FullName:     input.FullName,
+		Prefix:       input.Prefix,
+		FirstName:    input.FirstName,
+		LastName:     input.LastName,
 		Position:     input.Position,
 		IsAdmin:      true,
 	}
@@ -69,19 +82,28 @@ func Create(ctx context.Context, db *gorm.DB, input CreateInput) (*model.User, e
 }
 
 func validate(input CreateInput) error {
+	if input.FullName != "" && (input.Prefix != "" || input.FirstName != "" || input.LastName != "") {
+		return errors.New("full name cannot be combined with structured name fields")
+	}
 	if err := validateUsername(input.Username); err != nil {
 		return err
 	}
 	if err := validatePassword(input.Password); err != nil {
 		return err
 	}
-	if input.FullName == "" {
-		return errors.New("full name is required")
+	if input.FirstName == "" {
+		return errors.New("first name is required")
 	}
 	if input.Position == "" {
 		return errors.New("position is required")
 	}
 	return nil
+}
+
+// ValidateUsername ใช้กติกา username เดียวกับการสร้างบัญชีผ่าน API
+// ให้แพ็กเกจอื่น เช่น การนำเข้าครูจาก check-in ตรวจด้วยเงื่อนไขเดียวกัน.
+func ValidateUsername(username string) error {
+	return validateUsername(username)
 }
 
 func validateUsername(username string) error {

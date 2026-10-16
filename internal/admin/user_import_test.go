@@ -35,7 +35,7 @@ func TestBuildUserImportTemplateCanBeReadByImporter(t *testing.T) {
 			if len(rows) != 1 {
 				t.Fatalf("rows = %d, want one example row", len(rows))
 			}
-			if rows[0].Cells[0] != "สมชาย ใจดี" || rows[0].Cells[1] != "somchai.j" || rows[0].Cells[4] != "วิชาการ|บุคคล" {
+			if rows[0].Cells[0] != "นาย" || rows[0].Cells[1] != "สมชาย" || rows[0].Cells[2] != "ใจดี" || rows[0].Cells[4] != "somchai.j" || rows[0].Cells[7] != "วิชาการ|บุคคล" {
 				t.Fatalf("example row = %v", rows[0].Cells)
 			}
 		})
@@ -52,7 +52,7 @@ func TestReadImportRowsMapsAliasesAndReorderedColumns(t *testing.T) {
 		t.Fatalf("rows = %d, want 1", len(rows))
 	}
 	// รหัสผ่านต้องเก็บช่องว่างตามไฟล์ ส่วน field อื่นจะ normalize ตอน validate.
-	want := []string{"ครู หนึ่ง", "Teacher.One", " safe-password ", "ครู", "aca"}
+	want := []string{"", "", "", "ครู หนึ่ง", "Teacher.One", " safe-password ", "ครู", "aca"}
 	for index := range want {
 		if rows[0].Cells[index] != want[index] {
 			t.Fatalf("cell %d = %q, want %q", index, rows[0].Cells[index], want[index])
@@ -83,9 +83,9 @@ func TestValidateImportRowsCollectsAllErrors(t *testing.T) {
 		{UUIDModel: model.UUIDModel{UUID: personnelUUID}, Code: "per", Name: "ฝ่ายบุคคล", ShortName: "บุคคล"},
 	})
 	rows := []rawImportRow{
-		{Number: 2, Cells: []string{"ครู หนึ่ง", "Same.User", "short", "ครู", "aca|ไม่พบฝ่าย"}},
-		{Number: 3, Cells: []string{"ครู สอง", "same.user", "safe-password", "ครู", "วิชาการ"}},
-		{Number: 4, Cells: []string{"", "bad space", "safe-password", "", ""}},
+		{Number: 2, Cells: []string{"", "ครู", "หนึ่ง", "", "Same.User", "short", "ครู", "aca|ไม่พบฝ่าย"}},
+		{Number: 3, Cells: []string{"", "ครู", "สอง", "", "same.user", "safe-password", "ครู", "วิชาการ"}},
+		{Number: 4, Cells: []string{"", "", "", "", "bad space", "safe-password", "", ""}},
 	}
 
 	validated, rowErrors := validateImportRows(rows, lookup)
@@ -93,14 +93,14 @@ func TestValidateImportRowsCollectsAllErrors(t *testing.T) {
 		t.Fatalf("validated rows = %d, want 3 so all rows can be checked together", len(validated))
 	}
 	wantErrors := map[string]bool{
-		"2/password":  false,
-		"2/divisions": false,
-		"2/username":  false,
-		"3/username":  false,
-		"4/full_name": false,
-		"4/username":  false,
-		"4/position":  false,
-		"4/divisions": false,
+		"2/password":   false,
+		"2/divisions":  false,
+		"2/username":   false,
+		"3/username":   false,
+		"4/first_name": false,
+		"4/username":   false,
+		"4/position":   false,
+		"4/divisions":  false,
 	}
 	for _, rowError := range rowErrors {
 		key := fmt.Sprintf("%d/%s", rowError.Row, rowError.Field)

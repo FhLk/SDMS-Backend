@@ -51,9 +51,15 @@ const (
 // User บุคลากร 1 คน — ไม่ลบจริง ใช้ DeactivatedAt แทน
 type User struct {
 	UUIDModel
-	Username      string     `gorm:"size:32;not null;uniqueIndex;check:chk_users_username,username ~ '^[a-z0-9._-]{3,32}$'"`
-	PasswordHash  string     `gorm:"not null" json:"-"`
-	FullName      string     `gorm:"size:120;not null"`
+	Username     string `gorm:"size:32;not null;uniqueIndex;check:chk_users_username,username ~ '^[a-z0-9._-]{3,32}$'"`
+	PasswordHash string `gorm:"not null" json:"-"`
+	Prefix       string `gorm:"size:30;not null;default:''"`
+	FirstName    string `gorm:"size:120;not null"`
+	LastName     string `gorm:"size:120;not null;default:''"`
+	// FullName is a transitional, non-persistent field for internal callers that
+	// still construct User values with a display name. New code stores the three
+	// name components above and uses DisplayName when rendering a name.
+	FullName      string     `gorm:"-" json:"-"`
 	Position      string     `gorm:"size:120;not null"`
 	IsExec        bool       `gorm:"not null;default:false"`
 	IsAdmin       bool       `gorm:"not null;default:false"`
@@ -185,6 +191,20 @@ type Session struct {
 	IP         string    `gorm:"size:45"`
 	UserAgent  string    `gorm:"size:300"`
 	CreatedAt  time.Time
+
+	User User `gorm:"foreignKey:UserUUID;references:UUID;constraint:OnDelete:CASCADE"`
+}
+
+// CheckinUserLink ผูกบัญชี SDMS กับครูในระบบ check-in ที่ใช้ฐานข้อมูลเดียวกัน.
+// แถวถูกสร้างโดยคำสั่ง import-checkin-teachers เท่านั้น จึงใช้แยกบัญชีที่นำเข้า
+// ออกจากบัญชีที่แอดมินสร้างเอง และทำให้การนำเข้าซ้ำไม่สร้างบัญชีซ้ำ.
+// teacher_uid ไม่มี foreign key ข้าม schema เพื่อไม่ผูก migration ของสองระบบเข้าด้วยกัน.
+type CheckinUserLink struct {
+	UUIDModel
+	UserUUID          uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
+	CheckinTeacherUID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
+	PasswordSyncedAt  time.Time `gorm:"not null"` // เวลาที่คัดลอก password hash จาก check-in ล่าสุด
+	CreatedAt         time.Time
 
 	User User `gorm:"foreignKey:UserUUID;references:UUID;constraint:OnDelete:CASCADE"`
 }

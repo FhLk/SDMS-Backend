@@ -38,7 +38,9 @@ type TopicTableRow struct {
 type topicTableDatabaseRow struct {
 	UserUUID       uuid.UUID
 	Username       string
-	FullName       string
+	Prefix         string
+	FirstName      string
+	LastName       string
 	Position       string
 	SubmissionUUID *uuid.UUID
 	Values         datatypes.JSON
@@ -103,7 +105,7 @@ func (s *Service) ListPendingNames(ctx context.Context, topicUUID uuid.UUID, pro
 			Joins("JOIN topic_assignees ON topic_assignees.user_uuid = users.uuid AND topic_assignees.topic_uuid = ?", topic.UUID).
 			Joins("LEFT JOIN submissions ON submissions.topic_uuid = topic_assignees.topic_uuid AND submissions.user_uuid = topic_assignees.user_uuid").
 			Where("submissions.uuid IS NULL").
-			Order("users.full_name, users.username, users.uuid").
+			Order("users.first_name, users.last_name, users.username, users.uuid").
 			Find(&users).Error; err != nil {
 			return fmt.Errorf("list pending submission names: %w", err)
 		}
@@ -121,7 +123,9 @@ func queryTopicTableRows(db *gorm.DB, topic model.Topic, profile auth.Profile, s
 		Select(`
 			users.uuid AS user_uuid,
 			users.username,
-			users.full_name,
+			users.prefix,
+			users.first_name,
+			users.last_name,
 			users.position,
 			submissions.uuid AS submission_uuid,
 			submissions.values,
@@ -139,7 +143,7 @@ func queryTopicTableRows(db *gorm.DB, topic model.Topic, profile auth.Profile, s
 	case "pending":
 		query = query.Where("submissions.uuid IS NULL")
 	}
-	if err := query.Order("users.full_name, users.username, users.uuid").Scan(&databaseRows).Error; err != nil {
+	if err := query.Order("users.first_name, users.last_name, users.username, users.uuid").Scan(&databaseRows).Error; err != nil {
 		return nil, fmt.Errorf("list topic submission rows: %w", err)
 	}
 
@@ -164,7 +168,9 @@ func queryTopicTableRows(db *gorm.DB, topic model.Topic, profile auth.Profile, s
 			User: model.User{
 				UUIDModel: model.UUIDModel{UUID: row.UserUUID},
 				Username:  row.Username,
-				FullName:  row.FullName,
+				Prefix:    row.Prefix,
+				FirstName: row.FirstName,
+				LastName:  row.LastName,
 				Position:  row.Position,
 			},
 			SubmissionUUID: row.SubmissionUUID,

@@ -38,10 +38,13 @@ type setCurrentAcademicYearRequest struct {
 }
 
 type divisionHeadUserResponse struct {
-	UUID     uuid.UUID `json:"uuid"`
-	Username string    `json:"username"`
-	FullName string    `json:"full_name"`
-	Position string    `json:"position"`
+	UUID      uuid.UUID `json:"uuid"`
+	Username  string    `json:"username"`
+	Prefix    string    `json:"prefix"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+	FullName  string    `json:"full_name"`
+	Position  string    `json:"position"`
 }
 
 type adminDivisionResponse struct {
@@ -175,10 +178,13 @@ func newAdminDivisionResponse(division model.Division) adminDivisionResponse {
 	}
 	if division.HeadUser != nil {
 		response.HeadUser = &divisionHeadUserResponse{
-			UUID:     division.HeadUser.UUID,
-			Username: division.HeadUser.Username,
-			FullName: division.HeadUser.FullName,
-			Position: division.HeadUser.Position,
+			UUID:      division.HeadUser.UUID,
+			Username:  division.HeadUser.Username,
+			Prefix:    division.HeadUser.Prefix,
+			FirstName: division.HeadUser.FirstName,
+			LastName:  division.HeadUser.LastName,
+			FullName:  division.HeadUser.DisplayName(),
+			Position:  division.HeadUser.Position,
 		}
 	}
 	return response

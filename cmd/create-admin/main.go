@@ -17,7 +17,10 @@ func main() {
 	// รองรับทั้ง flags และ environment variable เพื่อไม่บังคับให้ใส่รหัสผ่านใน command history.
 	username := flag.String("username", os.Getenv("INITIAL_ADMIN_USERNAME"), "admin username")
 	password := flag.String("password", os.Getenv("INITIAL_ADMIN_PASSWORD"), "admin password (prefer INITIAL_ADMIN_PASSWORD)")
-	fullName := flag.String("name", os.Getenv("INITIAL_ADMIN_NAME"), "admin full name")
+	prefix := flag.String("prefix", os.Getenv("INITIAL_ADMIN_PREFIX"), "admin name prefix")
+	firstName := flag.String("first-name", os.Getenv("INITIAL_ADMIN_FIRST_NAME"), "admin first name")
+	lastName := flag.String("last-name", os.Getenv("INITIAL_ADMIN_LAST_NAME"), "admin last name")
+	fullName := flag.String("name", os.Getenv("INITIAL_ADMIN_NAME"), "legacy full name fallback")
 	position := flag.String("position", os.Getenv("INITIAL_ADMIN_POSITION"), "admin position")
 	flag.Parse()
 
@@ -42,10 +45,13 @@ func main() {
 	}()
 
 	created, err := admin.Create(context.Background(), db, admin.CreateInput{
-		Username: *username,
-		Password: *password,
-		FullName: *fullName,
-		Position: *position,
+		Username:  *username,
+		Password:  *password,
+		Prefix:    *prefix,
+		FirstName: *firstName,
+		LastName:  *lastName,
+		FullName:  *fullName,
+		Position:  *position,
 	})
 	if err != nil {
 		log.Fatalf("create admin failed: %v", err)

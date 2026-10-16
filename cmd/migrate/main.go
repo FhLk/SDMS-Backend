@@ -18,7 +18,9 @@ func main() {
 		log.Fatalf("migration failed: load configuration: %v", err)
 	}
 
-	db, err := database.Open(context.Background(), cfg.Database)
+	// OpenForMigration สร้าง schema ให้เองเมื่อ role มีสิทธิ์ (เช่น docker ในเครื่อง)
+	// และตรวจว่า search_path ชี้ไปที่ schema ของ SDMS ก่อนแตะตารางใด ๆ.
+	db, err := database.OpenForMigration(context.Background(), cfg.Database)
 	if err != nil {
 		log.Fatalf("migration failed: %v", err)
 	}
@@ -38,5 +40,5 @@ func main() {
 		log.Fatalf("migration failed: %v", err)
 	}
 
-	log.Println("migration completed successfully")
+	log.Printf("migration completed successfully (schema %q)", cfg.Database.Schema)
 }

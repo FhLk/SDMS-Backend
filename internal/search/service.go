@@ -121,7 +121,9 @@ type itemRow struct {
 	AcademicYear   int16
 	UserUUID       uuid.UUID
 	Username       string
-	FullName       string
+	Prefix         string
+	FirstName      string
+	LastName       string
 	Position       string
 }
 
@@ -176,7 +178,9 @@ func (s *Service) Search(ctx context.Context, input Input) (Result, error) {
 				academic_years.year AS academic_year,
 				users.uuid AS user_uuid,
 				users.username,
-				users.full_name,
+				users.prefix,
+				users.first_name,
+				users.last_name,
 				users.position`).
 			Order("submissions.submitted_at DESC, submissions.uuid DESC").
 			Limit(normalized.PageSize).
@@ -261,7 +265,11 @@ func searchableSubmissions(db *gorm.DB, input Input) *gorm.DB {
 			divisions.name ILIKE ? ESCAPE E'\\' OR
 			divisions.short_name ILIKE ? ESCAPE E'\\' OR
 			divisions.code ILIKE ? ESCAPE E'\\' OR
-			users.full_name ILIKE ? ESCAPE E'\\' OR
+			users.prefix ILIKE ? ESCAPE E'\\' OR
+			users.first_name ILIKE ? ESCAPE E'\\' OR
+			users.last_name ILIKE ? ESCAPE E'\\' OR
+			CONCAT_WS(' ', NULLIF(users.prefix, ''), users.first_name, NULLIF(users.last_name, '')) ILIKE ? ESCAPE E'\\' OR
+			(users.prefix || users.first_name || CASE WHEN users.last_name = '' THEN '' ELSE ' ' || users.last_name END) ILIKE ? ESCAPE E'\\' OR
 			users.username ILIKE ? ESCAPE E'\\' OR
 			submissions.values::text ILIKE ? ESCAPE E'\\' OR
 			EXISTS (
@@ -270,7 +278,7 @@ func searchableSubmissions(db *gorm.DB, input Input) *gorm.DB {
 					AND files.status = ?
 					AND files.original_name ILIKE ? ESCAPE E'\\'
 			)
-		)`, pattern, pattern, pattern, pattern, pattern, pattern, pattern, model.FileAttached, pattern)
+		)`, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, model.FileAttached, pattern)
 	}
 	if input.Division != "" {
 		query = query.Where("divisions.code = ?", input.Division)
@@ -388,7 +396,9 @@ func buildItems(rows []itemRow, fileRows []fileRow) []Item {
 			SubmittedBy: model.User{
 				UUIDModel: model.UUIDModel{UUID: row.UserUUID},
 				Username:  row.Username,
-				FullName:  row.FullName,
+				Prefix:    row.Prefix,
+				FirstName: row.FirstName,
+				LastName:  row.LastName,
 				Position:  row.Position,
 			},
 			Values:      append(json.RawMessage(nil), row.Values...),

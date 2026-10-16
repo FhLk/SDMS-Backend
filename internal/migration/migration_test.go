@@ -1,8 +1,11 @@
 package migration
 
 import (
+	"sync"
 	"testing"
 	"time"
+
+	"gorm.io/gorm/schema"
 )
 
 func TestCurrentAcademicPeriod(t *testing.T) {
@@ -52,6 +55,28 @@ func TestDefaultDivisions(t *testing.T) {
 	for index, wantCode := range wantCodes {
 		if got := divisions[index].Code; got != wantCode {
 			t.Errorf("division[%d].Code = %q, want %q", index, got, wantCode)
+		}
+	}
+}
+
+func TestSchemaModelsCoverEveryTable(t *testing.T) {
+	want := []string{
+		"users", "divisions", "user_divisions", "academic_years", "topics", "topic_fields",
+		"submissions", "files", "topic_assignees", "sessions", "checkin_user_links",
+	}
+
+	models := SchemaModels()
+	if len(models) != len(want) {
+		t.Fatalf("SchemaModels() returned %d models, want %d", len(models), len(want))
+	}
+	cache := &sync.Map{}
+	for index, value := range models {
+		parsed, err := schema.Parse(value, cache, schema.NamingStrategy{})
+		if err != nil {
+			t.Fatalf("parse model %T: %v", value, err)
+		}
+		if parsed.Table != want[index] {
+			t.Errorf("model[%d] table = %q, want %q", index, parsed.Table, want[index])
 		}
 	}
 }

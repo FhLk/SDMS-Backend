@@ -64,6 +64,11 @@ func Up(db *gorm.DB, now time.Time) error {
 		if err := migrateObjectStorageColumns(tx); err != nil {
 			return err
 		}
+		// Replace the denormalized full_name column with the three components
+		// used by the check-in system, preserving every existing display name.
+		if err := migrateUserNameColumns(tx); err != nil {
+			return err
+		}
 
 		// Register the explicit join model so GORM uses its UUID primary key and
 		// the UserUUID/DivisionUUID foreign-key columns.
@@ -71,20 +76,12 @@ func Up(db *gorm.DB, now time.Time) error {
 			return fmt.Errorf("configure user division join table: %w", err)
 		}
 
-		if err := tx.AutoMigrate(
-			&model.User{},
-			&model.Division{},
-			&model.UserDivision{},
-			&model.AcademicYear{},
-			&model.Topic{},
-			&model.TopicField{},
-			&model.Submission{},
-			&model.File{},
-			// ตารางต่อไปนี้รองรับความสัมพันธ์ที่ประกาศไว้ใน models และงานถัดไป.
-			&model.TopicAssignee{},
-			&model.Session{},
-		); err != nil {
+		models := SchemaModels()
+		if err := tx.AutoMigrate(models...); err != nil {
 			return fmt.Errorf("migrate database schema: %w", err)
+		}
+		if err := enableRowLevelSecurity(tx, models); err != nil {
+			return err
 		}
 
 		if err := seedDivisions(tx); err != nil {
@@ -96,6 +93,45 @@ func Up(db *gorm.DB, now time.Time) error {
 
 		return nil
 	})
+}
+
+// SchemaModels คืน model ทุกตัวที่ migration ดูแล เรียงตามลำดับที่ AutoMigrate ต้องสร้าง.
+// รายการเดียวกันใช้เปิด RLS ด้วย จึงไม่มีตารางใหม่ที่หลุดการป้องกัน.
+func SchemaModels() []any {
+	return []any{
+		&model.User{},
+		&model.Division{},
+		&model.UserDivision{},
+		&model.AcademicYear{},
+		&model.Topic{},
+		&model.TopicField{},
+		&model.Submission{},
+		&model.File{},
+		// ตารางต่อไปนี้รองรับความสัมพันธ์ที่ประกาศไว้ใน models และงานถัดไป.
+		&model.TopicAssignee{},
+		&model.Session{},
+		// ลิงก์บัญชีที่นำเข้าจากระบบ check-in (cmd/import-checkin-teachers).
+		&model.CheckinUserLink{},
+	}
+}
+
+// enableRowLevelSecurity เปิด RLS โดยไม่สร้าง policy ให้ทุกตารางของ SDMS แบบเดียวกับ
+// migration ของ check-in. role เจ้าของตาราง (sdms_app หรือผู้ใช้ docker ในเครื่อง)
+// ไม่ถูก RLS บังคับ แอปจึงทำงานเหมือนเดิม ส่วน role อื่นของ Supabase เช่น anon
+// และ authenticated จะอ่านแถวไม่ได้แม้มีคนเผลอ expose schema นี้ผ่าน Data API.
+// คำสั่งนี้รันซ้ำได้ เพราะการเปิด RLS ที่เปิดอยู่แล้วไม่มีผลอะไร.
+func enableRowLevelSecurity(db *gorm.DB, models []any) error {
+	for _, value := range models {
+		statement := &gorm.Statement{DB: db}
+		if err := statement.Parse(value); err != nil {
+			return fmt.Errorf("resolve table name for row level security: %w", err)
+		}
+		table := statement.Schema.Table
+		if err := db.Exec("ALTER TABLE " + db.Statement.Quote(table) + " ENABLE ROW LEVEL SECURITY").Error; err != nil {
+			return fmt.Errorf("enable row level security on %s: %w", table, err)
+		}
+	}
+	return nil
 }
 
 func seedDivisions(db *gorm.DB) error {

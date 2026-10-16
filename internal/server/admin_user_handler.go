@@ -28,8 +28,12 @@ type adminUserHandler struct {
 }
 
 type createUserRequest struct {
-	Username      string      `json:"username"`
-	Password      string      `json:"password"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	Prefix    string `json:"prefix"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	// FullName remains accepted as a backward-compatible fallback.
 	FullName      string      `json:"full_name"`
 	Position      string      `json:"position"`
 	DivisionUUIDs []uuid.UUID `json:"division_uuids"`
@@ -39,6 +43,9 @@ type createUserRequest struct {
 
 type updateUserRequest struct {
 	Username      *string      `json:"username"`
+	Prefix        *string      `json:"prefix"`
+	FirstName     *string      `json:"first_name"`
+	LastName      *string      `json:"last_name"`
 	FullName      *string      `json:"full_name"`
 	Position      *string      `json:"position"`
 	DivisionUUIDs *[]uuid.UUID `json:"division_uuids"`
@@ -54,6 +61,9 @@ type resetPasswordRequest struct {
 type adminUserResponse struct {
 	UUID          uuid.UUID          `json:"uuid"`
 	Username      string             `json:"username"`
+	Prefix        string             `json:"prefix"`
+	FirstName     string             `json:"first_name"`
+	LastName      string             `json:"last_name"`
 	FullName      string             `json:"full_name"`
 	Position      string             `json:"position"`
 	IsExec        bool               `json:"is_exec"`
@@ -95,6 +105,9 @@ func (h adminUserHandler) create(c fiber.Ctx) error {
 	user, err := h.service.CreateUser(c.Context(), admin.CreateUserInput{
 		Username:      request.Username,
 		Password:      request.Password,
+		Prefix:        request.Prefix,
+		FirstName:     request.FirstName,
+		LastName:      request.LastName,
 		FullName:      request.FullName,
 		Position:      request.Position,
 		DivisionUUIDs: request.DivisionUUIDs,
@@ -123,6 +136,9 @@ func (h adminUserHandler) update(c fiber.Ctx) error {
 	}
 	user, err := h.service.UpdateUser(c.Context(), userUUID, admin.UpdateUserInput{
 		Username:      request.Username,
+		Prefix:        request.Prefix,
+		FirstName:     request.FirstName,
+		LastName:      request.LastName,
 		FullName:      request.FullName,
 		Position:      request.Position,
 		DivisionUUIDs: request.DivisionUUIDs,
@@ -253,7 +269,10 @@ func newAdminUserResponse(user model.User) adminUserResponse {
 	return adminUserResponse{
 		UUID:          user.UUID,
 		Username:      user.Username,
-		FullName:      user.FullName,
+		Prefix:        user.Prefix,
+		FirstName:     user.FirstName,
+		LastName:      user.LastName,
+		FullName:      user.DisplayName(),
 		Position:      user.Position,
 		IsExec:        user.IsExec,
 		IsAdmin:       user.IsAdmin,

@@ -96,7 +96,9 @@ func TestAdminListsUsersWithoutPasswordHash(t *testing.T) {
 				UUIDModel:    model.UUIDModel{UUID: userUUID},
 				Username:     "teacher.one",
 				PasswordHash: "must-not-leak",
-				FullName:     "ครู หนึ่ง",
+				Prefix:       "นาง",
+				FirstName:    "ครู",
+				LastName:     "หนึ่ง",
 				Position:     "ครู",
 			}}, nil
 		},
@@ -119,6 +121,9 @@ func TestAdminListsUsersWithoutPasswordHash(t *testing.T) {
 	if len(body) != 1 || body[0]["uuid"] != userUUID.String() || body[0]["is_active"] != true {
 		t.Fatalf("body = %+v, want active user", body)
 	}
+	if body[0]["prefix"] != "นาง" || body[0]["first_name"] != "ครู" || body[0]["last_name"] != "หนึ่ง" || body[0]["full_name"] != "นางครู หนึ่ง" {
+		t.Fatalf("name fields = %+v, want split fields and computed full_name", body[0])
+	}
 	if _, exists := body[0]["password_hash"]; exists {
 		t.Fatal("response contains password_hash")
 	}
@@ -134,14 +139,16 @@ func TestAdminCreatesUser(t *testing.T) {
 			return model.User{
 				UUIDModel: model.UUIDModel{UUID: userUUID},
 				Username:  input.Username,
-				FullName:  input.FullName,
+				Prefix:    input.Prefix,
+				FirstName: input.FirstName,
+				LastName:  input.LastName,
 				Position:  input.Position,
 				IsExec:    input.IsExec,
 			}, nil
 		},
 	}
 	app := adminUsersTestApp(users)
-	body := `{"username":"teacher.one","password":"safe-password","full_name":"ครู หนึ่ง","position":"ครู","division_uuids":["` + divisionUUID.String() + `"],"is_exec":true}`
+	body := `{"username":"teacher.one","password":"safe-password","prefix":"นาง","first_name":"ครู","last_name":"หนึ่ง","position":"ครู","division_uuids":["` + divisionUUID.String() + `"],"is_exec":true}`
 	req := adminRequest(http.MethodPost, "/api/admin/users", body)
 
 	res, err := app.Test(req)
@@ -152,7 +159,7 @@ func TestAdminCreatesUser(t *testing.T) {
 	if got, want := res.StatusCode, http.StatusCreated; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
-	if received.Username != "teacher.one" || received.Password != "safe-password" || !received.IsExec {
+	if received.Username != "teacher.one" || received.Password != "safe-password" || received.Prefix != "นาง" || received.FirstName != "ครู" || received.LastName != "หนึ่ง" || received.FullName != "" || !received.IsExec {
 		t.Fatalf("CreateUser input = %+v", received)
 	}
 	if len(received.DivisionUUIDs) != 1 || received.DivisionUUIDs[0] != divisionUUID {
@@ -167,7 +174,7 @@ func TestAdminCreateDuplicateUsernameReturnsConflict(t *testing.T) {
 		},
 	}
 	app := adminUsersTestApp(users)
-	req := adminRequest(http.MethodPost, "/api/admin/users", `{"username":"duplicate","password":"safe-password","full_name":"ชื่อซ้ำ","position":"ครู"}`)
+	req := adminRequest(http.MethodPost, "/api/admin/users", `{"username":"duplicate","password":"safe-password","first_name":"ชื่อ","last_name":"ซ้ำ","position":"ครู"}`)
 
 	res, err := app.Test(req)
 	if err != nil {
@@ -189,11 +196,11 @@ func TestAdminUpdatesUserWithPatchFields(t *testing.T) {
 				t.Fatalf("user UUID = %s, want %s", gotUUID, userUUID)
 			}
 			received = input
-			return model.User{UUIDModel: model.UUIDModel{UUID: userUUID}, Username: "teacher.one", FullName: *input.FullName, Position: "ครู"}, nil
+			return model.User{UUIDModel: model.UUIDModel{UUID: userUUID}, Username: "teacher.one", FirstName: *input.FirstName, LastName: *input.LastName, Position: "ครู"}, nil
 		},
 	}
 	app := adminUsersTestApp(users)
-	req := adminRequest(http.MethodPatch, "/api/admin/users/"+userUUID.String(), `{"full_name":"ชื่อใหม่","division_uuids":[],"is_active":false}`)
+	req := adminRequest(http.MethodPatch, "/api/admin/users/"+userUUID.String(), `{"first_name":"ชื่อ","last_name":"ใหม่","division_uuids":[],"is_active":false}`)
 
 	res, err := app.Test(req)
 	if err != nil {
@@ -203,13 +210,13 @@ func TestAdminUpdatesUserWithPatchFields(t *testing.T) {
 	if got, want := res.StatusCode, http.StatusOK; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
-	if received.FullName == nil || *received.FullName != "ชื่อใหม่" || received.IsActive == nil || *received.IsActive {
+	if received.FirstName == nil || *received.FirstName != "ชื่อ" || received.LastName == nil || *received.LastName != "ใหม่" || received.FullName != nil || received.IsActive == nil || *received.IsActive {
 		t.Fatalf("UpdateUser input = %+v", received)
 	}
 	if received.DivisionUUIDs == nil || len(*received.DivisionUUIDs) != 0 {
 		t.Fatalf("division UUIDs = %v, want an explicit empty slice", received.DivisionUUIDs)
 	}
-	if received.Username != nil || received.Position != nil || received.IsAdmin != nil || received.IsExec != nil {
+	if received.Username != nil || received.Prefix != nil || received.Position != nil || received.IsAdmin != nil || received.IsExec != nil {
 		t.Fatalf("unsent PATCH fields were populated: %+v", received)
 	}
 }

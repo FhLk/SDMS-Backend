@@ -57,6 +57,9 @@ type divisionResponse struct {
 type meResponse struct {
 	UUID          uuid.UUID          `json:"uuid"`
 	Username      string             `json:"username"`
+	Prefix        string             `json:"prefix"`
+	FirstName     string             `json:"first_name"`
+	LastName      string             `json:"last_name"`
 	FullName      string             `json:"full_name"`
 	Position      string             `json:"position"`
 	Role          string             `json:"role"`
@@ -163,7 +166,10 @@ func newMeResponse(profile auth.Profile) meResponse {
 	return meResponse{
 		UUID:          profile.User.UUID,
 		Username:      profile.User.Username,
-		FullName:      profile.User.FullName,
+		Prefix:        profile.User.Prefix,
+		FirstName:     profile.User.FirstName,
+		LastName:      profile.User.LastName,
+		FullName:      profile.User.DisplayName(),
 		Position:      profile.User.Position,
 		Role:          primaryRole(profile),
 		Divisions:     divisionResponses(profile.Divisions),

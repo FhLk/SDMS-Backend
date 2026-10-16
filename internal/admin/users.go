@@ -33,8 +33,13 @@ func (e *ValidationError) Error() string {
 
 // CreateUserInput คือข้อมูลที่แอดมินใช้สร้างบุคลากรใหม่.
 type CreateUserInput struct {
-	Username      string
-	Password      string
+	Username  string
+	Password  string
+	Prefix    string
+	FirstName string
+	LastName  string
+	// FullName is accepted for backward compatibility and is stored verbatim
+	// in first_name when the structured fields are absent.
 	FullName      string
 	Position      string
 	DivisionUUIDs []uuid.UUID
@@ -45,7 +50,12 @@ type CreateUserInput struct {
 // UpdateUserInput ใช้ pointer เพื่อแยก field ที่ไม่ได้ส่งออกจากค่าศูนย์
 // เช่น false หรือ slice ว่างที่ผู้เรียกตั้งใจใช้ล้างข้อมูลเดิม.
 type UpdateUserInput struct {
-	Username      *string
+	Username  *string
+	Prefix    *string
+	FirstName *string
+	LastName  *string
+	// FullName is the legacy replacement form. It cannot be combined with the
+	// structured name fields.
 	FullName      *string
 	Position      *string
 	DivisionUUIDs *[]uuid.UUID
@@ -72,7 +82,8 @@ func (s *UserService) ListUsers(ctx context.Context) ([]model.User, error) {
 		Preload("Divisions", func(db *gorm.DB) *gorm.DB {
 			return db.Order("divisions.sort_order")
 		}).
-		Order("users.full_name").
+		Order("users.first_name").
+		Order("users.last_name").
 		Order("users.username").
 		Find(&users).Error
 	if err != nil {
@@ -106,7 +117,9 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (mo
 		user := model.User{
 			Username:     input.Username,
 			PasswordHash: string(passwordHash),
-			FullName:     input.FullName,
+			Prefix:       input.Prefix,
+			FirstName:    input.FirstName,
+			LastName:     input.LastName,
 			Position:     input.Position,
 			IsExec:       input.IsExec,
 			IsAdmin:      input.IsAdmin,
@@ -154,7 +167,19 @@ func (s *UserService) UpdateUser(ctx context.Context, userUUID uuid.UUID, input 
 			updates["username"] = *input.Username
 		}
 		if input.FullName != nil {
-			updates["full_name"] = *input.FullName
+			updates["prefix"] = ""
+			updates["first_name"] = *input.FullName
+			updates["last_name"] = ""
+		} else {
+			if input.Prefix != nil {
+				updates["prefix"] = *input.Prefix
+			}
+			if input.FirstName != nil {
+				updates["first_name"] = *input.FirstName
+			}
+			if input.LastName != nil {
+				updates["last_name"] = *input.LastName
+			}
 		}
 		if input.Position != nil {
 			updates["position"] = *input.Position
@@ -242,7 +267,14 @@ func (s *UserService) ResetPassword(ctx context.Context, userUUID uuid.UUID, pas
 
 func normalizeCreateUserInput(input CreateUserInput) CreateUserInput {
 	input.Username = strings.ToLower(strings.TrimSpace(input.Username))
+	input.Prefix = strings.TrimSpace(input.Prefix)
+	input.FirstName = strings.TrimSpace(input.FirstName)
+	input.LastName = strings.TrimSpace(input.LastName)
 	input.FullName = strings.TrimSpace(input.FullName)
+	if input.FullName != "" && input.Prefix == "" && input.FirstName == "" && input.LastName == "" {
+		input.FirstName = input.FullName
+		input.FullName = ""
+	}
 	input.Position = strings.TrimSpace(input.Position)
 	return input
 }
@@ -251,6 +283,18 @@ func normalizeUpdateUserInput(input UpdateUserInput) UpdateUserInput {
 	if input.Username != nil {
 		value := strings.ToLower(strings.TrimSpace(*input.Username))
 		input.Username = &value
+	}
+	if input.Prefix != nil {
+		value := strings.TrimSpace(*input.Prefix)
+		input.Prefix = &value
+	}
+	if input.FirstName != nil {
+		value := strings.TrimSpace(*input.FirstName)
+		input.FirstName = &value
+	}
+	if input.LastName != nil {
+		value := strings.TrimSpace(*input.LastName)
+		input.LastName = &value
 	}
 	if input.FullName != nil {
 		value := strings.TrimSpace(*input.FullName)
@@ -264,26 +308,53 @@ func normalizeUpdateUserInput(input UpdateUserInput) UpdateUserInput {
 }
 
 func validateCreateUserInput(input CreateUserInput) error {
+	if input.FullName != "" && (input.Prefix != "" || input.FirstName != "" || input.LastName != "") {
+		return &ValidationError{Field: "full_name", Message: "full_name cannot be combined with prefix, first_name, or last_name"}
+	}
 	if err := validateUsername(input.Username); err != nil {
 		return &ValidationError{Field: "username", Message: err.Error()}
 	}
 	if err := validatePassword(input.Password); err != nil {
 		return &ValidationError{Field: "password", Message: err.Error()}
 	}
-	if err := validateRequiredText("full_name", input.FullName, 120); err != nil {
+	if err := validateOptionalText("prefix", input.Prefix, 30); err != nil {
+		return err
+	}
+	if err := validateRequiredText("first_name", input.FirstName, 120); err != nil {
+		return err
+	}
+	if err := validateOptionalText("last_name", input.LastName, 120); err != nil {
 		return err
 	}
 	return validateRequiredText("position", input.Position, 120)
 }
 
 func validateUpdateUserInput(input UpdateUserInput) error {
-	if input.Username == nil && input.FullName == nil && input.Position == nil &&
+	if input.Username == nil && input.Prefix == nil && input.FirstName == nil && input.LastName == nil && input.FullName == nil && input.Position == nil &&
 		input.DivisionUUIDs == nil && input.IsExec == nil && input.IsAdmin == nil && input.IsActive == nil {
 		return &ValidationError{Field: "request", Message: "at least one field is required"}
 	}
 	if input.Username != nil {
 		if err := validateUsername(*input.Username); err != nil {
 			return &ValidationError{Field: "username", Message: err.Error()}
+		}
+	}
+	if input.FullName != nil && (input.Prefix != nil || input.FirstName != nil || input.LastName != nil) {
+		return &ValidationError{Field: "full_name", Message: "full_name cannot be combined with prefix, first_name, or last_name"}
+	}
+	if input.Prefix != nil {
+		if err := validateOptionalText("prefix", *input.Prefix, 30); err != nil {
+			return err
+		}
+	}
+	if input.FirstName != nil {
+		if err := validateRequiredText("first_name", *input.FirstName, 120); err != nil {
+			return err
+		}
+	}
+	if input.LastName != nil {
+		if err := validateOptionalText("last_name", *input.LastName, 120); err != nil {
+			return err
 		}
 	}
 	if input.FullName != nil {
@@ -295,6 +366,13 @@ func validateUpdateUserInput(input UpdateUserInput) error {
 		if err := validateRequiredText("position", *input.Position, 120); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func validateOptionalText(field, value string, maximum int) error {
+	if utf8.RuneCountInString(value) > maximum {
+		return &ValidationError{Field: field, Message: fmt.Sprintf("%s must not exceed %d characters", strings.ReplaceAll(field, "_", " "), maximum)}
 	}
 	return nil
 }

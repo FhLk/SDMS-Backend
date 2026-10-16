@@ -60,7 +60,9 @@ func TestSearchParsesFiltersAndReturnsPagination(t *testing.T) {
 					SubmittedBy: model.User{
 						UUIDModel: model.UUIDModel{UUID: byUUID},
 						Username:  "teacher.one",
-						FullName:  "ครูหนึ่ง",
+						Prefix:    "นาย",
+						FirstName: "ครู",
+						LastName:  "หนึ่ง",
 						Position:  "ครู",
 					},
 					Values: json.RawMessage(`{"note":"ข้อมูล"}`),
@@ -93,6 +95,9 @@ func TestSearchParsesFiltersAndReturnsPagination(t *testing.T) {
 	}
 	if len(response.Items) != 1 || response.Items[0].SubmissionUUID != submissionUUID || response.Items[0].Topic.UUID != topicUUID {
 		t.Fatalf("items = %+v", response.Items)
+	}
+	if got := response.Items[0].SubmittedBy; got.Prefix != "นาย" || got.FirstName != "ครู" || got.LastName != "หนึ่ง" || got.FullName != "นายครู หนึ่ง" {
+		t.Fatalf("submitted_by = %+v, want split fields and computed full_name", got)
 	}
 	if len(response.Items[0].Files) != 1 || response.Items[0].Files[0].UUID != fileUUID {
 		t.Fatalf("files = %+v", response.Items[0].Files)

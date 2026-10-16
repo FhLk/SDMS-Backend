@@ -10,10 +10,11 @@ import (
 
 func TestValidateCreateUserInput(t *testing.T) {
 	valid := CreateUserInput{
-		Username: "teacher.one",
-		Password: "safe-password",
-		FullName: "ครูตัวอย่าง",
-		Position: "ครู",
+		Username:  "teacher.one",
+		Password:  "safe-password",
+		FirstName: "ครู",
+		LastName:  "ตัวอย่าง",
+		Position:  "ครู",
 	}
 	if err := validateCreateUserInput(valid); err != nil {
 		t.Fatalf("validateCreateUserInput(valid) error = %v", err)
@@ -27,7 +28,8 @@ func TestValidateCreateUserInput(t *testing.T) {
 		{name: "invalid username", input: createInputWithUsername(valid, "INVALID"), field: "username"},
 		{name: "short password", input: createInputWithPassword(valid, "short"), field: "password"},
 		{name: "long password", input: createInputWithPassword(valid, strings.Repeat("x", 73)), field: "password"},
-		{name: "missing full name", input: createInputWithFullName(valid, ""), field: "full_name"},
+		{name: "mixed name formats", input: CreateUserInput{Username: "teacher.one", Password: "safe-password", FirstName: "ครู", FullName: "ครู ตัวอย่าง", Position: "ครู"}, field: "full_name"},
+		{name: "missing first name", input: createInputWithFirstName(valid, ""), field: "first_name"},
 		{name: "missing position", input: createInputWithPosition(valid, ""), field: "position"},
 	}
 
@@ -47,23 +49,31 @@ func TestValidateCreateUserInput(t *testing.T) {
 
 func TestNormalizeUserInput(t *testing.T) {
 	created := normalizeCreateUserInput(CreateUserInput{
-		Username: " Teacher.One ",
-		FullName: " ครู ตัวอย่าง ",
-		Position: " ครู ",
+		Username:  " Teacher.One ",
+		Prefix:    " นาย ",
+		FirstName: " ครู ",
+		LastName:  " ตัวอย่าง ",
+		Position:  " ครู ",
 	})
-	if created.Username != "teacher.one" || created.FullName != "ครู ตัวอย่าง" || created.Position != "ครู" {
+	if created.Username != "teacher.one" || created.Prefix != "นาย" || created.FirstName != "ครู" || created.LastName != "ตัวอย่าง" || created.Position != "ครู" {
 		t.Fatalf("normalizeCreateUserInput() = %+v", created)
+	}
+	legacy := normalizeCreateUserInput(CreateUserInput{FullName: " ผู้ดูแลระบบ "})
+	if legacy.FirstName != "ผู้ดูแลระบบ" || legacy.FullName != "" {
+		t.Fatalf("legacy normalizeCreateUserInput() = %+v, want first_name fallback", legacy)
 	}
 
 	username := " Teacher.Two "
-	fullName := " ครู สอง "
+	firstName := " ครู "
+	lastName := " สอง "
 	position := " ครูผู้ช่วย "
 	updated := normalizeUpdateUserInput(UpdateUserInput{
-		Username: &username,
-		FullName: &fullName,
-		Position: &position,
+		Username:  &username,
+		FirstName: &firstName,
+		LastName:  &lastName,
+		Position:  &position,
 	})
-	if *updated.Username != "teacher.two" || *updated.FullName != "ครู สอง" || *updated.Position != "ครูผู้ช่วย" {
+	if *updated.Username != "teacher.two" || *updated.FirstName != "ครู" || *updated.LastName != "สอง" || *updated.Position != "ครูผู้ช่วย" {
 		t.Fatalf("normalizeUpdateUserInput() = %+v", updated)
 	}
 }
@@ -108,8 +118,8 @@ func createInputWithPassword(input CreateUserInput, value string) CreateUserInpu
 	return input
 }
 
-func createInputWithFullName(input CreateUserInput, value string) CreateUserInput {
-	input.FullName = value
+func createInputWithFirstName(input CreateUserInput, value string) CreateUserInput {
+	input.FirstName = value
 	return input
 }
 

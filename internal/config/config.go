@@ -21,6 +21,7 @@ const (
 	defaultDatabasePort       = "5432"
 	defaultDatabaseSSLMode    = "disable"
 	defaultDatabaseTimeZone   = "Asia/Bangkok"
+	defaultDatabaseSchema     = "sdms"
 	defaultConnectTimeout     = 5 * time.Second
 	defaultMaxIdleConnections = 5
 	defaultMaxOpenConnections = 20
@@ -34,7 +35,12 @@ const (
 	defaultUploadCleanup      = time.Hour
 )
 
-var cookieNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+var (
+	cookieNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	// ชื่อ schema รับเฉพาะ identifier ตัวพิมพ์เล็กที่ไม่ต้อง quote เพื่อให้ชื่อเดียวกัน
+	// ใช้ได้ทั้งใน SQL ของแอป ใน ALTER ROLE ... SET search_path และในเอกสาร.
+	schemaNamePattern = regexp.MustCompile(`^[a-z_][a-z0-9_]{0,62}$`)
+)
 
 // Config contains all settings required to start the application.
 type Config struct {
@@ -57,7 +63,10 @@ func (c ServerConfig) Address() string {
 
 // DatabaseConfig contains the PostgreSQL DSN and database/sql pool settings.
 type DatabaseConfig struct {
-	DSN             string
+	DSN string
+	// Schema คือ PostgreSQL schema ที่ตารางของ SDMS อยู่ เช่น "sdms" เมื่อใช้ฐานข้อมูล
+	// ร่วมกับระบบ check-in. แอปตรวจตอนเริ่มว่า current_schema() ตรงกับค่านี้.
+	Schema          string
 	ConnectTimeout  time.Duration
 	MaxIdleConns    int
 	MaxOpenConns    int
@@ -111,6 +120,11 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	schema := strings.ToLower(firstNonEmpty(os.Getenv("DB_SCHEMA"), defaultDatabaseSchema))
+	if err := validateSchemaName(schema); err != nil {
+		return Config{}, err
+	}
+
 	connectTimeout, err := durationFromEnv("DB_CONNECT_TIMEOUT", defaultConnectTimeout)
 	if err != nil {
 		return Config{}, err
@@ -159,6 +173,7 @@ func Load() (Config, error) {
 		},
 		Database: DatabaseConfig{
 			DSN:             dsn,
+			Schema:          schema,
 			ConnectTimeout:  connectTimeout,
 			MaxIdleConns:    maxIdleConns,
 			MaxOpenConns:    maxOpenConns,
@@ -294,6 +309,17 @@ func databaseDSN() (string, error) {
 		Path:     "/" + databaseName,
 		RawQuery: query,
 	}).String(), nil
+}
+
+// validateSchemaName กันชื่อ schema ที่ต้อง quote หรือเป็น schema ระบบของ PostgreSQL.
+func validateSchemaName(schema string) error {
+	if !schemaNamePattern.MatchString(schema) {
+		return errors.New("DB_SCHEMA must start with a lowercase letter or underscore and contain only lowercase letters, numbers, and underscores (max 63)")
+	}
+	if strings.HasPrefix(schema, "pg_") || schema == "information_schema" {
+		return errors.New("DB_SCHEMA must not be a PostgreSQL system schema")
+	}
+	return nil
 }
 
 // requiredEnv reads a value that is mandatory when using individual DB_* settings.

@@ -12,10 +12,13 @@ import (
 )
 
 type topicSubmissionUserResponse struct {
-	UUID     uuid.UUID `json:"uuid"`
-	Username string    `json:"username"`
-	FullName string    `json:"full_name"`
-	Position string    `json:"position"`
+	UUID      uuid.UUID `json:"uuid"`
+	Username  string    `json:"username"`
+	Prefix    string    `json:"prefix"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+	FullName  string    `json:"full_name"`
+	Position  string    `json:"position"`
 }
 
 type topicSubmissionRowResponse struct {
@@ -108,10 +111,13 @@ func newTopicSubmissionTableResponse(table submission.TopicTable) (topicSubmissi
 
 func newTopicSubmissionUserResponse(user model.User) topicSubmissionUserResponse {
 	return topicSubmissionUserResponse{
-		UUID:     user.UUID,
-		Username: user.Username,
-		FullName: user.FullName,
-		Position: user.Position,
+		UUID:      user.UUID,
+		Username:  user.Username,
+		Prefix:    user.Prefix,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		FullName:  user.DisplayName(),
+		Position:  user.Position,
 	}
 }
 
