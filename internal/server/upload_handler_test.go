@@ -149,9 +149,14 @@ func TestDownloadFileStreamsWithSafeDisposition(t *testing.T) {
 		name            string
 		mimeType        string
 		originalName    string
+		query           string
 		wantDisposition string
 		wantContentType string
 	}{
+		{name: "video opens inline", mimeType: "video/mp4", originalName: "lesson.mp4", wantDisposition: "inline", wantContentType: "video/mp4"},
+		{name: "PDF can be downloaded", mimeType: "application/pdf", originalName: "report.pdf", query: "?download=true", wantDisposition: "attachment", wantContentType: "application/pdf"},
+		{name: "image can be downloaded", mimeType: "image/jpeg", originalName: "photo.jpg", query: "?download=true", wantDisposition: "attachment", wantContentType: "image/jpeg"},
+		{name: "video can be downloaded", mimeType: "video/webm", originalName: "lesson.webm", query: "?download=true", wantDisposition: "attachment", wantContentType: "video/webm"},
 		{name: "PDF opens inline", mimeType: "application/pdf", originalName: "รายงาน.pdf", wantDisposition: "inline", wantContentType: "application/pdf"},
 		{name: "raster image opens inline", mimeType: "image/png", originalName: "ภาพ.png", wantDisposition: "inline", wantContentType: "image/png"},
 		{name: "other file downloads", mimeType: "application/zip", originalName: "หลักฐาน.zip", wantDisposition: "attachment", wantContentType: "application/zip"},
@@ -180,7 +185,7 @@ func TestDownloadFileStreamsWithSafeDisposition(t *testing.T) {
 				},
 			}
 			app := uploadTestApp(service, userUUID)
-			req := httptest.NewRequest(http.MethodGet, "/api/files/"+fileUUID.String(), nil)
+			req := httptest.NewRequest(http.MethodGet, "/api/files/"+fileUUID.String()+tt.query, nil)
 			req.AddCookie(&http.Cookie{Name: "sdms_session", Value: "upload-session"})
 
 			res, err := app.Test(req)
@@ -212,6 +217,42 @@ func TestDownloadFileStreamsWithSafeDisposition(t *testing.T) {
 				t.Fatalf("body = %q, want %q", body, content)
 			}
 		})
+	}
+}
+
+func TestDownloadFileRejectsInvalidDownloadOptionBeforeOpeningFile(t *testing.T) {
+	called := false
+	service := fakeUploadService{
+		open: func(context.Context, uuid.UUID, auth.Profile) (upload.OpenedFile, error) {
+			called = true
+			return upload.OpenedFile{}, nil
+		},
+	}
+	app := uploadTestApp(service, uuid.New())
+	req := httptest.NewRequest(http.MethodGet, "/api/files/"+uuid.NewString()+"?download=sometimes", nil)
+	req.AddCookie(&http.Cookie{Name: "sdms_session", Value: "upload-session"})
+
+	res, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("app.Test() error = %v", err)
+	}
+	defer res.Body.Close()
+	if got, want := res.StatusCode, http.StatusBadRequest; got != want {
+		t.Fatalf("status = %d, want %d", got, want)
+	}
+	var body errorResponse
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != "VALIDATION_ERROR" {
+		t.Fatalf("code = %q, want VALIDATION_ERROR", body.Code)
+	}
+	details, ok := body.Details.(map[string]any)
+	if !ok || details["field"] != "download" {
+		t.Fatalf("details = %v, want field=download", body.Details)
+	}
+	if called {
+		t.Fatal("Open service was called for an invalid download option")
 	}
 }
 

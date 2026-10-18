@@ -14,6 +14,7 @@ import (
 )
 
 type adminOrganizationService interface {
+	ListDivisions(context.Context) ([]model.Division, error)
 	SetDivisionHead(context.Context, string, uuid.UUID) (model.Division, error)
 	ListAcademicYears(context.Context) ([]admin.AcademicYearSummary, error)
 	CreateAcademicYear(context.Context, admin.CreateAcademicYearInput) (admin.AcademicYearSummary, error)
@@ -56,6 +57,31 @@ type adminDivisionResponse struct {
 	HeadUser  *divisionHeadUserResponse `json:"head_user"`
 }
 
+type academicYearResponse struct {
+	UUID            uuid.UUID `json:"uuid"`
+	Year            int16     `json:"year"`
+	IsCurrent       bool      `json:"is_current"`
+	CurrentSemester int16     `json:"current_semester"`
+}
+
+// listDivisions คืนทุกฝ่ายพร้อมหัวหน้าปัจจุบันสำหรับหน้าจัดการระบบ.
+// ฝ่ายที่ยังไม่ได้ตั้งหัวหน้าจะมี head_user เป็น null.
+func (h adminOrganizationHandler) listDivisions(c fiber.Ctx) error {
+	if h.service == nil {
+		return apperror.New(fiber.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Organization administration service unavailable")
+	}
+
+	divisions, err := h.service.ListDivisions(c.Context())
+	if err != nil {
+		return mapAdminOrganizationError(err)
+	}
+	response := make([]adminDivisionResponse, 0, len(divisions))
+	for _, division := range divisions {
+		response = append(response, newAdminDivisionResponse(division))
+	}
+	return c.Status(fiber.StatusOK).JSON(response)
+}
+
 // setDivisionHead รับ UUID ของบุคลากรคนใหม่ ส่วน service จะตรวจบทบาท
 // และแทนที่หัวหน้าคนเดิมภายใน transaction.
 func (h adminOrganizationHandler) setDivisionHead(c fiber.Ctx) error {
@@ -85,6 +111,29 @@ func (h adminOrganizationHandler) listAcademicYears(c fiber.Ctx) error {
 		return mapAdminOrganizationError(err)
 	}
 	return c.Status(fiber.StatusOK).JSON(years)
+}
+
+// listPublicAcademicYears คืนรายการปีที่ใช้เป็นตัวเลือกในหน้าฝ่ายและหน้าค้นหา
+// โดยไม่ส่ง metadata สำหรับงานดูแลระบบ เช่นจำนวนหัวข้อและเวลาที่สร้าง.
+func (h adminOrganizationHandler) listPublicAcademicYears(c fiber.Ctx) error {
+	if h.service == nil {
+		return apperror.New(fiber.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Academic year service unavailable")
+	}
+
+	years, err := h.service.ListAcademicYears(c.Context())
+	if err != nil {
+		return mapAdminOrganizationError(err)
+	}
+	response := make([]academicYearResponse, 0, len(years))
+	for _, year := range years {
+		response = append(response, academicYearResponse{
+			UUID:            year.UUID,
+			Year:            year.Year,
+			IsCurrent:       year.IsCurrent,
+			CurrentSemester: year.CurrentSemester,
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(response)
 }
 
 // createAcademicYear สร้างปีใหม่โดยยังไม่เปลี่ยนปีปัจจุบัน

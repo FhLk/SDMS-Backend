@@ -16,3 +16,4 @@ backups/
 secrets/
 
 .cache/
+.archify/

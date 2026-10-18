@@ -5,6 +5,7 @@ import (
 	"errors"
 	"mime"
 	"mime/multipart"
+	"strconv"
 	"strings"
 	"time"
 
@@ -115,6 +116,10 @@ func (h uploadHandler) download(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	forceDownload, err := parseFileDownloadOption(c.Query("download"))
+	if err != nil {
+		return err
+	}
 
 	opened, err := h.service.Open(c.Context(), fileUUID, profile)
 	if err != nil {
@@ -123,7 +128,7 @@ func (h uploadHandler) download(c fiber.Ctx) error {
 
 	mimeType, inline := downloadableMimeType(opened.File.MimeType)
 	disposition := "attachment"
-	if inline {
+	if inline && !forceDownload {
 		disposition = "inline"
 	}
 	contentDisposition := mime.FormatMediaType(disposition, map[string]string{"filename": opened.File.OriginalName})
@@ -132,6 +137,7 @@ func (h uploadHandler) download(c fiber.Ctx) error {
 	}
 	c.Set(fiber.HeaderContentType, mimeType)
 	c.Set(fiber.HeaderContentDisposition, contentDisposition)
+	c.Set(fiber.HeaderCacheControl, "private, no-store")
 	// nosniff ป้องกัน browser ตีความไฟล์ที่ปลอม MIME type เป็น HTML หรือ script.
 	c.Set("X-Content-Type-Options", "nosniff")
 	if err := c.SendStream(opened.Content, int(opened.File.SizeBytes)); err != nil {
@@ -150,8 +156,29 @@ func downloadableMimeType(value string) (string, bool) {
 	if mediaType == "application/pdf" {
 		return mediaType, true
 	}
+	if strings.HasPrefix(mediaType, "video/") {
+		return mediaType, true
+	}
 	// SVG อาจมี script จึงบังคับดาวน์โหลด ส่วนรูปชนิดอื่นแสดงใน browser พร้อม nosniff ได้.
 	return mediaType, strings.HasPrefix(mediaType, "image/") && mediaType != "image/svg+xml"
+}
+
+func parseFileDownloadOption(value string) (bool, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false, nil
+	}
+	download, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, apperror.WrapWithDetails(
+			fiber.StatusBadRequest,
+			"VALIDATION_ERROR",
+			"download must be a boolean",
+			map[string]any{"field": "download"},
+			err,
+		)
+	}
+	return download, nil
 }
 
 func mapFileDownloadError(err error) error {

@@ -74,6 +74,8 @@ type searchPaginationResponse struct {
 
 type searchResponse struct {
 	Items      []searchItemResponse     `json:"items"`
+	Topics     []searchTopicResponse    `json:"topics"`
+	TopicTotal int64                    `json:"topic_total"`
 	Pagination searchPaginationResponse `json:"pagination"`
 }
 
@@ -237,13 +239,37 @@ func newSearchResponse(result searchdomain.Result) searchResponse {
 			UpdatedAt:   item.UpdatedAt,
 		})
 	}
+	topics := make([]searchTopicResponse, 0, len(result.Topics))
+	for _, topic := range result.Topics {
+		topics = append(topics, newSearchTopicResponse(topic))
+	}
 	return searchResponse{
-		Items: items,
+		Items:      items,
+		Topics:     topics,
+		TopicTotal: result.TopicTotal,
 		Pagination: searchPaginationResponse{
 			Page:       result.Page,
 			PageSize:   result.PageSize,
 			Total:      result.Total,
 			TotalPages: result.TotalPages,
 		},
+	}
+}
+
+func newSearchTopicResponse(topic searchdomain.Topic) searchTopicResponse {
+	return searchTopicResponse{
+		UUID:  topic.UUID,
+		Title: topic.Title,
+		Division: divisionResponse{
+			UUID:      topic.Division.UUID,
+			Code:      topic.Division.Code,
+			Name:      topic.Division.Name,
+			ShortName: topic.Division.ShortName,
+		},
+		AcademicYear: topic.AcademicYear,
+		Semester:     topic.Semester,
+		DueDate:      topic.DueDate.Format("2006-01-02"),
+		IsOpen:       topic.IsOpen,
+		IsSecret:     topic.IsSecret,
 	}
 }

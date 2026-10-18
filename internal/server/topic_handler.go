@@ -149,6 +149,8 @@ func mapTopicError(err error) error {
 		return apperror.New(fiber.StatusConflict, "CURRENT_ACADEMIC_YEAR_NOT_SET", "Current academic year is not set")
 	case errors.Is(err, topic.ErrCreatorNotFound):
 		return apperror.New(fiber.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
+	case errors.Is(err, topic.ErrNoEligibleAssignees):
+		return apperror.New(fiber.StatusConflict, "TOPIC_HAS_NO_ASSIGNEES", "The selected division has no active members to assign")
 	case errors.Is(err, topic.ErrTopicNotFound):
 		return apperror.New(fiber.StatusNotFound, "TOPIC_NOT_FOUND", "Topic not found")
 	case errors.Is(err, topic.ErrFieldTypeLocked):

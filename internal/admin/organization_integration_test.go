@@ -71,6 +71,21 @@ func TestOrganizationServiceWithPostgreSQL(t *testing.T) {
 	assertDivisionHeadCount(t, tx, users[0].UUID, 0)
 	assertDivisionHeadCount(t, tx, users[1].UUID, 1)
 
+	listedDivisions, err := service.ListDivisions(context.Background())
+	if err != nil {
+		t.Fatalf("ListDivisions() error = %v", err)
+	}
+	foundUpdatedHead := false
+	for _, division := range listedDivisions {
+		if division.UUID == divisions[0].UUID {
+			foundUpdatedHead = division.HeadUser != nil && division.HeadUser.UUID == users[1].UUID
+			break
+		}
+	}
+	if !foundUpdatedHead {
+		t.Fatalf("ListDivisions() did not preload the updated head: %+v", listedDivisions)
+	}
+
 	_, err = service.SetDivisionHead(context.Background(), divisions[1].Code, users[1].UUID)
 	if !errors.Is(err, ErrUserAlreadyDivisionHead) {
 		t.Fatalf("assign same user to another division error = %v, want ErrUserAlreadyDivisionHead", err)

@@ -146,6 +146,15 @@ func TestUserServiceWithPostgreSQL(t *testing.T) {
 	if !found {
 		t.Fatal("ListUsers() did not return the created user")
 	}
+	activeUsers, err := service.ListActiveUsers(context.Background())
+	if err != nil {
+		t.Fatalf("ListActiveUsers() error = %v", err)
+	}
+	for _, user := range activeUsers {
+		if user.UUID == created.UUID {
+			t.Fatal("ListActiveUsers() returned a deactivated user")
+		}
+	}
 }
 
 func TestUserImportServiceWithPostgreSQL(t *testing.T) {

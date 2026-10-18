@@ -21,6 +21,7 @@ import (
 const (
 	DefaultPageSize = 20
 	MaxPageSize     = 100
+	MaxTopicMatches = 20
 	maxSearchRunes  = 200
 	maxPage         = 1_000_000
 
@@ -88,6 +89,8 @@ type Item struct {
 
 type Result struct {
 	Items      []Item
+	Topics     []Topic
+	TopicTotal int64
 	Page       int
 	PageSize   int
 	Total      int64
@@ -138,6 +141,21 @@ type fileRow struct {
 	CreatedAt      time.Time
 }
 
+type topicRow struct {
+	TopicUUID     uuid.UUID
+	TopicTitle    string
+	DueDate       time.Time
+	Semester      int16
+	IsOpen        bool
+	IsSecret      bool
+	DivisionUUID  uuid.UUID
+	DivisionCode  string
+	DivisionName  string
+	DivisionShort string
+	DivisionOrder int16
+	AcademicYear  int16
+}
+
 // Search นับจำนวนและอ่านหน้าผลลัพธ์ใน repeatable-read snapshot เดียวกัน
 // เพื่อให้ total, items และไฟล์แนบสอดคล้องกันตลอดหนึ่ง request.
 func (s *Service) Search(ctx context.Context, input Input) (Result, error) {
@@ -148,6 +166,7 @@ func (s *Service) Search(ctx context.Context, input Input) (Result, error) {
 
 	result := Result{
 		Items:    make([]Item, 0),
+		Topics:   make([]Topic, 0),
 		Page:     normalized.Page,
 		PageSize: normalized.PageSize,
 	}
@@ -188,6 +207,33 @@ func (s *Service) Search(ctx context.Context, input Input) (Result, error) {
 			Scan(&rows).Error
 		if err != nil {
 			return fmt.Errorf("list search results: %w", err)
+		}
+
+		if normalized.Query != "" {
+			if err := searchableTopics(tx, normalized).Count(&result.TopicTotal).Error; err != nil {
+				return fmt.Errorf("count matching topics: %w", err)
+			}
+			topicRows := make([]topicRow, 0)
+			if err := searchableTopics(tx, normalized).
+				Select(`
+					topics.uuid AS topic_uuid,
+					topics.title AS topic_title,
+					topics.due_date,
+					topics.semester,
+					topics.is_open,
+					topics.is_secret,
+					divisions.uuid AS division_uuid,
+					divisions.code AS division_code,
+					divisions.name AS division_name,
+					divisions.short_name AS division_short,
+					divisions.sort_order AS division_order,
+					academic_years.year AS academic_year`).
+				Order("topics.is_open DESC, topics.updated_at DESC, topics.uuid DESC").
+				Limit(MaxTopicMatches).
+				Scan(&topicRows).Error; err != nil {
+				return fmt.Errorf("list matching topics: %w", err)
+			}
+			result.Topics = buildTopics(topicRows)
 		}
 
 		files, err := listResultFiles(tx, resultSubmissionUUIDs(rows))
@@ -295,6 +341,63 @@ func searchableSubmissions(db *gorm.DB, input Input) *gorm.DB {
 	return query
 }
 
+// searchableTopics finds the dedicated "matching topics" section. Text
+// matching is intentionally limited to the title; the other filters mirror
+// the answer search and by restricts topics to ones submitted by that user.
+func searchableTopics(db *gorm.DB, input Input) *gorm.DB {
+	query := db.Table("topics").
+		Joins("JOIN divisions ON divisions.uuid = topics.division_uuid").
+		Joins("JOIN academic_years ON academic_years.uuid = topics.academic_year_uuid")
+	query = applyTopicVisibility(query, input.Profile)
+
+	pattern := "%" + escapeLike(input.Query) + "%"
+	query = query.Where("topics.title ILIKE ? ESCAPE E'\\\\'", pattern)
+	if input.Division != "" {
+		query = query.Where("divisions.code = ?", input.Division)
+	}
+	if input.Year != nil {
+		query = query.Where("academic_years.year = ?", *input.Year)
+	}
+	if input.Semester != nil {
+		query = query.Where("topics.semester = ?", *input.Semester)
+	}
+	if input.By != nil {
+		query = applyTopicSubmitterFilter(query, input.Profile, *input.By)
+	}
+	return query
+}
+
+// applyTopicSubmitterFilter prevents a by filter from becoming a side channel
+// that reveals whether another person submitted to a secret topic.
+func applyTopicSubmitterFilter(query *gorm.DB, profile auth.Profile, submitterUUID uuid.UUID) *gorm.DB {
+	predicate := `EXISTS (
+		SELECT 1 FROM submissions AS filtered_submission
+		WHERE filtered_submission.topic_uuid = topics.uuid
+			AND filtered_submission.user_uuid = ?`
+	arguments := []any{submitterUUID}
+	if !profile.User.IsExec {
+		predicate += ` AND (
+			topics.is_secret = FALSE OR
+			topics.created_by_uuid = ? OR
+			filtered_submission.user_uuid = ?`
+		arguments = append(arguments, profile.User.UUID, profile.User.UUID)
+
+		headDivisionUUIDs := make([]uuid.UUID, 0, len(profile.HeadDivisions))
+		for _, division := range profile.HeadDivisions {
+			if division.UUID != uuid.Nil {
+				headDivisionUUIDs = append(headDivisionUUIDs, division.UUID)
+			}
+		}
+		if len(headDivisionUUIDs) > 0 {
+			predicate += " OR topics.division_uuid IN ?"
+			arguments = append(arguments, headDivisionUUIDs)
+		}
+		predicate += ")"
+	}
+	predicate += ")"
+	return query.Where(predicate, arguments...)
+}
+
 // applyVisibility วางเงื่อนไขสิทธิ์ไว้ใน SQL ก่อน count และ pagination
 // เพื่อไม่ให้ทั้งข้อมูลและจำนวนคำตอบของหัวข้อลับรั่วผ่าน metadata.
 func applyVisibility(query *gorm.DB, profile auth.Profile) *gorm.DB {
@@ -321,6 +424,41 @@ func applyVisibility(query *gorm.DB, profile auth.Profile) *gorm.DB {
 		submissions.user_uuid = ? OR
 		topics.created_by_uuid = ?
 	)`, profile.User.UUID, profile.User.UUID)
+}
+
+// applyTopicVisibility uses the same secret-topic boundary as answer search,
+// while allowing an assignee without a submission to discover their own topic.
+func applyTopicVisibility(query *gorm.DB, profile auth.Profile) *gorm.DB {
+	if profile.User.IsExec {
+		return query
+	}
+
+	headDivisionUUIDs := make([]uuid.UUID, 0, len(profile.HeadDivisions))
+	for _, division := range profile.HeadDivisions {
+		if division.UUID != uuid.Nil {
+			headDivisionUUIDs = append(headDivisionUUIDs, division.UUID)
+		}
+	}
+	visibility := `(
+		topics.is_secret = FALSE OR
+		topics.created_by_uuid = ? OR
+		EXISTS (
+			SELECT 1 FROM submissions AS visible_submission
+			WHERE visible_submission.topic_uuid = topics.uuid
+				AND visible_submission.user_uuid = ?
+		) OR
+		EXISTS (
+			SELECT 1 FROM topic_assignees AS visible_assignment
+			WHERE visible_assignment.topic_uuid = topics.uuid
+				AND visible_assignment.user_uuid = ?
+		)`
+	arguments := []any{profile.User.UUID, profile.User.UUID, profile.User.UUID}
+	if len(headDivisionUUIDs) > 0 {
+		visibility += " OR topics.division_uuid IN ?"
+		arguments = append(arguments, headDivisionUUIDs)
+	}
+	visibility += ")"
+	return query.Where(visibility, arguments...)
 }
 
 func listResultFiles(db *gorm.DB, submissionUUIDs []uuid.UUID) ([]fileRow, error) {
@@ -409,6 +547,29 @@ func buildItems(rows []itemRow, fileRows []fileRow) []Item {
 		})
 	}
 	return items
+}
+
+func buildTopics(rows []topicRow) []Topic {
+	topics := make([]Topic, 0, len(rows))
+	for _, row := range rows {
+		topics = append(topics, Topic{
+			UUID:  row.TopicUUID,
+			Title: row.TopicTitle,
+			Division: model.Division{
+				UUIDModel: model.UUIDModel{UUID: row.DivisionUUID},
+				Code:      row.DivisionCode,
+				Name:      row.DivisionName,
+				ShortName: row.DivisionShort,
+				SortOrder: row.DivisionOrder,
+			},
+			AcademicYear: row.AcademicYear,
+			Semester:     row.Semester,
+			DueDate:      row.DueDate,
+			IsOpen:       row.IsOpen,
+			IsSecret:     row.IsSecret,
+		})
+	}
+	return topics
 }
 
 func escapeLike(value string) string {

@@ -42,6 +42,10 @@ func New(dependencies ...Dependencies) *fiber.App {
 	// /me เป็น protected route แรกที่ใช้ middleware กลาง โดย middleware จะ
 	// ตรวจ session และส่ง profile ต่อให้ handler ผ่าน request context.
 	api.Get("/me", auth.authenticate, auth.me)
+	users := adminUserHandler{service: deps.UserAdmin}
+	organization := adminOrganizationHandler{service: deps.OrganizationAdmin}
+	api.Get("/users", auth.authenticate, users.listDirectory)
+	api.Get("/years", auth.authenticate, organization.listPublicAcademicYears)
 	topics := topicHandler{service: deps.Topics}
 	api.Post("/topics", auth.authenticate, topics.create)
 	api.Patch("/topics/:uuid", auth.authenticate, topics.update)
@@ -71,8 +75,6 @@ func New(dependencies ...Dependencies) *fiber.App {
 
 	// ทุก route ใต้ /admin ใช้ authentication และ policy แอดมินชุดเดียวกัน
 	// จึงไม่ต้องตรวจบทบาทแอดมินซ้ำในแต่ละ handler.
-	users := adminUserHandler{service: deps.UserAdmin}
-	organization := adminOrganizationHandler{service: deps.OrganizationAdmin}
 	adminRoutes := api.Group("/admin", auth.authenticate, requirePermission(authorization.CanManageUsers))
 	adminRoutes.Get("/users", users.list)
 	adminRoutes.Post("/users", users.create)
@@ -81,6 +83,7 @@ func New(dependencies ...Dependencies) *fiber.App {
 	adminRoutes.Get("/users/import/template.xlsx", users.downloadXLSXImportTemplate)
 	adminRoutes.Patch("/users/:uuid", users.update)
 	adminRoutes.Post("/users/:uuid/password", users.resetPassword)
+	adminRoutes.Get("/divisions", organization.listDivisions)
 	adminRoutes.Put("/divisions/:code/head", organization.setDivisionHead)
 	adminRoutes.Get("/years", organization.listAcademicYears)
 	adminRoutes.Post("/years", organization.createAcademicYear)

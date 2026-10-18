@@ -72,7 +72,14 @@ func TestSearchParsesFiltersAndReturnsPagination(t *testing.T) {
 					}},
 					Status: searchdomain.StatusLate, SubmittedAt: submittedAt, UpdatedAt: submittedAt,
 				}},
-				Page: 2, PageSize: 10, Total: 11, TotalPages: 2,
+				Topics: []searchdomain.Topic{{
+					UUID: topicUUID, Title: "หัวข้อภาษาไทย", Division: division,
+					AcademicYear: 2569, Semester: 2,
+					DueDate: time.Date(2026, time.October, 12, 0, 0, 0, 0, time.UTC),
+					IsOpen:  true,
+				}},
+				TopicTotal: 1,
+				Page:       2, PageSize: 10, Total: 11, TotalPages: 2,
 			}, nil
 		},
 	}
@@ -101,6 +108,9 @@ func TestSearchParsesFiltersAndReturnsPagination(t *testing.T) {
 	}
 	if len(response.Items[0].Files) != 1 || response.Items[0].Files[0].UUID != fileUUID {
 		t.Fatalf("files = %+v", response.Items[0].Files)
+	}
+	if len(response.Topics) != 1 || response.Topics[0].UUID != topicUUID || response.TopicTotal != 1 {
+		t.Fatalf("topics/total = %+v/%d", response.Topics, response.TopicTotal)
 	}
 	if response.Pagination.Page != 2 || response.Pagination.PageSize != 10 || response.Pagination.Total != 11 || response.Pagination.TotalPages != 2 {
 		t.Fatalf("pagination = %+v", response.Pagination)

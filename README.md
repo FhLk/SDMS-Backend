@@ -48,6 +48,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 6. รัน API ด้วย `go run ./cmd/api`
 7. ตรวจสอบด้วย `GET http://localhost:8080/api/health`
 
+เมื่อต้องการบัญชีตัวอย่างสำหรับ local ให้รัน `go run ./cmd/seed-sample` หลัง migration คำสั่งนี้อ่าน `sample-data/users.json`, ผูกครูและหัวหน้าฝ่ายตาม `division_codes`, ตั้งหัวหน้าฝ่าย และซ่อมหัวข้อเปิดที่เคยถูกสร้างโดยไม่มีผู้ต้องส่ง โดยไม่เปลี่ยนรหัสผ่านของบัญชีตัวอย่างที่มีอยู่แล้ว
+
 แอปตรวจตอนเริ่มว่า role ที่ต่อเห็นตารางใน schema ตาม `DB_SCHEMA` (ค่าเริ่มต้น `sdms`) ถ้าไม่ตรงจะหยุดพร้อมบอกวิธีแก้
 
 ### BE-02 · สร้างตารางฐานข้อมูล + ข้อมูลเริ่มต้น
@@ -91,7 +93,7 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 - [x] รหัสผิดหรือไม่มีผู้ใช้นี้ → 401 ข้อความเดียวกันทั้งสองกรณี
 - [x] บัญชีที่ปิดใช้งานแล้วเข้าระบบไม่ได้
 - [x] รหัสผ่านเก็บเป็น hash (bcrypt)
-- [x] `/api/me` คืนชื่อ ตำแหน่ง บทบาท ฝ่ายที่สังกัด และฝ่ายที่เป็นหัวหน้า
+- [x] `/api/me` คืนชื่อ ตำแหน่ง บทบาทหลัก ฝ่ายที่สังกัด ฝ่ายที่เป็นหัวหน้า และ flag `is_exec`/`is_admin` สำหรับบัญชีที่มีหลายบทบาท
 
 ### BE-04 · Middleware ตรวจ login และสิทธิ์
 
@@ -113,7 +115,7 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 
 ### BE-05 · API จัดการบุคลากร
 
-`GET` · `POST /api/admin/users` · `PATCH /api/admin/users/{uuid}` · `POST /api/admin/users/{uuid}/password`
+`GET /api/users` · `GET` · `POST /api/admin/users` · `PATCH /api/admin/users/{uuid}` · `POST /api/admin/users/{uuid}/password`
 
 ต้องทำก่อน: BE-04
 
@@ -132,6 +134,8 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 - `POST /api/admin/users/{uuid}/password`: `password`
 
 ทุก response ที่มีข้อมูลบุคลากรคืนทั้ง `prefix`, `first_name`, `last_name` และ `full_name` ที่ประกอบขึ้นเพื่อให้ frontend รุ่นเดิมยังใช้งานได้ ส่วน request ยังรับ `full_name` แบบเดิมชั่วคราว แต่ห้ามส่งพร้อมช่องชื่อแบบใหม่
+
+`GET /api/users` ใช้ได้หลัง login และคืนเฉพาะบัญชีที่เปิดใช้งาน พร้อม UUID, ชื่อ, ตำแหน่ง และฝ่าย แต่ไม่คืน username, password hash, บทบาท หรือข้อมูลสถานะสำหรับงานแอดมิน ใช้รายการนี้สร้างตัวกรอง `by` ในหน้าค้นหาได้
 
 ### BE-06 · นำเข้าบุคลากรจาก Excel/CSV
 
@@ -154,7 +158,7 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 
 ### BE-07 · หัวหน้าฝ่ายและปีการศึกษา
 
-`PUT /api/admin/divisions/{code}/head` · `GET` · `POST /api/admin/years` · `POST /api/admin/years/{year}/current`
+`GET /api/years` · `GET /api/admin/divisions` · `PUT /api/admin/divisions/{code}/head` · `GET /api/admin/years` · `POST /api/admin/years` · `POST /api/admin/years/{year}/current`
 
 ต้องทำก่อน: BE-04
 
@@ -167,10 +171,12 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 
 **Request fields**
 
+- `GET /api/admin/divisions`: คืนทุกฝ่ายเรียงตาม `sort_order` พร้อม `head_user`; หากยังไม่ได้ตั้งหัวหน้าจะเป็น `null`
 - `PUT /api/admin/divisions/{code}/head`: `user_uuid` โดยผู้ใช้ต้องเปิดใช้งาน ไม่ใช่ผู้บริหาร และต้องไม่เป็นหัวหน้าฝ่ายอื่น
 - `POST /api/admin/years`: `year` และ `current_semester` (ไม่ส่งภาคเรียนจะใช้ 1) โดยปีใหม่ยังไม่ถูกตั้งเป็นปีปัจจุบันอัตโนมัติ
 - `POST /api/admin/years/{year}/current`: ส่ง `current_semester` เป็น 1 หรือ 2 ได้ หรือไม่ส่ง body เพื่อใช้ภาคเรียนเดิม
 - `GET /api/admin/years`: เรียงปีล่าสุดก่อน และคืน `topic_count` ของแต่ละปี
+- `GET /api/years`: ใช้ได้หลัง login และคืน `uuid`, `year`, `is_current`, `current_semester` เรียงปีล่าสุดก่อน โดยไม่เปิดเผย metadata สำหรับงานแอดมิน
 
 ---
 
@@ -196,6 +202,7 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 - แต่ละช่องรับ `type` (`text`, `para`, `num`, `date`, `choice`, `file`), `label`, `required`, `options` และ `position`; หากไม่ส่ง `required` จะใช้ `true`
 - ช่อง `choice` ต้องมี `options` ที่ไม่ซ้ำอย่างน้อย 2 ค่า ส่วนช่องชนิดอื่นห้ามมีตัวเลือก
 - ระบบสร้างหัวข้อ ช่องฟอร์ม และ snapshot ผู้ต้องส่งใน transaction เดียวกัน โดย snapshot รวมเฉพาะสมาชิกฝ่ายที่เปิดใช้งานและไม่ใช่ผู้บริหาร
+- หากฝ่ายยังไม่มีสมาชิกที่เข้าเงื่อนไข ระบบไม่สร้างหัวข้อและตอบ `409 TOPIC_HAS_NO_ASSIGNEES`
 - validation error ตอบ `400` พร้อม `details.field` ระบุ field ที่ผิด เช่น `fields[0].options`
 
 ### BE-09 · API แก้ / ปิดรับ / เปิดรับ / ลบหัวข้อ
@@ -303,19 +310,19 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 
 ### BE-14 · API เปิดดู / ดาวน์โหลดไฟล์
 
-`GET /api/files/{uuid}`
+`GET /api/files/{uuid}` เปิดดูไฟล์ และ `GET /api/files/{uuid}?download=true` บังคับดาวน์โหลด
 
 ต้องทำก่อน: BE-11, BE-13
 
 **เกณฑ์เสร็จ**
 
 - [x] ตรวจสิทธิ์แบบเดียวกับตารางคำตอบ ไม่มีสิทธิ์ → 403
-- [x] PDF และรูปเปิดในเบราว์เซอร์ได้ ไฟล์ชนิดอื่นให้ดาวน์โหลด
+- [x] PDF รูป และวิดีโอเปิดในระบบได้ พร้อมตัวเลือกดาวน์โหลด
 - [x] ดึงไฟล์จาก R2 แบบสตรีม ไม่เปิดเผย R2 URL หรือ credentials ให้ผู้ใช้
 
 endpoint นี้เปิดได้เฉพาะไฟล์สถานะ `attached` ที่แสดงอยู่ในตารางคำตอบ ไฟล์ของหัวข้อทั่วไปเปิดได้หลังเข้าสู่ระบบ ส่วนหัวข้อลับใช้ขอบเขตเดียวกับ BE-13 คือผู้บริหาร หัวหน้าฝ่าย และผู้สร้างหัวข้อเปิดได้ทุกไฟล์ ขณะที่ผู้ต้องส่งทั่วไปเปิดได้เฉพาะไฟล์ของ submission ตนเอง หากไม่มีสิทธิ์ตอบ `403` และ UUID ที่ไม่มีอยู่หรือเป็นไฟล์ staged/trashed ตอบ `404`
 
-ระบบส่ง `application/pdf` และรูป raster ด้วย `Content-Disposition: inline` ส่วน SVG และไฟล์ชนิดอื่นใช้ `attachment` พร้อมชื่อไฟล์เดิมแบบ UTF-8 และ `X-Content-Type-Options: nosniff` ตัวไฟล์ถูก stream โดยตรงจาก local storage หรือ Cloudflare R2 ผ่าน API โดยไม่คืน object key, R2 URL หรือ credentials ให้ client
+ระบบส่ง `application/pdf`, รูป raster และวิดีโอด้วย `Content-Disposition: inline` เพื่อให้ frontend แสดงผ่าน `<iframe>`, `<img>` หรือ `<video controls>` ได้โดยใช้ URL เดิม ส่วนปุ่มดาวน์โหลดให้เติม `?download=true` เพื่อรับ `Content-Disposition: attachment` สำหรับไฟล์ทุกชนิด SVG และไฟล์ที่ browser ไม่รองรับจะดาวน์โหลดเป็นค่าเริ่มต้น ทุก response ใช้ชื่อไฟล์เดิมแบบ UTF-8, `Cache-Control: private, no-store` และ `X-Content-Type-Options: nosniff` ตัวไฟล์ถูก stream โดยตรงจาก local storage หรือ Cloudflare R2 ผ่าน API โดยไม่คืน object key, R2 URL หรือ credentials ให้ client
 
 ---
 
@@ -371,4 +378,6 @@ endpoint นี้เปิดได้เฉพาะไฟล์สถาน�
 
 `q` ค้นข้อความบางส่วนแบบไม่แยกตัวพิมพ์ในชื่อหัวข้อ ชื่อ/ชื่อย่อ/รหัสฝ่าย ชื่อหรือ username ผู้ส่ง JSON คำตอบ และชื่อไฟล์ `attached` รองรับภาษาไทยและ escape `%`, `_`, `\` เป็นตัวอักษรธรรมดา ตัวกรอง `division` ใช้รหัสฝ่าย, `year` ใช้ปี พ.ศ., `semester` รับ 1 หรือ 2 และ `by` รับ UUID ผู้ส่ง
 
-response คืน `items` ซึ่งประกอบด้วยหัวข้อ ผู้ส่ง ค่าที่กรอก ไฟล์ สถานะ และวันส่ง พร้อม `pagination` ที่มี `page`, `page_size`, `total`, `total_pages`; ค่าเริ่มต้นคือหน้า 1 จำนวน 20 รายการ และขอได้สูงสุด 100 รายการต่อหน้า ระบบจำกัดสิทธิ์ก่อนนับและแบ่งหน้า จึงไม่เปิดเผยทั้งเนื้อหาและจำนวนคำตอบลับ ผู้ใช้ทั่วไปเห็นเฉพาะคำตอบลับของตน ส่วนผู้บริหาร หัวหน้าฝ่ายเจ้าของหัวข้อ และผู้สร้างหัวข้อเห็นทุกคำตอบตาม scope เดียวกับ BE-13
+response คืน `items` ซึ่งประกอบด้วยหัวข้อ ผู้ส่ง ค่าที่กรอก ไฟล์ สถานะ และวันส่ง พร้อม `pagination` ที่มี `page`, `page_size`, `total`, `total_pages`; ค่าเริ่มต้นคือหน้า 1 จำนวน 20 รายการ และขอได้สูงสุด 100 รายการต่อหน้า นอกจากนี้คืน `topics` สำหรับหัวข้อที่ชื่อตรง `q` (สูงสุด 20 รายการ) และ `topic_total` เพื่อให้หน้าเว็บแสดงส่วน “หัวข้อที่ตรงคำค้น” แยกจากคำตอบได้ ตัวกรองฝ่าย ปี ภาคเรียน และผู้ส่งมีผลกับทั้งสองส่วน และเมื่อไม่ส่ง `q` จะได้ `topics: []`
+
+ระบบจำกัดสิทธิ์ก่อนนับและแบ่งหน้า จึงไม่เปิดเผยทั้งเนื้อหาและจำนวนคำตอบลับ ผู้ใช้ทั่วไปเห็นเฉพาะคำตอบลับของตน ส่วนผู้บริหาร หัวหน้าฝ่ายเจ้าของหัวข้อ และผู้สร้างหัวข้อเห็นทุกคำตอบตาม scope เดียวกับ BE-13 หัวข้อลับใน `topics` ใช้ขอบเขตเดียวกันและเปิดให้ผู้ที่ถูกมอบหมายค้นพบหัวข้อของตนได้แม้ยังไม่ได้ส่งคำตอบ

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/FhLk/SDMS-Backend/internal/admin"
 	"github.com/FhLk/SDMS-Backend/internal/auth"
@@ -20,6 +21,7 @@ import (
 
 type fakeAdminUserService struct {
 	list          func(context.Context) ([]model.User, error)
+	listActive    func(context.Context) ([]model.User, error)
 	create        func(context.Context, admin.CreateUserInput) (model.User, error)
 	update        func(context.Context, uuid.UUID, admin.UpdateUserInput) (model.User, error)
 	resetPassword func(context.Context, uuid.UUID, string) error
@@ -28,6 +30,13 @@ type fakeAdminUserService struct {
 
 func (f fakeAdminUserService) ListUsers(ctx context.Context) ([]model.User, error) {
 	return f.list(ctx)
+}
+
+func (f fakeAdminUserService) ListActiveUsers(ctx context.Context) ([]model.User, error) {
+	if f.listActive == nil {
+		return []model.User{}, nil
+	}
+	return f.listActive(ctx)
 }
 
 func (f fakeAdminUserService) CreateUser(ctx context.Context, input admin.CreateUserInput) (model.User, error) {
@@ -126,6 +135,53 @@ func TestAdminListsUsersWithoutPasswordHash(t *testing.T) {
 	}
 	if _, exists := body[0]["password_hash"]; exists {
 		t.Fatal("response contains password_hash")
+	}
+}
+
+func TestAuthenticatedUserListsActivePersonnel(t *testing.T) {
+	activeUUID := uuid.New()
+	inactiveUUID := uuid.New()
+	deactivatedAt := time.Now()
+	users := fakeAdminUserService{
+		listActive: func(context.Context) ([]model.User, error) {
+			return []model.User{
+				{
+					UUIDModel: model.UUIDModel{UUID: activeUUID}, Username: "teacher.one",
+					Prefix: "นาง", FirstName: "ครู", LastName: "หนึ่ง", Position: "ครู",
+					IsAdmin:   true,
+					Divisions: []model.Division{{Code: "aca", Name: "ฝ่ายวิชาการ", ShortName: "วิชาการ"}},
+				},
+				{UUIDModel: model.UUIDModel{UUID: inactiveUUID}, Username: "inactive", DeactivatedAt: &deactivatedAt},
+			}, nil
+		},
+	}
+	app := adminUsersTestApp(users)
+	req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
+	req.AddCookie(&http.Cookie{Name: "sdms_session", Value: "teacher-session"})
+
+	res, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("app.Test() error = %v", err)
+	}
+	defer res.Body.Close()
+	if got, want := res.StatusCode, http.StatusOK; got != want {
+		t.Fatalf("status = %d, want %d", got, want)
+	}
+	var body []map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body) != 1 || body[0]["uuid"] != activeUUID.String() || body[0]["full_name"] != "นางครู หนึ่ง" {
+		t.Fatalf("body = %+v", body)
+	}
+	divisions, ok := body[0]["divisions"].([]any)
+	if !ok || len(divisions) != 1 {
+		t.Fatalf("divisions = %+v", body[0]["divisions"])
+	}
+	for _, forbidden := range []string{"username", "password_hash", "is_exec", "is_admin", "is_active", "deactivated_at"} {
+		if _, exists := body[0][forbidden]; exists {
+			t.Fatalf("public directory response contains %q", forbidden)
+		}
 	}
 }
 

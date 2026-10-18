@@ -60,6 +60,19 @@ type SetCurrentAcademicYearInput struct {
 	CurrentSemester *int16
 }
 
+// ListDivisions คืนทุกฝ่ายพร้อมข้อมูลหัวหน้าปัจจุบัน โดยคงฝ่ายที่ยังไม่ได้
+// ตั้งหัวหน้าไว้ในผลลัพธ์ด้วย เพื่อให้หน้าแอดมินเห็นสถานะการตั้งค่าครบทุกฝ่าย.
+func (s *OrganizationService) ListDivisions(ctx context.Context) ([]model.Division, error) {
+	divisions := make([]model.Division, 0)
+	if err := s.db.WithContext(ctx).
+		Preload("HeadUser").
+		Order("sort_order, code").
+		Find(&divisions).Error; err != nil {
+		return nil, fmt.Errorf("list divisions with heads: %w", err)
+	}
+	return divisions, nil
+}
+
 // SetDivisionHead ตรวจผู้ใช้และฝ่ายภายใน transaction เดียว ก่อนแทนที่หัวหน้าคนเดิม.
 // การ lock แถวฝ่ายและผู้ใช้ช่วยให้คำขอพร้อมกันไม่เขียนทับกันโดยไม่ตั้งใจ.
 func (s *OrganizationService) SetDivisionHead(ctx context.Context, code string, userUUID uuid.UUID) (model.Division, error) {

@@ -31,19 +31,21 @@ func TestListDivisionTopicsWithPostgreSQL(t *testing.T) {
 	// rollback fixtures ของ BE-10 ทั้งหมดเพื่อไม่แก้ข้อมูลจริงของผู้ใช้.
 	t.Cleanup(func() { _ = tx.Rollback().Error })
 
-	var divisions []model.Division
-	if err := tx.Order("sort_order, code").Find(&divisions).Error; err != nil {
-		t.Fatalf("find divisions: %v", err)
+	suffix := uuid.NewString()[:8]
+	division := model.Division{
+		Code:      "l" + suffix[:7],
+		Name:      "ฝ่ายรายการทดสอบ " + suffix,
+		ShortName: "รายการทดสอบ",
+		SortOrder: 90,
 	}
-	if len(divisions) < 2 {
-		t.Fatalf("divisions = %d, want at least 2", len(divisions))
+	if err := tx.Create(&division).Error; err != nil {
+		t.Fatalf("create isolated division: %v", err)
 	}
 	var currentYear model.AcademicYear
 	if err := tx.Where("is_current = ?", true).First(&currentYear).Error; err != nil {
 		t.Fatalf("find current academic year: %v", err)
 	}
 
-	suffix := uuid.NewString()[:8]
 	inactiveAt := time.Now().UTC()
 	users := []model.User{
 		{Username: "be10." + suffix + ".creator", PasswordHash: "integration-hash", FullName: "ผู้สร้าง", Position: "ครู"},
@@ -55,7 +57,7 @@ func TestListDivisionTopicsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("create users: %v", err)
 	}
 	for _, user := range users {
-		if err := tx.Create(&model.UserDivision{UserUUID: user.UUID, DivisionUUID: divisions[0].UUID}).Error; err != nil {
+		if err := tx.Create(&model.UserDivision{UserUUID: user.UUID, DivisionUUID: division.UUID}).Error; err != nil {
 			t.Fatalf("create membership: %v", err)
 		}
 	}
@@ -65,11 +67,11 @@ func TestListDivisionTopicsWithPostgreSQL(t *testing.T) {
 		return time.Date(2026, time.October, 13, 12, 0, 0, 0, topicBangkokLocation)
 	}
 	topics := []model.Topic{
-		createListIntegrationTopic(t, service, divisions[0].UUID, users[0].UUID, "BE-10 submitted "+suffix, "2026-10-10"),
-		createListIntegrationTopic(t, service, divisions[0].UUID, users[0].UUID, "BE-10 late "+suffix, "2026-10-11"),
-		createListIntegrationTopic(t, service, divisions[0].UUID, users[0].UUID, "BE-10 overdue "+suffix, "2026-10-12"),
-		createListIntegrationTopic(t, service, divisions[0].UUID, users[0].UUID, "BE-10 pending "+suffix, "2026-10-14"),
-		createListIntegrationTopic(t, service, divisions[0].UUID, users[0].UUID, "BE-10 closed "+suffix, "2026-10-09"),
+		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, "BE-10 submitted "+suffix, "2026-10-10"),
+		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, "BE-10 late "+suffix, "2026-10-11"),
+		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, "BE-10 overdue "+suffix, "2026-10-12"),
+		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, "BE-10 pending "+suffix, "2026-10-14"),
+		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, "BE-10 closed "+suffix, "2026-10-09"),
 	}
 	if _, err := service.SetOpen(context.Background(), topics[4].UUID, false); err != nil {
 		t.Fatalf("close topic: %v", err)
@@ -102,11 +104,11 @@ func TestListDivisionTopicsWithPostgreSQL(t *testing.T) {
 		}
 	}
 
-	result, err := service.ListDivisionTopics(context.Background(), divisions[0].Code, nil, users[1].UUID)
+	result, err := service.ListDivisionTopics(context.Background(), division.Code, nil, users[1].UUID)
 	if err != nil {
 		t.Fatalf("ListDivisionTopics() error = %v", err)
 	}
-	if result.Division.UUID != divisions[0].UUID || result.AcademicYear.UUID != currentYear.UUID {
+	if result.Division.UUID != division.UUID || result.AcademicYear.UUID != currentYear.UUID {
 		t.Fatalf("division/year = %+v / %+v", result.Division, result.AcademicYear)
 	}
 	if len(result.Topics) != len(topics) {
@@ -136,7 +138,7 @@ func TestListDivisionTopicsWithPostgreSQL(t *testing.T) {
 	}
 
 	// ผู้บริหารไม่อยู่ใน snapshot แต่ยังดูรายการได้ และ x/y ต้องไม่เปลี่ยนตามผู้ดู.
-	executiveResult, err := service.ListDivisionTopics(context.Background(), divisions[0].Code, &currentYear.Year, users[2].UUID)
+	executiveResult, err := service.ListDivisionTopics(context.Background(), division.Code, &currentYear.Year, users[2].UUID)
 	if err != nil {
 		t.Fatalf("ListDivisionTopics(executive) error = %v", err)
 	}
@@ -154,14 +156,14 @@ func TestListDivisionTopicsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("missing division error = %v, want ErrDivisionNotFound", err)
 	}
 	invalidYear := int16(2300)
-	_, err = service.ListDivisionTopics(context.Background(), divisions[0].Code, &invalidYear, users[1].UUID)
+	_, err = service.ListDivisionTopics(context.Background(), division.Code, &invalidYear, users[1].UUID)
 	var validationErr *admin.ValidationError
 	if !errors.As(err, &validationErr) || validationErr.Field != "year" {
 		t.Fatalf("invalid year error = %v, want year ValidationError", err)
 	}
 
 	missingYear := findUnusedAcademicYear(t, tx)
-	_, err = service.ListDivisionTopics(context.Background(), divisions[0].Code, &missingYear, users[1].UUID)
+	_, err = service.ListDivisionTopics(context.Background(), division.Code, &missingYear, users[1].UUID)
 	if !errors.Is(err, ErrTopicAcademicYearNotFound) {
 		t.Fatalf("missing year error = %v, want ErrTopicAcademicYearNotFound", err)
 	}

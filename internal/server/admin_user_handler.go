@@ -15,6 +15,7 @@ import (
 
 type adminUserService interface {
 	ListUsers(context.Context) ([]model.User, error)
+	ListActiveUsers(context.Context) ([]model.User, error)
 	CreateUser(context.Context, admin.CreateUserInput) (model.User, error)
 	UpdateUser(context.Context, uuid.UUID, admin.UpdateUserInput) (model.User, error)
 	ResetPassword(context.Context, uuid.UUID, string) error
@@ -75,6 +76,18 @@ type adminUserResponse struct {
 	UpdatedAt     time.Time          `json:"updated_at"`
 }
 
+// directoryUserResponse contains only the identity fields needed for personnel
+// selectors and intentionally omits login and administration-only data.
+type directoryUserResponse struct {
+	UUID      uuid.UUID          `json:"uuid"`
+	Prefix    string             `json:"prefix"`
+	FirstName string             `json:"first_name"`
+	LastName  string             `json:"last_name"`
+	FullName  string             `json:"full_name"`
+	Position  string             `json:"position"`
+	Divisions []divisionResponse `json:"divisions"`
+}
+
 // list คืนผู้ใช้ทั้งที่เปิดและปิดใช้งาน โดยไม่ส่ง password hash ออกทาง API.
 func (h adminUserHandler) list(c fiber.Ctx) error {
 	if h.service == nil {
@@ -88,6 +101,35 @@ func (h adminUserHandler) list(c fiber.Ctx) error {
 	responses := make([]adminUserResponse, 0, len(users))
 	for _, user := range users {
 		responses = append(responses, newAdminUserResponse(user))
+	}
+	return c.Status(fiber.StatusOK).JSON(responses)
+}
+
+// listDirectory gives every authenticated user a safe, active-only personnel
+// directory. The search page can use UUIDs from this response for its by filter.
+func (h adminUserHandler) listDirectory(c fiber.Ctx) error {
+	if h.service == nil {
+		return apperror.New(fiber.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "User directory service unavailable")
+	}
+
+	users, err := h.service.ListActiveUsers(c.Context())
+	if err != nil {
+		return mapAdminUserError(err)
+	}
+	responses := make([]directoryUserResponse, 0, len(users))
+	for _, user := range users {
+		if user.DeactivatedAt != nil {
+			continue
+		}
+		responses = append(responses, directoryUserResponse{
+			UUID:      user.UUID,
+			Prefix:    user.Prefix,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			FullName:  user.DisplayName(),
+			Position:  user.Position,
+			Divisions: divisionResponses(user.Divisions),
+		})
 	}
 	return c.Status(fiber.StatusOK).JSON(responses)
 }

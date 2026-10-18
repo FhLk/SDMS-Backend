@@ -150,7 +150,7 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 **Priority: P1 — High**
 
-`PUT /api/admin/divisions/{code}/head` · `GET` · `POST /api/admin/years` · `POST /api/admin/years/{year}/current`
+`GET /api/admin/divisions` · `PUT /api/admin/divisions/{code}/head` · `GET /api/admin/years` · `POST /api/admin/years` · `POST /api/admin/years/{year}/current`
 
 ต้องทำก่อน: BE-04
 
@@ -163,6 +163,7 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 **รายละเอียดที่ทำแล้ว**
 
+- รายการฝ่ายเรียงตาม `sort_order` พร้อม `head_user`; ฝ่ายที่ยังไม่ได้ตั้งหัวหน้าคืน `null`
 - ใช้ `user_uuid` ตั้งหัวหน้า โดยห้ามผู้บริหาร บัญชีปิดใช้งาน และคนที่เป็นหัวหน้าฝ่ายอื่น
 - สร้างปีใหม่ด้วย `year` และ `current_semester` โดยไม่เปลี่ยนปีปัจจุบันจนกว่าจะเรียก endpoint `/current`
 - สลับปี/ภาคเรียนใน transaction ที่ lock แถวปีการศึกษา และมี partial unique index ป้องกันปีปัจจุบันซ้ำอีกชั้น
@@ -324,21 +325,21 @@ Priority บอกความสำคัญต่อการส่งมอ�
 
 **Priority: P1 — High**
 
-`GET /api/files/{uuid}`
+`GET /api/files/{uuid}` เปิดดูไฟล์ และ `GET /api/files/{uuid}?download=true` บังคับดาวน์โหลด
 
 ต้องทำก่อน: BE-11, BE-13
 
 **เกณฑ์เสร็จ**
 
 - [x] ตรวจสิทธิ์เหมือนตารางคำตอบ ไม่มีสิทธิ์ → 403
-- [x] PDF และรูปเปิดในเบราว์เซอร์ได้ ไฟล์อื่นให้ดาวน์โหลด
+- [x] PDF รูป และวิดีโอเปิดในระบบได้ พร้อมตัวเลือกดาวน์โหลด
 - [x] ดึงจาก R2 แบบสตรีม ไม่เปิดเผย R2 URL หรือ credentials โดยตรง
 
 **รายละเอียดที่ทำแล้ว**
 
 - `GET /api/files/{uuid}` เปิดเฉพาะไฟล์ `attached`; ไฟล์ staged, trashed หรือ UUID ที่ไม่มีอยู่ตอบ `404 FILE_NOT_FOUND`
 - ตรวจ topic และ submission ภายใน transaction พร้อม share lock แล้วใช้ policy เดียวกับ BE-13: หัวข้อทั่วไปเปิดได้หลัง login ส่วนหัวข้อลับเปิดได้ทุกไฟล์เฉพาะผู้บริหาร หัวหน้าฝ่าย และผู้สร้าง; ผู้ส่งทั่วไปเปิดได้เฉพาะไฟล์ของตนเอง
-- PDF และรูป raster ส่งแบบ `inline`; SVG และชนิดอื่นส่งแบบ `attachment` พร้อมชื่อเดิม UTF-8 และ header `X-Content-Type-Options: nosniff`
+- PDF รูป raster และวิดีโอส่งแบบ `inline`; เมื่อระบุ `?download=true` จะส่งแบบ `attachment` ทุกชนิด ส่วน SVG และชนิดที่ browser ไม่รองรับจะดาวน์โหลดเป็นค่าเริ่มต้น พร้อมชื่อเดิม UTF-8, `Cache-Control: private, no-store` และ `X-Content-Type-Options: nosniff`
 - เพิ่ม `Open` ใน local และ R2 storage adapters แล้วส่ง `io.ReadCloser` เข้า Fiber โดยตรง จึงไม่โหลดไฟล์ทั้งก้อนเข้า memory และไม่เปิดเผย object key, URL หรือ credentials
 - unit, handler และ PostgreSQL integration tests ครอบคลุม storage stream, response headers, สถานะไฟล์ และสิทธิ์ของหัวข้อทั่วไป/หัวข้อลับ โดย fixture ถูก rollback หลังจบ
 

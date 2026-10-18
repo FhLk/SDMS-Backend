@@ -223,6 +223,26 @@ func TestCreateTopicValidationReturnsFieldPath(t *testing.T) {
 	}
 }
 
+func TestCreateTopicRejectsDivisionWithoutAssignees(t *testing.T) {
+	service := fakeTopicService{
+		create: func(context.Context, topic.CreateInput) (model.Topic, error) {
+			return model.Topic{}, topic.ErrNoEligibleAssignees
+		},
+	}
+	app, divisionUUID := topicTestApp(service)
+	req := topicRequest("/api/topics", "admin-session", validCreateTopicBody(divisionUUID))
+
+	res, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("app.Test() error = %v", err)
+	}
+	defer res.Body.Close()
+	if got, want := res.StatusCode, http.StatusConflict; got != want {
+		t.Fatalf("status = %d, want %d", got, want)
+	}
+	assertErrorResponse(t, res, "TOPIC_HAS_NO_ASSIGNEES")
+}
+
 func topicTestApp(service topicService) (*fiber.App, uuid.UUID) {
 	divisionUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb30001")
 	otherDivisionUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb30002")

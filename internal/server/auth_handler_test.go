@@ -218,6 +218,31 @@ func TestMeRejectsMissingSession(t *testing.T) {
 	assertErrorResponse(t, res, "UNAUTHORIZED")
 }
 
+func TestMeReturnsOverlappingRoleFlagsAlongsidePrimaryRole(t *testing.T) {
+	response := newMeResponse(auth.Profile{
+		User: model.User{
+			UUIDModel: model.UUIDModel{UUID: uuid.New()},
+			IsExec:    true,
+			IsAdmin:   true,
+		},
+		HeadDivisions: []model.Division{{UUIDModel: model.UUIDModel{UUID: uuid.New()}}},
+	})
+	if response.Role != "admin" || !response.IsExec || !response.IsAdmin {
+		t.Fatalf("response roles = role:%q is_exec:%v is_admin:%v", response.Role, response.IsExec, response.IsAdmin)
+	}
+	encoded, err := json.Marshal(response)
+	if err != nil {
+		t.Fatalf("marshal response: %v", err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(encoded, &body); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if body["is_exec"] != true || body["is_admin"] != true {
+		t.Fatalf("JSON role flags = %s", encoded)
+	}
+}
+
 func testAuthConfig() config.AuthConfig {
 	return config.AuthConfig{
 		SessionTTL: 24 * time.Hour,

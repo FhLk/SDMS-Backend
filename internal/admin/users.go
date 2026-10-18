@@ -92,6 +92,25 @@ func (s *UserService) ListUsers(ctx context.Context) ([]model.User, error) {
 	return users, nil
 }
 
+// ListActiveUsers returns the personnel directory without ever loading
+// deactivated accounts into the public read path.
+func (s *UserService) ListActiveUsers(ctx context.Context) ([]model.User, error) {
+	users := make([]model.User, 0)
+	err := s.db.WithContext(ctx).
+		Preload("Divisions", func(db *gorm.DB) *gorm.DB {
+			return db.Order("divisions.sort_order")
+		}).
+		Where("users.deactivated_at IS NULL").
+		Order("users.first_name").
+		Order("users.last_name").
+		Order("users.username").
+		Find(&users).Error
+	if err != nil {
+		return nil, fmt.Errorf("list active users: %w", err)
+	}
+	return users, nil
+}
+
 // CreateUser ตรวจข้อมูล สร้าง bcrypt hash และบันทึกผู้ใช้กับฝ่ายใน transaction เดียว.
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (model.User, error) {
 	input = normalizeCreateUserInput(input)

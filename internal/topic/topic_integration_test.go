@@ -33,19 +33,19 @@ func TestTopicServiceWithPostgreSQL(t *testing.T) {
 	// rollback ผู้ใช้ หัวข้อ fields และ assignees ทั้งหมดเมื่อ test จบ.
 	t.Cleanup(func() { _ = tx.Rollback().Error })
 
-	var divisions []model.Division
-	if err := tx.Order("sort_order").Limit(2).Find(&divisions).Error; err != nil {
-		t.Fatalf("find divisions: %v", err)
+	suffix := uuid.NewString()[:8]
+	divisions := []model.Division{
+		{Code: "a" + suffix[:7], Name: "ฝ่ายทดสอบหนึ่ง " + suffix, ShortName: "ทดสอบหนึ่ง", SortOrder: 90},
+		{Code: "b" + suffix[:7], Name: "ฝ่ายทดสอบสอง " + suffix, ShortName: "ทดสอบสอง", SortOrder: 91},
 	}
-	if len(divisions) != 2 {
-		t.Fatalf("divisions = %d, want at least 2", len(divisions))
+	if err := tx.Create(&divisions).Error; err != nil {
+		t.Fatalf("create isolated divisions: %v", err)
 	}
 	var currentYear model.AcademicYear
 	if err := tx.Where("is_current = ?", true).Take(&currentYear).Error; err != nil {
 		t.Fatalf("find current academic year: %v", err)
 	}
 
-	suffix := uuid.NewString()[:8]
 	inactiveAt := time.Now()
 	users := []model.User{
 		{Username: "be08." + suffix + ".admin", PasswordHash: "integration-hash", FullName: "ผู้สร้าง", Position: "แอดมิน", IsAdmin: true},
@@ -144,6 +144,29 @@ func TestTopicServiceWithPostgreSQL(t *testing.T) {
 		t.Fatalf("invalid choice error = %v, want fields[0].options ValidationError", err)
 	}
 	assertTopicRelatedCount(t, tx, &model.Topic{}, "title = ?", 0, invalidTitle)
+
+	// ฝ่ายที่ไม่มีสมาชิกต้องไม่ทิ้งหัวข้อว่างซึ่งไม่มีใครสามารถส่งได้.
+	emptyDivision := model.Division{
+		Code:      "x" + suffix[:6],
+		Name:      "ฝ่ายทดสอบว่าง " + suffix,
+		ShortName: "ว่าง",
+		SortOrder: 99,
+	}
+	if err := tx.Create(&emptyDivision).Error; err != nil {
+		t.Fatalf("create empty division: %v", err)
+	}
+	emptyTitle := title + " empty division"
+	_, err = service.Create(context.Background(), CreateInput{
+		DivisionUUID:  emptyDivision.UUID,
+		CreatedByUUID: users[0].UUID,
+		Title:         emptyTitle,
+		DueDate:       "2026-10-31",
+		Fields:        []FieldInput{{Type: model.FieldText, Label: "ข้อความ"}},
+	})
+	if !errors.Is(err, ErrNoEligibleAssignees) {
+		t.Fatalf("Create(empty division) error = %v, want ErrNoEligibleAssignees", err)
+	}
+	assertTopicRelatedCount(t, tx, &model.Topic{}, "title = ?", 0, emptyTitle)
 
 	// หากไม่มีปีปัจจุบัน transaction ต้องหยุดก่อนสร้าง topic.
 	if err := tx.Model(&model.AcademicYear{}).

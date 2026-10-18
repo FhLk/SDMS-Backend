@@ -28,6 +28,7 @@ const (
 var (
 	ErrCurrentAcademicYearNotSet = errors.New("current academic year is not set")
 	ErrCreatorNotFound           = errors.New("topic creator not found")
+	ErrNoEligibleAssignees       = errors.New("topic has no eligible assignees")
 )
 
 type FieldInput struct {
@@ -346,7 +347,7 @@ func createTopicAssignees(db *gorm.DB, topicUUID, divisionUUID uuid.UUID) ([]mod
 		assignees = append(assignees, model.TopicAssignee{TopicUUID: topicUUID, UserUUID: userUUID})
 	}
 	if len(assignees) == 0 {
-		return assignees, nil
+		return nil, ErrNoEligibleAssignees
 	}
 	if err := db.Create(&assignees).Error; err != nil {
 		return nil, fmt.Errorf("create topic assignees: %w", err)

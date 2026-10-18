@@ -65,6 +65,10 @@ func TestSearchServiceWithPostgreSQL(t *testing.T) {
 		t, tx, divisions[0], firstYear, creator, 1,
 		"หัวข้อลับ "+marker, "2026-10-20", true,
 	)
+	topicWithoutAnswers, _ := createSearchTopic(
+		t, tx, divisions[0], firstYear, creator, 1,
+		"หัวข้อยังไม่มีคำตอบ "+marker, "2026-10-21", false,
+	)
 
 	publicOneSubmission := createSearchSubmission(
 		t, tx, publicOne.UUID, submitter.UUID,
@@ -114,6 +118,9 @@ func TestSearchServiceWithPostgreSQL(t *testing.T) {
 	}
 	if regular.Total != 3 || regular.TotalPages != 2 || len(regular.Items) != 2 {
 		t.Fatalf("regular page 1 = %+v, want total=3 pages=2 items=2", regular)
+	}
+	if regular.TopicTotal != 4 || !containsSearchTopic(regular.Topics, topicWithoutAnswers.UUID) {
+		t.Fatalf("regular matching topics = total %d topics %+v, want topic without answers", regular.TopicTotal, regular.Topics)
 	}
 	if regular.Items[0].SubmissionUUID != publicTwoSubmission.UUID || regular.Items[1].SubmissionUUID != secretOwnSubmission.UUID {
 		t.Fatalf("regular page 1 order = %v", searchItemUUIDs(regular.Items))
@@ -174,6 +181,25 @@ func TestSearchServiceWithPostgreSQL(t *testing.T) {
 		publicOneSubmission.UUID, publicTwoSubmission.UUID,
 	})
 	assertSearchOne(t, service, Input{Profile: regularProfile, Query: marker, By: &viewer.UUID}, secretOwnSubmission.UUID)
+
+	secretTitleForRegular, err := service.Search(context.Background(), Input{
+		Profile: regularProfile, Query: secret.Title, By: &submitter.UUID,
+	})
+	if err != nil {
+		t.Fatalf("Search(secret title by another submitter) error = %v", err)
+	}
+	if secretTitleForRegular.Total != 0 || secretTitleForRegular.TopicTotal != 0 || len(secretTitleForRegular.Topics) != 0 {
+		t.Fatalf("secret submitter filter leaked results: %+v", secretTitleForRegular)
+	}
+	secretTitleForOwner, err := service.Search(context.Background(), Input{
+		Profile: creatorProfile, Query: secret.Title, By: &submitter.UUID,
+	})
+	if err != nil {
+		t.Fatalf("Search(secret title as creator) error = %v", err)
+	}
+	if secretTitleForOwner.Total != 1 || secretTitleForOwner.TopicTotal != 1 || len(secretTitleForOwner.Topics) != 1 || secretTitleForOwner.Topics[0].UUID != secret.UUID {
+		t.Fatalf("creator secret topic results = %+v", secretTitleForOwner)
+	}
 }
 
 func createSearchAcademicYear(t *testing.T, db *gorm.DB, excluded int16) model.AcademicYear {
@@ -323,4 +349,13 @@ func searchItemUUIDs(items []Item) []uuid.UUID {
 		values = append(values, item.SubmissionUUID)
 	}
 	return values
+}
+
+func containsSearchTopic(topics []Topic, topicUUID uuid.UUID) bool {
+	for _, topic := range topics {
+		if topic.UUID == topicUUID {
+			return true
+		}
+	}
+	return false
 }
