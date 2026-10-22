@@ -107,13 +107,13 @@ type AcademicYear struct {
 type Topic struct {
 	UUIDModel
 	DivisionUUID     uuid.UUID `gorm:"type:uuid;not null;index:idx_topics_division_year,priority:1"`
-	AcademicYearUUID uuid.UUID `gorm:"type:uuid;not null;index:idx_topics_division_year,priority:2"`
+	AcademicYearUUID uuid.UUID `gorm:"type:uuid;not null;index;index:idx_topics_division_year,priority:2"`
 	Semester         int16     `gorm:"not null;check:chk_topics_semester,semester IN (1,2)"`
 	Title            string    `gorm:"size:200;not null"`
 	DueDate          time.Time `gorm:"type:date;not null;index"`
 	IsOpen           bool      `gorm:"not null;default:true"`
 	IsSecret         bool      `gorm:"not null;default:false"`
-	CreatedByUUID    uuid.UUID `gorm:"type:uuid;not null"`
+	CreatedByUUID    uuid.UUID `gorm:"type:uuid;not null;index"`
 	ClosedAt         *time.Time
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -165,9 +165,9 @@ type Submission struct {
 type File struct {
 	UUIDModel
 	TopicUUID      uuid.UUID  `gorm:"type:uuid;not null;index"`
-	FieldUUID      uuid.UUID  `gorm:"type:uuid;not null"`
+	FieldUUID      uuid.UUID  `gorm:"type:uuid;not null;index"`
 	SubmissionUUID *uuid.UUID `gorm:"type:uuid;index"`
-	UploadedByUUID uuid.UUID  `gorm:"type:uuid;not null"`
+	UploadedByUUID uuid.UUID  `gorm:"type:uuid;not null;index"`
 	ObjectKey      string     `gorm:"size:512;not null"`
 	OriginalName   string     `gorm:"size:255;not null"`
 	MimeType       string     `gorm:"size:120;not null"`

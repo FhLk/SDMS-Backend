@@ -1,0 +1,16 @@
+.git
+.gitignore
+.env
+.env.*
+.dev.vars*
+.cache
+.archify
+node_modules
+tmp
+uploads
+backups
+secrets
+*.log
+*.md
+compose.yaml
+sample-data
