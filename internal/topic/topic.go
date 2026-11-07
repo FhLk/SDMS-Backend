@@ -46,6 +46,10 @@ type CreateInput struct {
 	DueDate       string
 	IsSecret      bool
 	Fields        []FieldInput
+	// AssigneeUUIDs is optional for backward compatibility. A nil value assigns
+	// every eligible division member, while a non-nil value is the exact list
+	// selected by the topic manager.
+	AssigneeUUIDs *[]uuid.UUID
 }
 
 type Service struct {
@@ -105,7 +109,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (model.Topic, e
 		if err != nil {
 			return err
 		}
-		assignees, err := createTopicAssignees(tx, topic.UUID, division.UUID)
+		assignees, err := createTopicAssignees(tx, topic.UUID, division.UUID, input.AssigneeUUIDs)
 		if err != nil {
 			return err
 		}
@@ -167,7 +171,31 @@ func validateCreateInput(input CreateInput) (time.Time, error) {
 	if err := validateTopicFields(input.Fields); err != nil {
 		return time.Time{}, err
 	}
+	if err := validateAssigneeUUIDs(input.AssigneeUUIDs); err != nil {
+		return time.Time{}, err
+	}
 	return dueDate, nil
+}
+
+func validateAssigneeUUIDs(values *[]uuid.UUID) error {
+	if values == nil {
+		return nil
+	}
+	if len(*values) == 0 {
+		return validationError("assignee_uuids", "at least one assignee is required")
+	}
+	seen := make(map[uuid.UUID]struct{}, len(*values))
+	for index, userUUID := range *values {
+		path := fmt.Sprintf("assignee_uuids[%d]", index)
+		if userUUID == uuid.Nil {
+			return validationError(path, "assignee UUID is required")
+		}
+		if _, duplicate := seen[userUUID]; duplicate {
+			return validationError(path, "assignee UUID must not be duplicated")
+		}
+		seen[userUUID] = struct{}{}
+	}
+	return nil
 }
 
 func validateTopicFields(fields []FieldInput) error {
@@ -329,17 +357,24 @@ func createTopicFields(db *gorm.DB, topicUUID uuid.UUID, inputs []FieldInput) ([
 	return fields, nil
 }
 
-func createTopicAssignees(db *gorm.DB, topicUUID, divisionUUID uuid.UUID) ([]model.TopicAssignee, error) {
-	var userUUIDs []uuid.UUID
-	if err := db.Table("accounts").
-		Select("accounts.uuid").
-		Joins("JOIN user_divisions ON user_divisions.user_uuid = accounts.uuid").
-		Where("user_divisions.division_uuid = ?", divisionUUID).
-		Where("accounts.is_exec = ?", false).
-		Where("accounts.deactivated_at IS NULL").
-		Order("accounts.uuid").
-		Scan(&userUUIDs).Error; err != nil {
-		return nil, fmt.Errorf("list topic assignees: %w", err)
+func createTopicAssignees(db *gorm.DB, topicUUID, divisionUUID uuid.UUID, requested *[]uuid.UUID) ([]model.TopicAssignee, error) {
+	userUUIDs, err := listEligibleTopicAssigneeUUIDs(db, divisionUUID, requested)
+	if err != nil {
+		return nil, err
+	}
+	if requested != nil {
+		eligible := make(map[uuid.UUID]struct{}, len(userUUIDs))
+		for _, userUUID := range userUUIDs {
+			eligible[userUUID] = struct{}{}
+		}
+		for index, userUUID := range *requested {
+			if _, exists := eligible[userUUID]; !exists {
+				return nil, validationError(
+					fmt.Sprintf("assignee_uuids[%d]", index),
+					"assignee must be an active, non-executive member of the topic division",
+				)
+			}
+		}
 	}
 
 	assignees := make([]model.TopicAssignee, 0, len(userUUIDs))
@@ -353,4 +388,21 @@ func createTopicAssignees(db *gorm.DB, topicUUID, divisionUUID uuid.UUID) ([]mod
 		return nil, fmt.Errorf("create topic assignees: %w", err)
 	}
 	return assignees, nil
+}
+
+func listEligibleTopicAssigneeUUIDs(db *gorm.DB, divisionUUID uuid.UUID, requested *[]uuid.UUID) ([]uuid.UUID, error) {
+	var userUUIDs []uuid.UUID
+	query := db.Table("accounts").
+		Select("accounts.uuid").
+		Joins("JOIN user_divisions ON user_divisions.user_uuid = accounts.uuid").
+		Where("user_divisions.division_uuid = ?", divisionUUID).
+		Where("accounts.is_exec = ?", false).
+		Where("accounts.deactivated_at IS NULL")
+	if requested != nil {
+		query = query.Where("accounts.uuid IN ?", *requested)
+	}
+	if err := query.Order("accounts.uuid").Scan(&userUUIDs).Error; err != nil {
+		return nil, fmt.Errorf("list topic assignees: %w", err)
+	}
+	return userUUIDs, nil
 }

@@ -13,10 +13,11 @@ import (
 )
 
 type updateTopicRequest struct {
-	Title    *string                    `json:"title"`
-	DueDate  *string                    `json:"due_date"`
-	IsSecret *bool                      `json:"is_secret"`
-	Fields   *[]updateTopicFieldRequest `json:"fields"`
+	Title         *string                    `json:"title"`
+	DueDate       *string                    `json:"due_date"`
+	IsSecret      *bool                      `json:"is_secret"`
+	Fields        *[]updateTopicFieldRequest `json:"fields"`
+	AssigneeUUIDs *[]uuid.UUID               `json:"assignee_uuids"`
 }
 
 type updateTopicFieldRequest struct {
@@ -61,15 +62,16 @@ func (h topicHandler) update(c fiber.Ctx) error {
 	}
 
 	updated, err := h.service.Update(c.Context(), topicUUID, topic.UpdateInput{
-		Title:    request.Title,
-		DueDate:  request.DueDate,
-		IsSecret: request.IsSecret,
-		Fields:   fields,
+		Title:         request.Title,
+		DueDate:       request.DueDate,
+		IsSecret:      request.IsSecret,
+		Fields:        fields,
+		AssigneeUUIDs: request.AssigneeUUIDs,
 	})
 	if err != nil {
 		return mapTopicError(err)
 	}
-	response, err := newTopicResponse(updated)
+	response, err := newManagedTopicResponse(updated)
 	if err != nil {
 		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
 	}
@@ -96,7 +98,7 @@ func (h topicHandler) changeOpenState(c fiber.Ctx, open bool) error {
 	if err != nil {
 		return mapTopicError(err)
 	}
-	response, err := newTopicResponse(updated)
+	response, err := newManagedTopicResponse(updated)
 	if err != nil {
 		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
 	}

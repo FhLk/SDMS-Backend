@@ -123,11 +123,14 @@ func TestDivisionHeadCreatesTopic(t *testing.T) {
 		},
 	}
 	app, divisionUUID := topicTestApp(service)
+	assigneeOneUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb30007")
+	assigneeTwoUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb30008")
 	body := `{
 		"division_uuid":"` + divisionUUID.String() + `",
 		"title":"รายงานประจำเดือน",
 		"due_date":"2026-10-31",
 		"is_secret":true,
+		"assignee_uuids":["` + assigneeOneUUID.String() + `","` + assigneeTwoUUID.String() + `"],
 		"fields":[
 			{"position":2,"type":"choice","label":"ระดับชั้น","options":["ม.1","ม.2"]},
 			{"position":1,"type":"text","label":"ชื่อกิจกรรม","required":false}
@@ -149,6 +152,9 @@ func TestDivisionHeadCreatesTopic(t *testing.T) {
 	if len(received.Fields) != 2 || !received.Fields[0].Required || received.Fields[1].Required {
 		t.Fatalf("required defaults = %+v, want default true then explicit false", received.Fields)
 	}
+	if received.AssigneeUUIDs == nil || len(*received.AssigneeUUIDs) != 2 || (*received.AssigneeUUIDs)[0] != assigneeOneUUID {
+		t.Fatalf("assignee UUIDs = %+v", received.AssigneeUUIDs)
+	}
 
 	var response topicResponse
 	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
@@ -159,6 +165,9 @@ func TestDivisionHeadCreatesTopic(t *testing.T) {
 	}
 	if response.DueDate != "2026-10-31" || !response.IsOpen || !response.IsSecret || response.AssigneeCount != 2 {
 		t.Fatalf("topic response = %+v", response)
+	}
+	if len(response.AssigneeUUIDs) != 2 || response.AssigneeUUIDs[0] != assigneeOneUUID || response.AssigneeUUIDs[1] != assigneeTwoUUID {
+		t.Fatalf("assignee UUID response = %v", response.AssigneeUUIDs)
 	}
 	if len(response.Fields) != 2 || response.Fields[0].Position != 1 || len(response.Fields[1].Options) != 2 {
 		t.Fatalf("fields response = %+v", response.Fields)
@@ -186,6 +195,27 @@ func TestAdminCreatesTopicForAnyDivision(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("admin request did not reach topic service")
+	}
+}
+
+func TestSubmissionTopicResponseOmitsAssigneeUUIDs(t *testing.T) {
+	value := createdTopicFixture(topic.CreateInput{
+		DivisionUUID: uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb30001"),
+	})
+	response, err := newTopicResponse(value)
+	if err != nil {
+		t.Fatalf("newTopicResponse() error = %v", err)
+	}
+	encoded, err := json.Marshal(response)
+	if err != nil {
+		t.Fatalf("marshal response: %v", err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(encoded, &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if _, exists := body["assignee_uuids"]; exists {
+		t.Fatalf("submission topic response leaked assignee UUIDs: %s", encoded)
 	}
 }
 
@@ -296,6 +326,17 @@ func createdTopicFixture(input topic.CreateInput) model.Topic {
 	fieldOneUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb40003")
 	fieldTwoUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb40004")
 	now := time.Date(2026, time.October, 13, 8, 0, 0, 0, time.UTC)
+	assigneeUUIDs := []uuid.UUID{
+		uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb30007"),
+		uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb30008"),
+	}
+	if input.AssigneeUUIDs != nil {
+		assigneeUUIDs = append([]uuid.UUID(nil), (*input.AssigneeUUIDs)...)
+	}
+	assignees := make([]model.TopicAssignee, 0, len(assigneeUUIDs))
+	for _, userUUID := range assigneeUUIDs {
+		assignees = append(assignees, model.TopicAssignee{UserUUID: userUUID})
+	}
 	return model.Topic{
 		UUIDModel:        model.UUIDModel{UUID: topicUUID},
 		DivisionUUID:     input.DivisionUUID,
@@ -319,6 +360,6 @@ func createdTopicFixture(input topic.CreateInput) model.Topic {
 			{UUIDModel: model.UUIDModel{UUID: fieldOneUUID}, Position: 1, Type: model.FieldText, Label: "ชื่อกิจกรรม", Required: false, Options: datatypes.JSON([]byte(`[]`))},
 			{UUIDModel: model.UUIDModel{UUID: fieldTwoUUID}, Position: 2, Type: model.FieldChoice, Label: "ระดับชั้น", Required: true, Options: datatypes.JSON([]byte(`["ม.1","ม.2"]`))},
 		},
-		Assignees: []model.TopicAssignee{{}, {}},
+		Assignees: assignees,
 	}
 }

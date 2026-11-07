@@ -163,6 +163,7 @@ func TestSubmissionHandlerListsTopicTableWithFilter(t *testing.T) {
 						Label:     "รายละเอียด",
 						Required:  true,
 					}},
+					Assignees: []model.TopicAssignee{{UserUUID: userUUID}},
 				},
 				Rows: []submission.TopicTableRow{{
 					User:           model.User{UUIDModel: model.UUIDModel{UUID: userUUID}, Username: "teacher", FullName: "ครูทดสอบ"},
@@ -190,6 +191,55 @@ func TestSubmissionHandlerListsTopicTableWithFilter(t *testing.T) {
 	}
 	if len(decoded.Rows) != 1 || decoded.Rows[0].SubmissionUUID == nil || *decoded.Rows[0].SubmissionUUID != submissionUUID {
 		t.Fatalf("table response = %+v", decoded)
+	}
+	if decoded.Topic.AssigneeUUIDs != nil {
+		t.Fatalf("non-editor response leaked assignee UUIDs: %v", decoded.Topic.AssigneeUUIDs)
+	}
+}
+
+func TestSubmissionHandlerIncludesAssigneeUUIDsForTopicEditor(t *testing.T) {
+	userUUID := uuid.New()
+	topicUUID := uuid.New()
+	otherAssigneeUUID := uuid.New()
+	service := &stubSubmissionService{
+		listTable: func(_ context.Context, gotTopicUUID uuid.UUID, profile auth.Profile, status string) (submission.TopicTable, error) {
+			if gotTopicUUID != topicUUID || profile.User.UUID != userUUID || status != "" {
+				t.Fatalf("table input = %s/%s/%q", gotTopicUUID, profile.User.UUID, status)
+			}
+			return submission.TopicTable{
+				Topic: model.Topic{
+					UUIDModel:     model.UUIDModel{UUID: topicUUID},
+					Division:      model.Division{UUIDModel: model.UUIDModel{UUID: uuid.New()}, Code: "aca"},
+					AcademicYear:  model.AcademicYear{UUIDModel: model.UUIDModel{UUID: uuid.New()}, Year: 2569},
+					Title:         "หัวข้อที่แก้ไขได้",
+					DueDate:       time.Date(2026, time.October, 13, 0, 0, 0, 0, time.UTC),
+					CreatedByUUID: userUUID,
+					Fields:        []model.TopicField{},
+					Assignees: []model.TopicAssignee{
+						{UserUUID: userUUID},
+						{UserUUID: otherAssigneeUUID},
+					},
+				},
+				Rows: []submission.TopicTableRow{},
+			}, nil
+		},
+	}
+	app := newSubmissionHandlerTestApp(userUUID, service)
+	request := httptest.NewRequest(http.MethodGet, "/topics/"+topicUUID.String(), nil)
+	response, err := app.Test(request)
+	if err != nil {
+		t.Fatalf("app.Test() error = %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", response.StatusCode)
+	}
+	var decoded topicSubmissionTableResponse
+	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
+		t.Fatalf("decode table response: %v", err)
+	}
+	if len(decoded.Topic.AssigneeUUIDs) != 2 {
+		t.Fatalf("editor assignee UUIDs = %v, want two", decoded.Topic.AssigneeUUIDs)
 	}
 }
 

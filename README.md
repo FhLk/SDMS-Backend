@@ -4,6 +4,8 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 
 > **ฐานข้อมูลสำหรับพัฒนา:** ใช้ PostgreSQL 17 บนเครื่องผ่าน Docker Compose และเก็บตารางใน schema `sdms` ส่วนไฟล์เก็บในโฟลเดอร์ `uploads`
 
+เอกสาร API ฉบับเต็ม: [`api.md`](api.md)
+
 | # | Issue | ต้องทำก่อน |
 |---|---|---|
 | BE-01 | ตั้งโปรเจกต์ Go Fiber + เชื่อม PostgreSQL | – |
@@ -46,7 +48,7 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 4. สร้าง schema ตาราง และข้อมูลตั้งต้นด้วย `go run ./cmd/migrate`
 5. สร้างแอดมินคนแรกตามคำสั่งใน BE-02
 6. รัน API ด้วย `go run ./cmd/api`
-7. ตรวจสอบด้วย `GET http://localhost:8080/api/health`
+7. ตรวจสอบด้วย `GET http://localhost:8081/api/health`
 
 เมื่อต้องการบัญชีตัวอย่างสำหรับ local ให้รัน `go run ./cmd/seed-sample` หลัง migration คำสั่งนี้อ่าน `sample-data/users.json`, ผูกครูและหัวหน้าฝ่ายตาม `division_codes`, ตั้งหัวหน้าฝ่าย และซ่อมหัวข้อเปิดที่เคยถูกสร้างโดยไม่มีผู้ต้องส่ง โดยไม่เปลี่ยนรหัสผ่านของบัญชีตัวอย่างที่มีอยู่แล้ว
 
@@ -135,7 +137,7 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 
 ทุก response ที่มีข้อมูลบุคลากรคืนทั้ง `prefix`, `first_name`, `last_name` และ `full_name` ที่ประกอบขึ้นเพื่อให้ frontend รุ่นเดิมยังใช้งานได้ ส่วน request ยังรับ `full_name` แบบเดิมชั่วคราว แต่ห้ามส่งพร้อมช่องชื่อแบบใหม่
 
-`GET /api/users` ใช้ได้หลัง login และคืนเฉพาะบัญชีที่เปิดใช้งาน พร้อม UUID, ชื่อ และฝ่าย แต่ไม่คืน username, password hash, บทบาท หรือข้อมูลสถานะสำหรับงานแอดมิน ใช้รายการนี้สร้างตัวกรอง `by` ในหน้าค้นหาได้
+`GET /api/users` ใช้ได้หลัง login และคืนเฉพาะบัญชีที่เปิดใช้งาน พร้อม UUID, ชื่อ, ฝ่าย และ `is_topic_assignee_eligible` สำหรับสร้างตัวเลือกผู้ต้องส่ง แต่ไม่คืน username, password hash, บทบาท หรือข้อมูลสถานะสำหรับงานแอดมิน ใช้รายการนี้สร้างตัวกรอง `by` ในหน้าค้นหาได้ด้วย
 
 ### BE-06 · นำเข้าบุคลากรจาก Excel/CSV
 
@@ -198,10 +200,11 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 
 **Request fields**
 
-- ส่ง JSON ที่มี `division_uuid`, `title`, `due_date` รูปแบบ `YYYY-MM-DD`, `is_secret` และ `fields`
+- ส่ง JSON ที่มี `division_uuid`, `title`, `due_date` รูปแบบ `YYYY-MM-DD`, `is_secret`, `fields` และส่ง `assignee_uuids` เป็น UUID ของผู้ต้องส่งที่เลือกได้
 - แต่ละช่องรับ `type` (`text`, `para`, `num`, `date`, `choice`, `file`), `label`, `required`, `options` และ `position`; หากไม่ส่ง `required` จะใช้ `true`
 - ช่อง `choice` ต้องมี `options` ที่ไม่ซ้ำอย่างน้อย 2 ค่า ส่วนช่องชนิดอื่นห้ามมีตัวเลือก
-- ระบบสร้างหัวข้อ ช่องฟอร์ม และ snapshot ผู้ต้องส่งใน transaction เดียวกัน โดย snapshot รวมเฉพาะสมาชิกฝ่ายที่เปิดใช้งานและไม่ใช่ผู้บริหาร
+- หากส่ง `assignee_uuids` ต้องมีอย่างน้อย 1 คน UUID ห้ามซ้ำ และทุกคนต้องเป็นสมาชิกฝ่ายของหัวข้อที่เปิดใช้งานและไม่ใช่ผู้บริหาร; หากไม่ส่ง field นี้จะเลือกสมาชิกที่เข้าเงื่อนไขทั้งหมดเหมือน API รุ่นเดิม
+- ระบบสร้างหัวข้อ ช่องฟอร์ม และรายชื่อผู้ต้องส่งใน transaction เดียวกัน โดย response จาก endpoint จัดการหัวข้อคืนทั้ง `assignee_count` กับ `assignee_uuids` (response ฝั่งส่งงานไม่เปิดเผย UUID ทั้งชุด)
 - หากฝ่ายยังไม่มีสมาชิกที่เข้าเงื่อนไข ระบบไม่สร้างหัวข้อและตอบ `409 TOPIC_HAS_NO_ASSIGNEES`
 - validation error ตอบ `400` พร้อม `details.field` ระบุ field ที่ผิด เช่น `fields[0].options`
 
@@ -221,10 +224,11 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 **รูปแบบการแก้ไข**
 
 - `PATCH` ส่งเฉพาะ `title`, `due_date`, `is_secret` ที่ต้องการแก้ได้
+- `PATCH` รับ `assignee_uuids` เป็นรายชื่อผู้ต้องส่งฉบับเต็ม เพิ่มผู้เข้าเงื่อนไขหรือถอดผู้ที่ยังไม่ส่งได้; ผู้ที่ส่งแล้วถอดไม่ได้และตอบ `409 TOPIC_ASSIGNEE_HAS_SUBMISSION`
 - หากส่ง `fields` ต้องส่งแบบฟอร์มฉบับเต็ม: ช่องเดิมส่ง `uuid`, ช่องใหม่ไม่ส่ง `uuid`, ช่องเดิมที่ไม่อยู่ในรายการถือว่าถูกลบ
 - ช่องเดิมที่ไม่ส่ง `required` จะคงค่าเดิม ส่วนช่องใหม่จะใช้ `true` เป็นค่าเริ่มต้น
 - ปิดและเปิดรับซ้ำได้โดยไม่เปลี่ยน timestamp โดยไม่จำเป็น; `closed_at` เก็บเวลาปิดล่าสุดแม้เปิดรับใหม่
-- conflict ใช้ code `TOPIC_FIELD_TYPE_LOCKED` และ `TOPIC_HAS_SUBMISSIONS`; ลบสำเร็จตอบ `204`
+- conflict ใช้ code `TOPIC_FIELD_TYPE_LOCKED`, `TOPIC_ASSIGNEE_HAS_SUBMISSION` และ `TOPIC_HAS_SUBMISSIONS`; ลบสำเร็จตอบ `204`
 
 ### BE-10 · API รายการฝ่ายและหัวข้อ
 
@@ -245,7 +249,7 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 - รายการหัวข้อคืน `division`, `academic_year` และ `topics`; ระบุ `year` เป็นปี พ.ศ. หรือไม่ส่งเพื่อใช้ปีปัจจุบัน
 - แต่ละหัวข้อมี `submitted_count` (x), `assignee_count` (y), `is_assigned`, `my_status` และ `my_submitted_at`
 - `my_status` เป็น `submitted`, `late`, `pending`, `overdue`, `not_submitted`; ผู้ที่ไม่อยู่ใน snapshot ผู้ต้องส่งได้ `null`
-- x/y นับจาก snapshot ใน `topic_assignees` ซึ่งสร้างจากสมาชิกที่เปิดใช้งานและไม่ใช่ผู้บริหารตอนสร้างหัวข้อ
+- x/y นับจากรายชื่อใน `topic_assignees` ที่ผู้สร้างเลือก และอาจแก้ไขได้ตราบใดที่ไม่ถอดผู้ที่ส่งแล้ว
 - การเทียบกำหนดส่งใช้วันที่ตาม `Asia/Bangkok` และยังถือว่าส่งทันจนจบวันกำหนดส่ง
 
 ---

@@ -34,6 +34,13 @@ func TestValidateUpdateInputAcceptsPartialMetadataAndFullForm(t *testing.T) {
 	}
 }
 
+func TestValidateUpdateInputAcceptsAssigneeOnlyPatch(t *testing.T) {
+	assignees := []uuid.UUID{uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb50003")}
+	if _, err := validateUpdateInput(UpdateInput{AssigneeUUIDs: &assignees}); err != nil {
+		t.Fatalf("validateUpdateInput() error = %v", err)
+	}
+}
+
 func TestValidateUpdateInputReportsExactFieldPath(t *testing.T) {
 	title := "หัวข้อฉบับแก้ไข"
 	validFieldUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb50002")
@@ -46,6 +53,7 @@ func TestValidateUpdateInputReportsExactFieldPath(t *testing.T) {
 		{name: "empty title", input: UpdateInput{Title: stringPointer(" ")}, wantField: "title"},
 		{name: "invalid date", input: UpdateInput{DueDate: stringPointer("2026-02-30")}, wantField: "due_date"},
 		{name: "empty fields", input: UpdateInput{Fields: updateFieldsPointer([]UpdateFieldInput{})}, wantField: "fields"},
+		{name: "empty assignees", input: UpdateInput{AssigneeUUIDs: assigneeUUIDsPointer([]uuid.UUID{})}, wantField: "assignee_uuids"},
 		{
 			name: "duplicate field UUID",
 			input: UpdateInput{Fields: updateFieldsPointer([]UpdateFieldInput{

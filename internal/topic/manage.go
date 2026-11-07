@@ -18,9 +18,10 @@ import (
 )
 
 var (
-	ErrTopicNotFound       = errors.New("topic not found")
-	ErrFieldTypeLocked     = errors.New("topic field type cannot be changed after a submission")
-	ErrTopicHasSubmissions = errors.New("topic with submissions cannot be deleted")
+	ErrTopicNotFound         = errors.New("topic not found")
+	ErrFieldTypeLocked       = errors.New("topic field type cannot be changed after a submission")
+	ErrTopicHasSubmissions   = errors.New("topic with submissions cannot be deleted")
+	ErrAssigneeHasSubmission = errors.New("topic assignee with a submission cannot be removed")
 )
 
 // UpdateFieldInput ใช้ UUID แยกช่องเดิมออกจากช่องใหม่: UUID ว่างหมายถึงเพิ่มช่องใหม่.
@@ -34,12 +35,13 @@ type UpdateFieldInput struct {
 }
 
 // UpdateInput ใช้ pointer เพื่อแยก field ที่ไม่ได้ส่งออกจากค่าศูนย์ที่ผู้ใช้ตั้งใจส่ง.
-// หากส่ง Fields มา รายการนั้นถือเป็นแบบฟอร์มฉบับเต็มของหัวข้อหลังแก้ไข.
+// หากส่ง Fields หรือ AssigneeUUIDs มา รายการนั้นถือเป็นแบบฟอร์มหรือรายชื่อผู้ต้องส่งฉบับเต็มหลังแก้ไข.
 type UpdateInput struct {
-	Title    *string
-	DueDate  *string
-	IsSecret *bool
-	Fields   *[]UpdateFieldInput
+	Title         *string
+	DueDate       *string
+	IsSecret      *bool
+	Fields        *[]UpdateFieldInput
+	AssigneeUUIDs *[]uuid.UUID
 }
 
 // Get โหลดหัวข้อพร้อม relation ที่จำเป็นทั้งสำหรับตรวจสิทธิ์และสร้าง response.
@@ -68,7 +70,8 @@ func (s *Service) Update(ctx context.Context, topicUUID uuid.UUID, input UpdateI
 
 	var result model.Topic
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if _, err := lockTopic(tx, topicUUID); err != nil {
+		current, err := lockTopic(tx, topicUUID)
+		if err != nil {
 			return err
 		}
 
@@ -84,6 +87,11 @@ func (s *Service) Update(ctx context.Context, topicUUID uuid.UUID, input UpdateI
 		}
 		if input.Fields != nil {
 			if err := synchronizeTopicFields(tx, topicUUID, *input.Fields); err != nil {
+				return err
+			}
+		}
+		if input.AssigneeUUIDs != nil {
+			if err := synchronizeTopicAssignees(tx, current, *input.AssigneeUUIDs); err != nil {
 				return err
 			}
 		}
@@ -207,7 +215,7 @@ func normalizeUpdateInput(input UpdateInput) UpdateInput {
 }
 
 func validateUpdateInput(input UpdateInput) (*time.Time, error) {
-	if input.Title == nil && input.DueDate == nil && input.IsSecret == nil && input.Fields == nil {
+	if input.Title == nil && input.DueDate == nil && input.IsSecret == nil && input.Fields == nil && input.AssigneeUUIDs == nil {
 		return nil, validationError("body", "at least one property is required")
 	}
 	if input.Title != nil {
@@ -248,7 +256,92 @@ func validateUpdateInput(input UpdateInput) (*time.Time, error) {
 			return nil, err
 		}
 	}
+	if err := validateAssigneeUUIDs(input.AssigneeUUIDs); err != nil {
+		return nil, err
+	}
 	return dueDate, nil
+}
+
+func synchronizeTopicAssignees(db *gorm.DB, topic model.Topic, requested []uuid.UUID) error {
+	current := make([]model.TopicAssignee, 0)
+	if err := db.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("topic_uuid = ?", topic.UUID).
+		Order("user_uuid").
+		Find(&current).Error; err != nil {
+		return fmt.Errorf("lock topic assignees: %w", err)
+	}
+
+	currentByUser := make(map[uuid.UUID]model.TopicAssignee, len(current))
+	for _, assignee := range current {
+		currentByUser[assignee.UserUUID] = assignee
+	}
+	desired := make(map[uuid.UUID]struct{}, len(requested))
+	newUserUUIDs := make([]uuid.UUID, 0, len(requested))
+	for _, userUUID := range requested {
+		desired[userUUID] = struct{}{}
+		if _, exists := currentByUser[userUUID]; !exists {
+			newUserUUIDs = append(newUserUUIDs, userUUID)
+		}
+	}
+
+	if len(newUserUUIDs) > 0 {
+		eligibleUUIDs, err := listEligibleTopicAssigneeUUIDs(db, topic.DivisionUUID, &newUserUUIDs)
+		if err != nil {
+			return err
+		}
+		eligible := make(map[uuid.UUID]struct{}, len(eligibleUUIDs))
+		for _, userUUID := range eligibleUUIDs {
+			eligible[userUUID] = struct{}{}
+		}
+		for index, userUUID := range requested {
+			if _, alreadyAssigned := currentByUser[userUUID]; alreadyAssigned {
+				continue
+			}
+			if _, canAssign := eligible[userUUID]; !canAssign {
+				return validationError(
+					fmt.Sprintf("assignee_uuids[%d]", index),
+					"assignee must be an active, non-executive member of the topic division",
+				)
+			}
+		}
+	}
+
+	removedUserUUIDs := make([]uuid.UUID, 0, len(current))
+	for _, assignee := range current {
+		if _, keep := desired[assignee.UserUUID]; !keep {
+			removedUserUUIDs = append(removedUserUUIDs, assignee.UserUUID)
+		}
+	}
+	if len(removedUserUUIDs) > 0 {
+		var submittedUserUUIDs []uuid.UUID
+		if err := db.Model(&model.Submission{}).
+			Where("topic_uuid = ? AND user_uuid IN ?", topic.UUID, removedUserUUIDs).
+			Order("user_uuid").
+			Pluck("user_uuid", &submittedUserUUIDs).Error; err != nil {
+			return fmt.Errorf("check removed topic assignees: %w", err)
+		}
+		if len(submittedUserUUIDs) > 0 {
+			return ErrAssigneeHasSubmission
+		}
+		if err := db.Where("topic_uuid = ? AND user_uuid IN ?", topic.UUID, removedUserUUIDs).
+			Delete(&model.TopicAssignee{}).Error; err != nil {
+			return fmt.Errorf("remove topic assignees: %w", err)
+		}
+	}
+
+	if len(newUserUUIDs) > 0 {
+		assignees := make([]model.TopicAssignee, 0, len(newUserUUIDs))
+		for _, userUUID := range newUserUUIDs {
+			assignees = append(assignees, model.TopicAssignee{TopicUUID: topic.UUID, UserUUID: userUUID})
+		}
+		sort.Slice(assignees, func(left, right int) bool {
+			return assignees[left].UserUUID.String() < assignees[right].UserUUID.String()
+		})
+		if err := db.Create(&assignees).Error; err != nil {
+			return fmt.Errorf("add topic assignees: %w", err)
+		}
+	}
+	return nil
 }
 
 func synchronizeTopicFields(db *gorm.DB, topicUUID uuid.UUID, inputs []UpdateFieldInput) error {
@@ -401,7 +494,9 @@ func loadTopic(db *gorm.DB, topicUUID uuid.UUID) (model.Topic, error) {
 		Preload("Fields", func(query *gorm.DB) *gorm.DB {
 			return query.Where("hidden_at IS NULL").Order("position")
 		}).
-		Preload("Assignees").
+		Preload("Assignees", func(query *gorm.DB) *gorm.DB {
+			return query.Order("user_uuid")
+		}).
 		Where("uuid = ?", topicUUID).
 		Limit(1).
 		Find(&topic)

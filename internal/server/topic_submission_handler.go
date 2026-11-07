@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FhLk/SDMS-Backend/internal/apperror"
+	"github.com/FhLk/SDMS-Backend/internal/authorization"
 	"github.com/FhLk/SDMS-Backend/internal/model"
 	"github.com/FhLk/SDMS-Backend/internal/submission"
 	"github.com/gofiber/fiber/v3"
@@ -52,7 +53,7 @@ func (h submissionHandler) listTopicTable(c fiber.Ctx) error {
 	if err != nil {
 		return mapSubmissionError(err)
 	}
-	response, err := newTopicSubmissionTableResponse(table)
+	response, err := newTopicSubmissionTableResponse(table, authorization.CanEditTopic(profile, table.Topic))
 	if err != nil {
 		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
 	}
@@ -84,8 +85,14 @@ func (h submissionHandler) listPendingNames(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func newTopicSubmissionTableResponse(table submission.TopicTable) (topicSubmissionTableResponse, error) {
-	topicValue, err := newTopicResponse(table.Topic)
+func newTopicSubmissionTableResponse(table submission.TopicTable, includeAssigneeUUIDs bool) (topicSubmissionTableResponse, error) {
+	var topicValue topicResponse
+	var err error
+	if includeAssigneeUUIDs {
+		topicValue, err = newManagedTopicResponse(table.Topic)
+	} else {
+		topicValue, err = newTopicResponse(table.Topic)
+	}
 	if err != nil {
 		return topicSubmissionTableResponse{}, err
 	}

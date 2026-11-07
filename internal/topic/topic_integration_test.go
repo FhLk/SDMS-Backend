@@ -128,6 +128,40 @@ func TestTopicServiceWithPostgreSQL(t *testing.T) {
 		}
 	}
 
+	// เมื่อระบุรายชื่อเอง ต้องสร้าง assignment เฉพาะคนที่เลือกและปฏิเสธคนที่ไม่เข้าเงื่อนไข.
+	selectedAssignees := []uuid.UUID{users[1].UUID}
+	selectedTitle := title + " selected assignee"
+	selectedTopic, err := service.Create(context.Background(), CreateInput{
+		DivisionUUID:  divisions[0].UUID,
+		CreatedByUUID: users[0].UUID,
+		Title:         selectedTitle,
+		DueDate:       "2026-10-31",
+		Fields:        []FieldInput{{Type: model.FieldText, Label: "ข้อความ"}},
+		AssigneeUUIDs: &selectedAssignees,
+	})
+	if err != nil {
+		t.Fatalf("Create(selected assignee) error = %v", err)
+	}
+	if len(selectedTopic.Assignees) != 1 || selectedTopic.Assignees[0].UserUUID != users[1].UUID {
+		t.Fatalf("selected assignees = %+v", selectedTopic.Assignees)
+	}
+
+	ineligibleAssignees := []uuid.UUID{users[2].UUID}
+	ineligibleTitle := title + " ineligible assignee"
+	_, err = service.Create(context.Background(), CreateInput{
+		DivisionUUID:  divisions[0].UUID,
+		CreatedByUUID: users[0].UUID,
+		Title:         ineligibleTitle,
+		DueDate:       "2026-10-31",
+		Fields:        []FieldInput{{Type: model.FieldText, Label: "ข้อความ"}},
+		AssigneeUUIDs: &ineligibleAssignees,
+	})
+	var assigneeValidationErr *admin.ValidationError
+	if !errors.As(err, &assigneeValidationErr) || assigneeValidationErr.Field != "assignee_uuids[0]" {
+		t.Fatalf("ineligible assignee error = %v, want assignee_uuids[0] ValidationError", err)
+	}
+	assertTopicRelatedCount(t, tx, &model.Topic{}, "title = ?", 0, ineligibleTitle)
+
 	// validation ต้องเกิดก่อนเริ่มเขียน จึงไม่มีหัวข้อค้างเมื่อ choice มีตัวเลือกไม่ครบ.
 	invalidTitle := title + " invalid"
 	_, err = service.Create(context.Background(), CreateInput{
@@ -221,8 +255,20 @@ func TestTopicManagementServiceWithPostgreSQL(t *testing.T) {
 	if err := tx.Create(&model.UserDivision{UserUUID: creator.UUID, DivisionUUID: division.UUID}).Error; err != nil {
 		t.Fatalf("create membership: %v", err)
 	}
+	secondAssignee := model.User{
+		Username:     "be09." + suffix + ".second",
+		PasswordHash: "integration-hash",
+		FullName:     "ผู้รับผิดชอบคนที่สอง",
+	}
+	if err := tx.Create(&secondAssignee).Error; err != nil {
+		t.Fatalf("create second assignee: %v", err)
+	}
+	if err := tx.Create(&model.UserDivision{UserUUID: secondAssignee.UUID, DivisionUUID: division.UUID}).Error; err != nil {
+		t.Fatalf("create second assignee membership: %v", err)
+	}
 
 	service := NewService(tx)
+	initialAssignees := []uuid.UUID{creator.UUID, secondAssignee.UUID}
 	created, err := service.Create(context.Background(), CreateInput{
 		DivisionUUID:  division.UUID,
 		CreatedByUUID: creator.UUID,
@@ -234,6 +280,7 @@ func TestTopicManagementServiceWithPostgreSQL(t *testing.T) {
 			{Position: 2, Type: model.FieldNum, Label: "ช่องที่ยังไม่มีคำตอบ", Required: false},
 			{Position: 3, Type: model.FieldChoice, Label: "ช่องที่เก็บไว้", Required: true, Options: []string{"หนึ่ง", "สอง"}},
 		},
+		AssigneeUUIDs: &initialAssignees,
 	})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
@@ -249,6 +296,22 @@ func TestTopicManagementServiceWithPostgreSQL(t *testing.T) {
 		SubmittedAt: time.Now().UTC(),
 	}).Error; err != nil {
 		t.Fatalf("create submission: %v", err)
+	}
+
+	onlySecondAssignee := []uuid.UUID{secondAssignee.UUID}
+	_, err = service.Update(context.Background(), created.UUID, UpdateInput{AssigneeUUIDs: &onlySecondAssignee})
+	if !errors.Is(err, ErrAssigneeHasSubmission) {
+		t.Fatalf("Update(remove submitted assignee) error = %v, want ErrAssigneeHasSubmission", err)
+	}
+	assertTopicRelatedCount(t, tx, &model.TopicAssignee{}, "topic_uuid = ?", 2, created.UUID)
+
+	onlySubmittedAssignee := []uuid.UUID{creator.UUID}
+	updatedAssignees, err := service.Update(context.Background(), created.UUID, UpdateInput{AssigneeUUIDs: &onlySubmittedAssignee})
+	if err != nil {
+		t.Fatalf("Update(remove unsubmitted assignee) error = %v", err)
+	}
+	if len(updatedAssignees.Assignees) != 1 || updatedAssignees.Assignees[0].UserUUID != creator.UUID {
+		t.Fatalf("updated assignees = %+v", updatedAssignees.Assignees)
 	}
 
 	// เมื่อมีผู้ส่งแล้ว แม้ช่องนั้นยังไม่มีค่า ก็ห้ามเปลี่ยนชนิดของช่องเดิมทั้งฟอร์ม.

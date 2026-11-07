@@ -76,9 +76,11 @@ func TestTopicCreatorUpdatesTopic(t *testing.T) {
 	}
 	app, _ := topicTestApp(service)
 	existingFieldUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb40003")
+	assigneeUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb30007")
 	body := `{
 		"title":"หัวข้อฉบับแก้ไข",
 		"is_secret":false,
+		"assignee_uuids":["` + assigneeUUID.String() + `"],
 		"fields":[
 			{"uuid":"` + existingFieldUUID.String() + `","position":1,"type":"text","label":"ชื่อกิจกรรม","required":false},
 			{"position":2,"type":"choice","label":"ระดับชั้น","options":["ม.1","ม.2"]}
@@ -97,6 +99,9 @@ func TestTopicCreatorUpdatesTopic(t *testing.T) {
 	}
 	if received.Fields == nil || len(*received.Fields) != 2 {
 		t.Fatalf("fields = %+v, want full form", received.Fields)
+	}
+	if received.AssigneeUUIDs == nil || len(*received.AssigneeUUIDs) != 1 || (*received.AssigneeUUIDs)[0] != assigneeUUID {
+		t.Fatalf("assignee UUIDs = %+v", received.AssigneeUUIDs)
 	}
 	if (*received.Fields)[0].UUID != existingFieldUUID || (*received.Fields)[0].Required == nil || *(*received.Fields)[0].Required {
 		t.Fatalf("existing field = %+v", (*received.Fields)[0])
@@ -190,6 +195,19 @@ func TestTopicManagementConflictsUseStableCodes(t *testing.T) {
 				delete: func(context.Context, uuid.UUID) error { return topic.ErrTopicHasSubmissions },
 			},
 			wantCode: "TOPIC_HAS_SUBMISSIONS",
+		},
+		{
+			name:   "submitted assignee cannot be removed",
+			method: http.MethodPatch,
+			service: fakeTopicService{
+				get: func(_ context.Context, topicUUID uuid.UUID) (model.Topic, error) {
+					return managedTopicFixture(topicUUID, managementCreatorUUID), nil
+				},
+				update: func(context.Context, uuid.UUID, topic.UpdateInput) (model.Topic, error) {
+					return model.Topic{}, topic.ErrAssigneeHasSubmission
+				},
+			},
+			wantCode: "TOPIC_ASSIGNEE_HAS_SUBMISSION",
 		},
 	}
 

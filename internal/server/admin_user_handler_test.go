@@ -176,6 +176,9 @@ func TestAuthenticatedUserListsActivePersonnel(t *testing.T) {
 	if len(body) != 1 || body[0]["uuid"] != activeUUID.String() || body[0]["full_name"] != "นางครู หนึ่ง" {
 		t.Fatalf("body = %+v", body)
 	}
+	if body[0]["is_topic_assignee_eligible"] != true {
+		t.Fatalf("is_topic_assignee_eligible = %v, want true", body[0]["is_topic_assignee_eligible"])
+	}
 	divisions, ok := body[0]["divisions"].([]any)
 	if !ok || len(divisions) != 1 {
 		t.Fatalf("divisions = %+v", body[0]["divisions"])

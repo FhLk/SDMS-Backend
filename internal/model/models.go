@@ -143,7 +143,7 @@ type TopicField struct {
 	CreatedAt time.Time
 }
 
-// TopicAssignee รายชื่อผู้ต้องส่ง บันทึกตอนสร้างหัวข้อ
+// TopicAssignee รายชื่อผู้ต้องส่งของหัวข้อ ซึ่งผู้มีสิทธิ์จัดการแก้ไขได้ก่อนบุคคลนั้นส่งคำตอบ
 type TopicAssignee struct {
 	UUIDModel
 	TopicUUID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uq_topic_assignees_topic_user,priority:1"`

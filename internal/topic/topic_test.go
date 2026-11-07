@@ -93,6 +93,21 @@ func TestValidateCreateInputReportsExactFieldPath(t *testing.T) {
 			},
 			wantField: "fields[0].options[1]",
 		},
+		{
+			name: "empty assignee list",
+			mutate: func(input *CreateInput) {
+				input.AssigneeUUIDs = assigneeUUIDsPointer([]uuid.UUID{})
+			},
+			wantField: "assignee_uuids",
+		},
+		{
+			name: "duplicate assignee",
+			mutate: func(input *CreateInput) {
+				userUUID := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6fb20003")
+				input.AssigneeUUIDs = assigneeUUIDsPointer([]uuid.UUID{userUUID, userUUID})
+			},
+			wantField: "assignee_uuids[1]",
+		},
 	}
 
 	for _, tt := range tests {
@@ -109,3 +124,5 @@ func TestValidateCreateInputReportsExactFieldPath(t *testing.T) {
 		})
 	}
 }
+
+func assigneeUUIDsPointer(value []uuid.UUID) *[]uuid.UUID { return &value }

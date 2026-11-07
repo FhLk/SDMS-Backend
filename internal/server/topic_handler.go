@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sort"
 	"time"
 
 	"github.com/FhLk/SDMS-Backend/internal/admin"
@@ -30,11 +31,12 @@ type topicHandler struct {
 }
 
 type createTopicRequest struct {
-	DivisionUUID uuid.UUID                 `json:"division_uuid"`
-	Title        string                    `json:"title"`
-	DueDate      string                    `json:"due_date"`
-	IsSecret     bool                      `json:"is_secret"`
-	Fields       []createTopicFieldRequest `json:"fields"`
+	DivisionUUID  uuid.UUID                 `json:"division_uuid"`
+	Title         string                    `json:"title"`
+	DueDate       string                    `json:"due_date"`
+	IsSecret      bool                      `json:"is_secret"`
+	Fields        []createTopicFieldRequest `json:"fields"`
+	AssigneeUUIDs *[]uuid.UUID              `json:"assignee_uuids"`
 }
 
 type createTopicFieldRequest struct {
@@ -71,6 +73,7 @@ type topicResponse struct {
 	CreatedByUUID uuid.UUID                 `json:"created_by_uuid"`
 	Fields        []topicFieldResponse      `json:"fields"`
 	AssigneeCount int                       `json:"assignee_count"`
+	AssigneeUUIDs []uuid.UUID               `json:"assignee_uuids,omitempty"`
 	ClosedAt      *time.Time                `json:"closed_at"`
 	CreatedAt     time.Time                 `json:"created_at"`
 	UpdatedAt     time.Time                 `json:"updated_at"`
@@ -121,11 +124,12 @@ func (h topicHandler) create(c fiber.Ctx) error {
 		DueDate:       request.DueDate,
 		IsSecret:      request.IsSecret,
 		Fields:        fields,
+		AssigneeUUIDs: request.AssigneeUUIDs,
 	})
 	if err != nil {
 		return mapTopicError(err)
 	}
-	response, err := newTopicResponse(created)
+	response, err := newManagedTopicResponse(created)
 	if err != nil {
 		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
 	}
@@ -157,6 +161,8 @@ func mapTopicError(err error) error {
 		return apperror.New(fiber.StatusConflict, "TOPIC_FIELD_TYPE_LOCKED", "Field type cannot be changed after a submission")
 	case errors.Is(err, topic.ErrTopicHasSubmissions):
 		return apperror.New(fiber.StatusConflict, "TOPIC_HAS_SUBMISSIONS", "Topic with submissions cannot be deleted")
+	case errors.Is(err, topic.ErrAssigneeHasSubmission):
+		return apperror.New(fiber.StatusConflict, "TOPIC_ASSIGNEE_HAS_SUBMISSION", "An assignee who has submitted cannot be removed")
 	case errors.Is(err, topic.ErrTopicAcademicYearNotFound):
 		return apperror.New(fiber.StatusNotFound, "ACADEMIC_YEAR_NOT_FOUND", "Academic year not found")
 	default:
@@ -165,6 +171,14 @@ func mapTopicError(err error) error {
 }
 
 func newTopicResponse(value model.Topic) (topicResponse, error) {
+	return buildTopicResponse(value, false)
+}
+
+func newManagedTopicResponse(value model.Topic) (topicResponse, error) {
+	return buildTopicResponse(value, true)
+}
+
+func buildTopicResponse(value model.Topic, includeAssigneeUUIDs bool) (topicResponse, error) {
 	fields := make([]topicFieldResponse, 0, len(value.Fields))
 	for _, field := range value.Fields {
 		options := make([]string, 0)
@@ -180,6 +194,16 @@ func newTopicResponse(value model.Topic) (topicResponse, error) {
 			Label:    field.Label,
 			Required: field.Required,
 			Options:  options,
+		})
+	}
+	var assigneeUUIDs []uuid.UUID
+	if includeAssigneeUUIDs {
+		assigneeUUIDs = make([]uuid.UUID, 0, len(value.Assignees))
+		for _, assignee := range value.Assignees {
+			assigneeUUIDs = append(assigneeUUIDs, assignee.UserUUID)
+		}
+		sort.Slice(assigneeUUIDs, func(left, right int) bool {
+			return assigneeUUIDs[left].String() < assigneeUUIDs[right].String()
 		})
 	}
 
@@ -203,6 +227,7 @@ func newTopicResponse(value model.Topic) (topicResponse, error) {
 		CreatedByUUID: value.CreatedByUUID,
 		Fields:        fields,
 		AssigneeCount: len(value.Assignees),
+		AssigneeUUIDs: assigneeUUIDs,
 		ClosedAt:      value.ClosedAt,
 		CreatedAt:     value.CreatedAt,
 		UpdatedAt:     value.UpdatedAt,

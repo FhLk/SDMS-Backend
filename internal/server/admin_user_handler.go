@@ -76,12 +76,13 @@ type adminUserResponse struct {
 // directoryUserResponse contains only the identity fields needed for personnel
 // selectors and intentionally omits login and administration-only data.
 type directoryUserResponse struct {
-	UUID      uuid.UUID          `json:"uuid"`
-	Prefix    string             `json:"prefix"`
-	FirstName string             `json:"first_name"`
-	LastName  string             `json:"last_name"`
-	FullName  string             `json:"full_name"`
-	Divisions []divisionResponse `json:"divisions"`
+	UUID                    uuid.UUID          `json:"uuid"`
+	Prefix                  string             `json:"prefix"`
+	FirstName               string             `json:"first_name"`
+	LastName                string             `json:"last_name"`
+	FullName                string             `json:"full_name"`
+	Divisions               []divisionResponse `json:"divisions"`
+	IsTopicAssigneeEligible bool               `json:"is_topic_assignee_eligible"`
 }
 
 // list คืนผู้ใช้ทั้งที่เปิดและปิดใช้งาน โดยไม่ส่ง password hash ออกทาง API.
@@ -118,12 +119,13 @@ func (h adminUserHandler) listDirectory(c fiber.Ctx) error {
 			continue
 		}
 		responses = append(responses, directoryUserResponse{
-			UUID:      user.UUID,
-			Prefix:    user.Prefix,
-			FirstName: user.FirstName,
-			LastName:  user.LastName,
-			FullName:  user.DisplayName(),
-			Divisions: divisionResponses(user.Divisions),
+			UUID:                    user.UUID,
+			Prefix:                  user.Prefix,
+			FirstName:               user.FirstName,
+			LastName:                user.LastName,
+			FullName:                user.DisplayName(),
+			Divisions:               divisionResponses(user.Divisions),
+			IsTopicAssigneeEligible: !user.IsExec,
 		})
 	}
 	return c.Status(fiber.StatusOK).JSON(responses)
