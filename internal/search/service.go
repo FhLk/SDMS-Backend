@@ -127,7 +127,6 @@ type itemRow struct {
 	Prefix         string
 	FirstName      string
 	LastName       string
-	Position       string
 }
 
 type fileRow struct {
@@ -195,12 +194,11 @@ func (s *Service) Search(ctx context.Context, input Input) (Result, error) {
 				divisions.short_name AS division_short,
 				divisions.sort_order AS division_order,
 				academic_years.year AS academic_year,
-				users.uuid AS user_uuid,
-				users.username,
-				users.prefix,
-				users.first_name,
-				users.last_name,
-				users.position`).
+				accounts.uuid AS user_uuid,
+				accounts.username,
+				accounts.prefix,
+				accounts.first_name,
+				accounts.last_name`).
 			Order("submissions.submitted_at DESC, submissions.uuid DESC").
 			Limit(normalized.PageSize).
 			Offset(offset).
@@ -301,7 +299,7 @@ func searchableSubmissions(db *gorm.DB, input Input) *gorm.DB {
 		Joins("JOIN topics ON topics.uuid = submissions.topic_uuid").
 		Joins("JOIN divisions ON divisions.uuid = topics.division_uuid").
 		Joins("JOIN academic_years ON academic_years.uuid = topics.academic_year_uuid").
-		Joins("JOIN users ON users.uuid = submissions.user_uuid")
+		Joins("JOIN accounts ON accounts.uuid = submissions.user_uuid")
 	query = applyVisibility(query, input.Profile)
 
 	if input.Query != "" {
@@ -311,12 +309,12 @@ func searchableSubmissions(db *gorm.DB, input Input) *gorm.DB {
 			divisions.name ILIKE ? ESCAPE E'\\' OR
 			divisions.short_name ILIKE ? ESCAPE E'\\' OR
 			divisions.code ILIKE ? ESCAPE E'\\' OR
-			users.prefix ILIKE ? ESCAPE E'\\' OR
-			users.first_name ILIKE ? ESCAPE E'\\' OR
-			users.last_name ILIKE ? ESCAPE E'\\' OR
-			CONCAT_WS(' ', NULLIF(users.prefix, ''), users.first_name, NULLIF(users.last_name, '')) ILIKE ? ESCAPE E'\\' OR
-			(users.prefix || users.first_name || CASE WHEN users.last_name = '' THEN '' ELSE ' ' || users.last_name END) ILIKE ? ESCAPE E'\\' OR
-			users.username ILIKE ? ESCAPE E'\\' OR
+			accounts.prefix ILIKE ? ESCAPE E'\\' OR
+			accounts.first_name ILIKE ? ESCAPE E'\\' OR
+			accounts.last_name ILIKE ? ESCAPE E'\\' OR
+			CONCAT_WS(' ', NULLIF(accounts.prefix, ''), accounts.first_name, NULLIF(accounts.last_name, '')) ILIKE ? ESCAPE E'\\' OR
+			(accounts.prefix || accounts.first_name || CASE WHEN accounts.last_name = '' THEN '' ELSE ' ' || accounts.last_name END) ILIKE ? ESCAPE E'\\' OR
+			accounts.username ILIKE ? ESCAPE E'\\' OR
 			submissions.values::text ILIKE ? ESCAPE E'\\' OR
 			EXISTS (
 				SELECT 1 FROM files
@@ -537,7 +535,6 @@ func buildItems(rows []itemRow, fileRows []fileRow) []Item {
 				Prefix:    row.Prefix,
 				FirstName: row.FirstName,
 				LastName:  row.LastName,
-				Position:  row.Position,
 			},
 			Values:      append(json.RawMessage(nil), row.Values...),
 			Files:       files,

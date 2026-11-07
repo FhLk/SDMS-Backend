@@ -61,7 +61,6 @@ type meResponse struct {
 	FirstName     string             `json:"first_name"`
 	LastName      string             `json:"last_name"`
 	FullName      string             `json:"full_name"`
-	Position      string             `json:"position"`
 	Role          string             `json:"role"`
 	IsExec        bool               `json:"is_exec"`
 	IsAdmin       bool               `json:"is_admin"`
@@ -172,7 +171,6 @@ func newMeResponse(profile auth.Profile) meResponse {
 		FirstName:     profile.User.FirstName,
 		LastName:      profile.User.LastName,
 		FullName:      profile.User.DisplayName(),
-		Position:      profile.User.Position,
 		Role:          primaryRole(profile),
 		IsExec:        profile.User.IsExec,
 		IsAdmin:       profile.User.IsAdmin,

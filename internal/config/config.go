@@ -26,6 +26,7 @@ const (
 	defaultMaxIdleConnections = 5
 	defaultMaxOpenConnections = 20
 	defaultConnectionLifetime = time.Hour
+	defaultConnectionIdleTime = 10 * time.Minute
 	defaultSessionCookieName  = "sdms_session"
 	defaultSessionTTL         = 24 * time.Hour
 	defaultFileStorageDriver  = "local"
@@ -64,6 +65,9 @@ func (c ServerConfig) Address() string {
 // DatabaseConfig contains the PostgreSQL DSN and database/sql pool settings.
 type DatabaseConfig struct {
 	DSN string
+	// PreferSimpleProtocol disables pgx's implicit prepared statements. It is
+	// enabled automatically for Supabase's shared transaction pooler (port 6543).
+	PreferSimpleProtocol bool
 	// Schema คือ PostgreSQL schema ที่ตารางของ SDMS อยู่ เช่น "sdms" เมื่อใช้ฐานข้อมูล
 	// ร่วมกับระบบ check-in. แอปตรวจตอนเริ่มว่า current_schema() ตรงกับค่านี้.
 	Schema          string
@@ -71,6 +75,7 @@ type DatabaseConfig struct {
 	MaxIdleConns    int
 	MaxOpenConns    int
 	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
 }
 
 // AuthConfig controls server-side session lifetime and browser cookie security.
@@ -103,6 +108,17 @@ type R2Config struct {
 // Load reads .env when present and then resolves the process environment.
 // Existing environment variables take precedence over values in .env.
 func Load() (Config, error) {
+	return load("")
+}
+
+// LoadForMigration uses MIGRATION_DATABASE_URL when provided. Supabase
+// recommends a direct connection for schema migrations while the application
+// can keep using a pooled DATABASE_URL at runtime.
+func LoadForMigration() (Config, error) {
+	return load("MIGRATION_DATABASE_URL")
+}
+
+func load(databaseURLOverride string) (Config, error) {
 	// godotenv does not overwrite variables already present in the process
 	// environment, so deployment secrets take precedence over local .env values.
 	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -115,7 +131,14 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
-	dsn, err := databaseDSN()
+	dsn, err := databaseDSN(databaseURLOverride)
+	if err != nil {
+		return Config{}, err
+	}
+	preferSimpleProtocol, err := boolFromEnv(
+		"DB_PREFER_SIMPLE_PROTOCOL",
+		isSupabaseTransactionPooler(dsn),
+	)
 	if err != nil {
 		return Config{}, err
 	}
@@ -147,6 +170,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	connMaxIdleTime, err := durationFromEnv("DB_CONN_MAX_IDLE_TIME", defaultConnectionIdleTime)
+	if err != nil {
+		return Config{}, err
+	}
 
 	sessionTTL, err := durationFromEnv("SESSION_TTL", defaultSessionTTL)
 	if err != nil {
@@ -172,12 +199,14 @@ func Load() (Config, error) {
 			Port: serverPort,
 		},
 		Database: DatabaseConfig{
-			DSN:             dsn,
-			Schema:          schema,
-			ConnectTimeout:  connectTimeout,
-			MaxIdleConns:    maxIdleConns,
-			MaxOpenConns:    maxOpenConns,
-			ConnMaxLifetime: connMaxLifetime,
+			DSN:                  dsn,
+			PreferSimpleProtocol: preferSimpleProtocol,
+			Schema:               schema,
+			ConnectTimeout:       connectTimeout,
+			MaxIdleConns:         maxIdleConns,
+			MaxOpenConns:         maxOpenConns,
+			ConnMaxLifetime:      connMaxLifetime,
+			ConnMaxIdleTime:      connMaxIdleTime,
 		},
 		Auth: AuthConfig{
 			SessionTTL:   sessionTTL,
@@ -239,14 +268,25 @@ func loadUploadConfig() (UploadConfig, error) {
 // databaseDSN prefers a complete DATABASE_URL, which is common in production.
 // For local development it safely builds the same URL from the individual DB_*
 // variables and escapes credentials that contain special characters.
-func databaseDSN() (string, error) {
-	if dsn := strings.TrimSpace(os.Getenv("DATABASE_URL")); dsn != "" {
+func databaseDSN(preferredURLKey string) (string, error) {
+	urlKey := "DATABASE_URL"
+	dsn := ""
+	if preferredURLKey != "" {
+		dsn = strings.TrimSpace(os.Getenv(preferredURLKey))
+		if dsn != "" {
+			urlKey = preferredURLKey
+		}
+	}
+	if dsn == "" {
+		dsn = strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	}
+	if dsn != "" {
 		parsed, err := url.Parse(dsn)
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-			return "", errors.New("DATABASE_URL must be a valid PostgreSQL URL")
+			return "", fmt.Errorf("%s must be a valid PostgreSQL URL", urlKey)
 		}
 		if parsed.Scheme != "postgres" && parsed.Scheme != "postgresql" {
-			return "", errors.New("DATABASE_URL scheme must be postgres or postgresql")
+			return "", fmt.Errorf("%s scheme must be postgres or postgresql", urlKey)
 		}
 
 		// Normalize an encoded timezone for the same PostgreSQL driver behavior as
@@ -254,7 +294,7 @@ func databaseDSN() (string, error) {
 		query := parsed.Query()
 		if timeZone := query.Get("TimeZone"); timeZone != "" {
 			if _, err := time.LoadLocation(timeZone); err != nil {
-				return "", fmt.Errorf("DATABASE_URL TimeZone must be a valid IANA time zone: %w", err)
+				return "", fmt.Errorf("%s TimeZone must be a valid IANA time zone: %w", urlKey, err)
 			}
 			query.Del("TimeZone")
 			parsed.RawQuery = query.Encode()
@@ -309,6 +349,19 @@ func databaseDSN() (string, error) {
 		Path:     "/" + databaseName,
 		RawQuery: query,
 	}).String(), nil
+}
+
+// isSupabaseTransactionPooler recognizes the shared transaction endpoint from
+// the exact URL copied from Supabase's Connect dialog. pgx must avoid implicit
+// prepared statements for this mode because sessions can switch connections
+// after each transaction.
+func isSupabaseTransactionPooler(dsn string) bool {
+	parsed, err := url.Parse(dsn)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(parsed.Hostname())
+	return parsed.Port() == "6543" && strings.HasSuffix(host, ".pooler.supabase.com")
 }
 
 // validateSchemaName กันชื่อ schema ที่ต้อง quote หรือเป็น schema ระบบของ PostgreSQL.

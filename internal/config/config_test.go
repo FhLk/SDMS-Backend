@@ -14,6 +14,7 @@ func TestLoadWithDatabaseURL(t *testing.T) {
 	t.Setenv("DB_MAX_IDLE_CONNS", "2")
 	t.Setenv("DB_MAX_OPEN_CONNS", "10")
 	t.Setenv("DB_CONN_MAX_LIFETIME", "30m")
+	t.Setenv("DB_CONN_MAX_IDLE_TIME", "4m")
 	t.Setenv("SESSION_TTL", "12h")
 	t.Setenv("SESSION_COOKIE_NAME", "school_session")
 	t.Setenv("SESSION_COOKIE_SECURE", "true")
@@ -32,6 +33,9 @@ func TestLoadWithDatabaseURL(t *testing.T) {
 	if got, want := cfg.Database.ConnMaxLifetime, 30*time.Minute; got != want {
 		t.Fatalf("ConnMaxLifetime = %v, want %v", got, want)
 	}
+	if got, want := cfg.Database.ConnMaxIdleTime, 4*time.Minute; got != want {
+		t.Fatalf("ConnMaxIdleTime = %v, want %v", got, want)
+	}
 	if got, want := cfg.Auth.SessionTTL, 12*time.Hour; got != want {
 		t.Fatalf("Auth.SessionTTL = %v, want %v", got, want)
 	}
@@ -43,6 +47,78 @@ func TestLoadWithDatabaseURL(t *testing.T) {
 	}
 	if strings.Contains(cfg.Database.DSN, "Asia%2FBangkok") || !strings.Contains(cfg.Database.DSN, "TimeZone=Asia/Bangkok") {
 		t.Fatalf("Database.DSN = %q, want an unescaped IANA timezone", cfg.Database.DSN)
+	}
+}
+
+func TestLoadDetectsSupabaseTransactionPooler(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgresql://postgres.project:password@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require")
+	t.Setenv("DB_PREFER_SIMPLE_PROTOCOL", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !cfg.Database.PreferSimpleProtocol {
+		t.Fatal("PreferSimpleProtocol = false, want true for Supabase transaction pooler")
+	}
+}
+
+func TestLoadKeepsPreparedStatementsForSupabaseSessionPooler(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgresql://postgres.project:password@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require")
+	t.Setenv("DB_PREFER_SIMPLE_PROTOCOL", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Database.PreferSimpleProtocol {
+		t.Fatal("PreferSimpleProtocol = true, want false for Supabase session pooler")
+	}
+}
+
+func TestLoadAllowsSimpleProtocolOverride(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgresql://postgres:password@example.com:6543/postgres?sslmode=require")
+	t.Setenv("DB_PREFER_SIMPLE_PROTOCOL", "true")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !cfg.Database.PreferSimpleProtocol {
+		t.Fatal("PreferSimpleProtocol = false, want explicit override")
+	}
+}
+
+func TestLoadForMigrationPrefersMigrationDatabaseURL(t *testing.T) {
+	runtimeURL := "postgresql://runtime:password@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require"
+	migrationURL := "postgresql://migration:password@db.project.supabase.co:5432/postgres?sslmode=require"
+	t.Setenv("DATABASE_URL", runtimeURL)
+	t.Setenv("MIGRATION_DATABASE_URL", migrationURL)
+	t.Setenv("DB_PREFER_SIMPLE_PROTOCOL", "")
+
+	cfg, err := LoadForMigration()
+	if err != nil {
+		t.Fatalf("LoadForMigration() error = %v", err)
+	}
+	if cfg.Database.DSN != migrationURL {
+		t.Fatalf("Database.DSN = %q, want migration URL", cfg.Database.DSN)
+	}
+	if cfg.Database.PreferSimpleProtocol {
+		t.Fatal("PreferSimpleProtocol = true, want false for direct migration connection")
+	}
+}
+
+func TestLoadForMigrationFallsBackToDatabaseURL(t *testing.T) {
+	runtimeURL := "postgresql://runtime:password@localhost:5432/postgres?sslmode=disable"
+	t.Setenv("DATABASE_URL", runtimeURL)
+	t.Setenv("MIGRATION_DATABASE_URL", "")
+
+	cfg, err := LoadForMigration()
+	if err != nil {
+		t.Fatalf("LoadForMigration() error = %v", err)
+	}
+	if cfg.Database.DSN != runtimeURL {
+		t.Fatalf("Database.DSN = %q, want DATABASE_URL fallback", cfg.Database.DSN)
 	}
 }
 

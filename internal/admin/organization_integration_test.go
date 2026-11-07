@@ -42,10 +42,10 @@ func TestOrganizationServiceWithPostgreSQL(t *testing.T) {
 	suffix := uuid.NewString()[:8]
 	inactiveAt := time.Now()
 	users := []model.User{
-		{Username: "be07." + suffix + ".one", PasswordHash: "integration-hash", FullName: "ครู หนึ่ง", Position: "ครู"},
-		{Username: "be07." + suffix + ".two", PasswordHash: "integration-hash", FullName: "ครู สอง", Position: "ครู"},
-		{Username: "be07." + suffix + ".exec", PasswordHash: "integration-hash", FullName: "ผู้บริหาร", Position: "ผู้อำนวยการ", IsExec: true},
-		{Username: "be07." + suffix + ".off", PasswordHash: "integration-hash", FullName: "บัญชีปิด", Position: "ครู", DeactivatedAt: &inactiveAt},
+		{Username: "be07." + suffix + ".one", PasswordHash: "integration-hash", FullName: "ครู หนึ่ง"},
+		{Username: "be07." + suffix + ".two", PasswordHash: "integration-hash", FullName: "ครู สอง"},
+		{Username: "be07." + suffix + ".exec", PasswordHash: "integration-hash", FullName: "ผู้บริหาร", IsExec: true},
+		{Username: "be07." + suffix + ".off", PasswordHash: "integration-hash", FullName: "บัญชีปิด", DeactivatedAt: &inactiveAt},
 	}
 	if err := tx.Create(&users).Error; err != nil {
 		t.Fatalf("create users: %v", err)

@@ -175,7 +175,7 @@ flowchart LR
 
 | กลุ่ม | ตาราง |
 | --- | --- |
-| บัญชีและ session | `users`, `sessions` |
+| บัญชีและ session | `accounts`, `sessions` |
 | โครงสร้างโรงเรียน | `divisions`, `user_divisions`, `academic_years` |
 | หัวข้อและผู้ต้องส่ง | `topics`, `topic_fields`, `topic_assignees` |
 | คำตอบและไฟล์ | `submissions`, `files` |
@@ -235,7 +235,7 @@ flowchart LR
 Copy-Item .env.example .env
 docker compose up -d
 go run ./cmd/migrate
-go run ./cmd/create-admin -username admin -password '<อย่างน้อย 8 ตัวอักษร>' -first-name 'ผู้ดูแลระบบ' -position 'ผู้ดูแลระบบ'
+go run ./cmd/create-admin -username admin -password '<อย่างน้อย 8 ตัวอักษร>' -first-name 'ผู้ดูแลระบบ'
 go run ./cmd/api
 ```
 
@@ -247,7 +247,7 @@ API ฟังที่ `http://localhost:8081` ตามค่า default แล
 go test ./...
 ```
 
-เพื่อไม่ให้รหัสผ่านอยู่ใน shell history ควรกำหนด `INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_PASSWORD`, `INITIAL_ADMIN_FIRST_NAME` และ `INITIAL_ADMIN_POSITION` แล้วเรียก `go run ./cmd/create-admin` โดยไม่ส่ง flag
+เพื่อไม่ให้รหัสผ่านอยู่ใน shell history ควรกำหนด `INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_PASSWORD` และ `INITIAL_ADMIN_FIRST_NAME` แล้วเรียก `go run ./cmd/create-admin` โดยไม่ส่ง flag
 
 ## ขอบเขตที่ยังไม่มีและจุดที่ต้องตัดสินใจก่อน production
 

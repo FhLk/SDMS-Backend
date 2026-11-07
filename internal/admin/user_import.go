@@ -25,7 +25,6 @@ const (
 	importHeaderFullName  = "ชื่อ-สกุล"
 	importHeaderUsername  = "username"
 	importHeaderPassword  = "รหัสผ่านเริ่มต้น"
-	importHeaderPosition  = "ตำแหน่ง"
 	importHeaderDivisions = "ฝ่าย"
 	maximumImportRows     = 2000
 )
@@ -117,7 +116,6 @@ func (s *UserService) ImportUsers(ctx context.Context, filename string, content 
 				Prefix:       row.Input.Prefix,
 				FirstName:    row.Input.FirstName,
 				LastName:     row.Input.LastName,
-				Position:     row.Input.Position,
 			}
 			if err := tx.Create(&user).Error; err != nil {
 				if errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -143,8 +141,8 @@ func (s *UserService) ImportUsers(ctx context.Context, filename string, content 
 // จึงลดโอกาสที่ template กับรูปแบบนำเข้าจริงจะไม่ตรงกันในอนาคต.
 func BuildUserImportTemplate(format string) ([]byte, string, string, error) {
 	rows := [][]string{
-		{importHeaderPrefix, importHeaderFirstName, importHeaderLastName, importHeaderUsername, importHeaderPassword, importHeaderPosition, importHeaderDivisions},
-		{"นาย", "สมชาย", "ใจดี", "somchai.j", "change-me-123", "ครู", "วิชาการ|บุคคล"},
+		{importHeaderPrefix, importHeaderFirstName, importHeaderLastName, importHeaderUsername, importHeaderPassword, importHeaderDivisions},
+		{"นาย", "สมชาย", "ใจดี", "somchai.j", "change-me-123", "วิชาการ|บุคคล"},
 	}
 
 	switch strings.ToLower(strings.TrimPrefix(format, ".")) {
@@ -179,7 +177,7 @@ func BuildUserImportTemplate(format string) ([]byte, string, string, error) {
 		if err := file.SetColWidth(sheet, "A", "A", 24); err != nil {
 			return nil, "", "", fmt.Errorf("size XLSX template column: %w", err)
 		}
-		if err := file.SetColWidth(sheet, "B", "G", 22); err != nil {
+		if err := file.SetColWidth(sheet, "B", "F", 22); err != nil {
 			return nil, "", "", fmt.Errorf("size XLSX template columns: %w", err)
 		}
 		buffer, err := file.WriteToBuffer()
@@ -272,7 +270,7 @@ func mapImportColumns(rows []rawImportRow) ([]rawImportRow, error) {
 		}
 		headerIndexes[canonical] = index
 	}
-	for _, required := range []string{"username", "password", "position", "divisions"} {
+	for _, required := range []string{"username", "password", "divisions"} {
 		if _, exists := headerIndexes[required]; !exists {
 			return nil, &ValidationError{Field: "header", Message: "missing required import column: " + required}
 		}
@@ -297,7 +295,6 @@ func mapImportColumns(rows []rawImportRow) ([]rawImportRow, error) {
 				importColumn(row.Cells, headerIndexes, "full_name"),
 				importColumn(row.Cells, headerIndexes, "username"),
 				importColumn(row.Cells, headerIndexes, "password"),
-				importColumn(row.Cells, headerIndexes, "position"),
 				importColumn(row.Cells, headerIndexes, "divisions"),
 			},
 		})
@@ -326,8 +323,6 @@ func canonicalImportHeader(value string) string {
 		return "username"
 	case "รหัสผ่านเริ่มต้น", "password":
 		return "password"
-	case "ตำแหน่ง", "position":
-		return "position"
 	case "ฝ่าย", "division", "divisions":
 		return "divisions"
 	default:
@@ -348,7 +343,6 @@ func validateImportRows(rows []rawImportRow, divisionLookup map[string]model.Div
 			FullName:  row.Cells[3],
 			Username:  row.Cells[4],
 			Password:  row.Cells[5],
-			Position:  row.Cells[6],
 		})
 		if err := validateUsername(input.Username); err != nil {
 			errorsByRow = append(errorsByRow, ImportRowError{Row: row.Number, Field: "username", Message: err.Error()})
@@ -365,11 +359,7 @@ func validateImportRows(rows []rawImportRow, divisionLookup map[string]model.Div
 		if err := validateOptionalText("last_name", input.LastName, 120); err != nil {
 			errorsByRow = append(errorsByRow, ImportRowError{Row: row.Number, Field: "last_name", Message: err.Error()})
 		}
-		if err := validateRequiredText("position", input.Position, 120); err != nil {
-			errorsByRow = append(errorsByRow, ImportRowError{Row: row.Number, Field: "position", Message: err.Error()})
-		}
-
-		divisionUUIDs, divisionErrors := resolveImportDivisions(row.Number, row.Cells[7], divisionLookup)
+		divisionUUIDs, divisionErrors := resolveImportDivisions(row.Number, row.Cells[6], divisionLookup)
 		if len(divisionErrors) > 0 {
 			errorsByRow = append(errorsByRow, divisionErrors...)
 		}

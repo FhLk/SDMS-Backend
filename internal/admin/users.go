@@ -41,7 +41,6 @@ type CreateUserInput struct {
 	// FullName is accepted for backward compatibility and is stored verbatim
 	// in first_name when the structured fields are absent.
 	FullName      string
-	Position      string
 	DivisionUUIDs []uuid.UUID
 	IsExec        bool
 	IsAdmin       bool
@@ -57,7 +56,6 @@ type UpdateUserInput struct {
 	// FullName is the legacy replacement form. It cannot be combined with the
 	// structured name fields.
 	FullName      *string
-	Position      *string
 	DivisionUUIDs *[]uuid.UUID
 	IsExec        *bool
 	IsAdmin       *bool
@@ -82,9 +80,9 @@ func (s *UserService) ListUsers(ctx context.Context) ([]model.User, error) {
 		Preload("Divisions", func(db *gorm.DB) *gorm.DB {
 			return db.Order("divisions.sort_order")
 		}).
-		Order("users.first_name").
-		Order("users.last_name").
-		Order("users.username").
+		Order("accounts.first_name").
+		Order("accounts.last_name").
+		Order("accounts.username").
 		Find(&users).Error
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
@@ -100,10 +98,10 @@ func (s *UserService) ListActiveUsers(ctx context.Context) ([]model.User, error)
 		Preload("Divisions", func(db *gorm.DB) *gorm.DB {
 			return db.Order("divisions.sort_order")
 		}).
-		Where("users.deactivated_at IS NULL").
-		Order("users.first_name").
-		Order("users.last_name").
-		Order("users.username").
+		Where("accounts.deactivated_at IS NULL").
+		Order("accounts.first_name").
+		Order("accounts.last_name").
+		Order("accounts.username").
 		Find(&users).Error
 	if err != nil {
 		return nil, fmt.Errorf("list active users: %w", err)
@@ -139,7 +137,6 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (mo
 			Prefix:       input.Prefix,
 			FirstName:    input.FirstName,
 			LastName:     input.LastName,
-			Position:     input.Position,
 			IsExec:       input.IsExec,
 			IsAdmin:      input.IsAdmin,
 		}
@@ -199,9 +196,6 @@ func (s *UserService) UpdateUser(ctx context.Context, userUUID uuid.UUID, input 
 			if input.LastName != nil {
 				updates["last_name"] = *input.LastName
 			}
-		}
-		if input.Position != nil {
-			updates["position"] = *input.Position
 		}
 		if input.IsExec != nil {
 			updates["is_exec"] = *input.IsExec
@@ -294,7 +288,6 @@ func normalizeCreateUserInput(input CreateUserInput) CreateUserInput {
 		input.FirstName = input.FullName
 		input.FullName = ""
 	}
-	input.Position = strings.TrimSpace(input.Position)
 	return input
 }
 
@@ -319,10 +312,6 @@ func normalizeUpdateUserInput(input UpdateUserInput) UpdateUserInput {
 		value := strings.TrimSpace(*input.FullName)
 		input.FullName = &value
 	}
-	if input.Position != nil {
-		value := strings.TrimSpace(*input.Position)
-		input.Position = &value
-	}
 	return input
 }
 
@@ -345,11 +334,11 @@ func validateCreateUserInput(input CreateUserInput) error {
 	if err := validateOptionalText("last_name", input.LastName, 120); err != nil {
 		return err
 	}
-	return validateRequiredText("position", input.Position, 120)
+	return nil
 }
 
 func validateUpdateUserInput(input UpdateUserInput) error {
-	if input.Username == nil && input.Prefix == nil && input.FirstName == nil && input.LastName == nil && input.FullName == nil && input.Position == nil &&
+	if input.Username == nil && input.Prefix == nil && input.FirstName == nil && input.LastName == nil && input.FullName == nil &&
 		input.DivisionUUIDs == nil && input.IsExec == nil && input.IsAdmin == nil && input.IsActive == nil {
 		return &ValidationError{Field: "request", Message: "at least one field is required"}
 	}
@@ -378,11 +367,6 @@ func validateUpdateUserInput(input UpdateUserInput) error {
 	}
 	if input.FullName != nil {
 		if err := validateRequiredText("full_name", *input.FullName, 120); err != nil {
-			return err
-		}
-	}
-	if input.Position != nil {
-		if err := validateRequiredText("position", *input.Position, 120); err != nil {
 			return err
 		}
 	}

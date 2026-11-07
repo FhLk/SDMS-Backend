@@ -204,7 +204,7 @@ func createPortfolioAcademicYear(t *testing.T, db *gorm.DB, excluded int16) mode
 
 func createPortfolioUser(t *testing.T, db *gorm.DB, username, fullName string) model.User {
 	t.Helper()
-	user := model.User{Username: username, PasswordHash: "hash", FullName: fullName, Position: "ครู"}
+	user := model.User{Username: username, PasswordHash: "hash", FullName: fullName}
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatalf("create user %s: %v", username, err)
 	}

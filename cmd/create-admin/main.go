@@ -21,7 +21,6 @@ func main() {
 	prefix := flag.String("prefix", os.Getenv("INITIAL_ADMIN_PREFIX"), "admin name prefix")
 	firstName := flag.String("first-name", os.Getenv("INITIAL_ADMIN_FIRST_NAME"), "admin first name")
 	lastName := flag.String("last-name", os.Getenv("INITIAL_ADMIN_LAST_NAME"), "admin last name")
-	position := flag.String("position", os.Getenv("INITIAL_ADMIN_POSITION"), "admin position")
 	flag.Parse()
 
 	cfg, err := config.Load()
@@ -50,7 +49,6 @@ func main() {
 		Prefix:    *prefix,
 		FirstName: *firstName,
 		LastName:  *lastName,
-		Position:  *position,
 	})
 	if err != nil {
 		log.Fatalf("create admin failed: %v", err)

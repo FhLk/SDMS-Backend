@@ -46,13 +46,11 @@ func TestUploadServiceWithPostgreSQL(t *testing.T) {
 		Username:     "be11." + suffix,
 		PasswordHash: "integration-hash",
 		FullName:     "ผู้ส่งไฟล์ BE-11",
-		Position:     "ครู",
 	}
 	outsider := model.User{
 		Username:     "be11.other." + suffix,
 		PasswordHash: "integration-hash",
 		FullName:     "ผู้ใช้นอก snapshot",
-		Position:     "ครู",
 	}
 	if err := tx.Create(&[]model.User{user, outsider}).Error; err != nil {
 		t.Fatalf("create users: %v", err)

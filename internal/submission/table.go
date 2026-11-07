@@ -41,7 +41,6 @@ type topicTableDatabaseRow struct {
 	Prefix         string
 	FirstName      string
 	LastName       string
-	Position       string
 	SubmissionUUID *uuid.UUID
 	Values         datatypes.JSON
 	SubmittedAt    *time.Time
@@ -100,12 +99,12 @@ func (s *Service) ListPendingNames(ctx context.Context, topicUUID uuid.UUID, pro
 		if !authorization.CanEditTopic(profile, topic) {
 			return ErrForbidden
 		}
-		if err := tx.Table("users").
-			Select("users.*").
-			Joins("JOIN topic_assignees ON topic_assignees.user_uuid = users.uuid AND topic_assignees.topic_uuid = ?", topic.UUID).
+		if err := tx.Table("accounts").
+			Select("accounts.*").
+			Joins("JOIN topic_assignees ON topic_assignees.user_uuid = accounts.uuid AND topic_assignees.topic_uuid = ?", topic.UUID).
 			Joins("LEFT JOIN submissions ON submissions.topic_uuid = topic_assignees.topic_uuid AND submissions.user_uuid = topic_assignees.user_uuid").
 			Where("submissions.uuid IS NULL").
-			Order("users.first_name, users.last_name, users.username, users.uuid").
+			Order("accounts.first_name, accounts.last_name, accounts.username, accounts.uuid").
 			Find(&users).Error; err != nil {
 			return fmt.Errorf("list pending submission names: %w", err)
 		}
@@ -121,17 +120,16 @@ func queryTopicTableRows(db *gorm.DB, topic model.Topic, profile auth.Profile, s
 	databaseRows := make([]topicTableDatabaseRow, 0)
 	query := db.Table("topic_assignees").
 		Select(`
-			users.uuid AS user_uuid,
-			users.username,
-			users.prefix,
-			users.first_name,
-			users.last_name,
-			users.position,
+			accounts.uuid AS user_uuid,
+			accounts.username,
+			accounts.prefix,
+			accounts.first_name,
+			accounts.last_name,
 			submissions.uuid AS submission_uuid,
 			submissions.values,
 			submissions.submitted_at,
 			submissions.updated_at`).
-		Joins("JOIN users ON users.uuid = topic_assignees.user_uuid").
+		Joins("JOIN accounts ON accounts.uuid = topic_assignees.user_uuid").
 		Joins("LEFT JOIN submissions ON submissions.topic_uuid = topic_assignees.topic_uuid AND submissions.user_uuid = topic_assignees.user_uuid").
 		Where("topic_assignees.topic_uuid = ?", topic.UUID)
 	if topic.IsSecret && !authorization.CanViewAllTopicSubmissions(profile, topic) {
@@ -143,7 +141,7 @@ func queryTopicTableRows(db *gorm.DB, topic model.Topic, profile auth.Profile, s
 	case "pending":
 		query = query.Where("submissions.uuid IS NULL")
 	}
-	if err := query.Order("users.first_name, users.last_name, users.username, users.uuid").Scan(&databaseRows).Error; err != nil {
+	if err := query.Order("accounts.first_name, accounts.last_name, accounts.username, accounts.uuid").Scan(&databaseRows).Error; err != nil {
 		return nil, fmt.Errorf("list topic submission rows: %w", err)
 	}
 
@@ -171,7 +169,6 @@ func queryTopicTableRows(db *gorm.DB, topic model.Topic, profile auth.Profile, s
 				Prefix:    row.Prefix,
 				FirstName: row.FirstName,
 				LastName:  row.LastName,
-				Position:  row.Position,
 			},
 			SubmissionUUID: row.SubmissionUUID,
 			Values:         values,

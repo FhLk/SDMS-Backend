@@ -36,7 +36,6 @@ type createUserRequest struct {
 	LastName  string `json:"last_name"`
 	// FullName remains accepted as a backward-compatible fallback.
 	FullName      string      `json:"full_name"`
-	Position      string      `json:"position"`
 	DivisionUUIDs []uuid.UUID `json:"division_uuids"`
 	IsExec        bool        `json:"is_exec"`
 	IsAdmin       bool        `json:"is_admin"`
@@ -48,7 +47,6 @@ type updateUserRequest struct {
 	FirstName     *string      `json:"first_name"`
 	LastName      *string      `json:"last_name"`
 	FullName      *string      `json:"full_name"`
-	Position      *string      `json:"position"`
 	DivisionUUIDs *[]uuid.UUID `json:"division_uuids"`
 	IsExec        *bool        `json:"is_exec"`
 	IsAdmin       *bool        `json:"is_admin"`
@@ -66,7 +64,6 @@ type adminUserResponse struct {
 	FirstName     string             `json:"first_name"`
 	LastName      string             `json:"last_name"`
 	FullName      string             `json:"full_name"`
-	Position      string             `json:"position"`
 	IsExec        bool               `json:"is_exec"`
 	IsAdmin       bool               `json:"is_admin"`
 	IsActive      bool               `json:"is_active"`
@@ -84,7 +81,6 @@ type directoryUserResponse struct {
 	FirstName string             `json:"first_name"`
 	LastName  string             `json:"last_name"`
 	FullName  string             `json:"full_name"`
-	Position  string             `json:"position"`
 	Divisions []divisionResponse `json:"divisions"`
 }
 
@@ -127,7 +123,6 @@ func (h adminUserHandler) listDirectory(c fiber.Ctx) error {
 			FirstName: user.FirstName,
 			LastName:  user.LastName,
 			FullName:  user.DisplayName(),
-			Position:  user.Position,
 			Divisions: divisionResponses(user.Divisions),
 		})
 	}
@@ -151,7 +146,6 @@ func (h adminUserHandler) create(c fiber.Ctx) error {
 		FirstName:     request.FirstName,
 		LastName:      request.LastName,
 		FullName:      request.FullName,
-		Position:      request.Position,
 		DivisionUUIDs: request.DivisionUUIDs,
 		IsExec:        request.IsExec,
 		IsAdmin:       request.IsAdmin,
@@ -182,7 +176,6 @@ func (h adminUserHandler) update(c fiber.Ctx) error {
 		FirstName:     request.FirstName,
 		LastName:      request.LastName,
 		FullName:      request.FullName,
-		Position:      request.Position,
 		DivisionUUIDs: request.DivisionUUIDs,
 		IsExec:        request.IsExec,
 		IsAdmin:       request.IsAdmin,
@@ -315,7 +308,6 @@ func newAdminUserResponse(user model.User) adminUserResponse {
 		FirstName:     user.FirstName,
 		LastName:      user.LastName,
 		FullName:      user.DisplayName(),
-		Position:      user.Position,
 		IsExec:        user.IsExec,
 		IsAdmin:       user.IsAdmin,
 		IsActive:      user.DeactivatedAt == nil,

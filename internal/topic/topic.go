@@ -331,13 +331,13 @@ func createTopicFields(db *gorm.DB, topicUUID uuid.UUID, inputs []FieldInput) ([
 
 func createTopicAssignees(db *gorm.DB, topicUUID, divisionUUID uuid.UUID) ([]model.TopicAssignee, error) {
 	var userUUIDs []uuid.UUID
-	if err := db.Table("users").
-		Select("users.uuid").
-		Joins("JOIN user_divisions ON user_divisions.user_uuid = users.uuid").
+	if err := db.Table("accounts").
+		Select("accounts.uuid").
+		Joins("JOIN user_divisions ON user_divisions.user_uuid = accounts.uuid").
 		Where("user_divisions.division_uuid = ?", divisionUUID).
-		Where("users.is_exec = ?", false).
-		Where("users.deactivated_at IS NULL").
-		Order("users.uuid").
+		Where("accounts.is_exec = ?", false).
+		Where("accounts.deactivated_at IS NULL").
+		Order("accounts.uuid").
 		Scan(&userUUIDs).Error; err != nil {
 		return nil, fmt.Errorf("list topic assignees: %w", err)
 	}

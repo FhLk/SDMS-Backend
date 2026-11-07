@@ -18,7 +18,6 @@ type topicSubmissionUserResponse struct {
 	FirstName string    `json:"first_name"`
 	LastName  string    `json:"last_name"`
 	FullName  string    `json:"full_name"`
-	Position  string    `json:"position"`
 }
 
 type topicSubmissionRowResponse struct {
@@ -117,7 +116,6 @@ func newTopicSubmissionUserResponse(user model.User) topicSubmissionUserResponse
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 		FullName:  user.DisplayName(),
-		Position:  user.Position,
 	}
 }
 

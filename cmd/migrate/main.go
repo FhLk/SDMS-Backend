@@ -13,7 +13,7 @@ import (
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.LUTC)
 
-	cfg, err := config.Load()
+	cfg, err := config.LoadForMigration()
 	if err != nil {
 		log.Fatalf("initialize database failed: load configuration: %v", err)
 	}

@@ -27,7 +27,10 @@ func OpenForMigration(ctx context.Context, cfg config.DatabaseConfig) (*gorm.DB,
 
 func open(ctx context.Context, cfg config.DatabaseConfig, createSchema bool) (*gorm.DB, error) {
 	// The PostgreSQL dialector lets GORM use pgx through database/sql.
-	db, err := gorm.Open(postgres.Open(cfg.DSN), &gorm.Config{
+	db, err := gorm.Open(postgres.New(postgres.Config{
+		DSN:                  cfg.DSN,
+		PreferSimpleProtocol: cfg.PreferSimpleProtocol,
+	}), &gorm.Config{
 		// แปลง error เฉพาะฐานข้อมูล เช่น unique violation เป็น error มาตรฐานของ GORM.
 		TranslateError: true,
 	})
@@ -44,6 +47,7 @@ func open(ctx context.Context, cfg config.DatabaseConfig, createSchema bool) (*g
 	sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
 	sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)
 	sqlDB.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
 
 	// Opening a database/sql handle can be lazy, so an explicit ping proves that
 	// PostgreSQL is reachable before the HTTP server starts accepting requests.

@@ -41,7 +41,6 @@ type searchUserResponse struct {
 	FirstName string    `json:"first_name"`
 	LastName  string    `json:"last_name"`
 	FullName  string    `json:"full_name"`
-	Position  string    `json:"position"`
 }
 
 type searchFileResponse struct {
@@ -230,7 +229,6 @@ func newSearchResponse(result searchdomain.Result) searchResponse {
 				FirstName: item.SubmittedBy.FirstName,
 				LastName:  item.SubmittedBy.LastName,
 				FullName:  item.SubmittedBy.DisplayName(),
-				Position:  item.SubmittedBy.Position,
 			},
 			Values:      item.Values,
 			Files:       files,

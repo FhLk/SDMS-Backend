@@ -46,7 +46,6 @@ func TestAdminListsDivisionsWithHeads(t *testing.T) {
 						Prefix:    "นางสาว",
 						FirstName: "อรทัย",
 						LastName:  "แสงวิชา",
-						Position:  "หัวหน้าฝ่ายวิชาการ",
 					},
 				},
 				{Code: "bud", Name: "ฝ่ายงบประมาณ", ShortName: "งบประมาณ", SortOrder: 2},
@@ -138,7 +137,6 @@ func TestAdminSetsDivisionHead(t *testing.T) {
 					UUIDModel: model.UUIDModel{UUID: userUUID},
 					Username:  "teacher.one",
 					FullName:  "ครู หนึ่ง",
-					Position:  "ครู",
 				},
 			}, nil
 		},

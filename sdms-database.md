@@ -30,29 +30,28 @@ ER diagram พจนานุกรมข้อมูล และ GORM models �
 
 ```mermaid
 erDiagram
-  users ||--o{ user_divisions : "สังกัด"
+  accounts ||--o{ user_divisions : "สังกัด"
   divisions ||--o{ user_divisions : "มีสมาชิก"
-  users |o--o| divisions : "เป็นหัวหน้า"
+  accounts |o--o| divisions : "เป็นหัวหน้า"
   academic_years ||--o{ topics : "มี"
   divisions ||--o{ topics : "เปิด"
-  users ||--o{ topics : "สร้าง"
+  accounts ||--o{ topics : "สร้าง"
   topics ||--|{ topic_fields : "มีช่อง"
   topics ||--o{ topic_assignees : "ต้องส่ง"
-  users ||--o{ topic_assignees : "ถูกกำหนด"
+  accounts ||--o{ topic_assignees : "ถูกกำหนด"
   topics ||--o{ submissions : "รับ"
-  users ||--o{ submissions : "ส่ง"
+  accounts ||--o{ submissions : "ส่ง"
   submissions |o--o{ files : "แนบ"
   topic_fields ||--o{ files : "ของช่อง"
-  users ||--o{ files : "อัปโหลด"
-  users ||--o{ sessions : "เข้าสู่ระบบ"
-  users {
+  accounts ||--o{ files : "อัปโหลด"
+  accounts ||--o{ sessions : "เข้าสู่ระบบ"
+  accounts {
     uuid uuid PK
     varchar username UK
     text password_hash
     varchar prefix
     varchar first_name
     varchar last_name
-    varchar position
     boolean is_exec
     boolean is_admin
     timestamptz deactivated_at
@@ -137,7 +136,7 @@ erDiagram
 | ลบหัวข้อที่มีคำตอบแล้วไม่ได้ | `fk_submissions_topic` (RESTRICT) | `23503` → 409 |
 | ชนิดช่องต้องเป็น 1 ใน 6 ชนิด | `chk_topic_fields_type` | `23514` → 400 |
 | ไฟล์ขนาด 1 ไบต์ ถึง 50 MB | `chk_files_size` | `23514` → 413 |
-| ชื่อผู้ใช้ตามรูปแบบ | `chk_users_username` | `23514` → 400 |
+| ชื่อผู้ใช้ตามรูปแบบ | `chk_accounts_username` | `23514` → 400 |
 
 **ที่โค้ดต้องตรวจเอง** (ฐานข้อมูลไม่รู้):
 
@@ -154,7 +153,7 @@ erDiagram
 
 ### บุคลากรและการเข้าสู่ระบบ
 
-#### `users`
+#### `accounts`
 
 บุคลากร 1 แถวต่อ 1 คน ไม่ลบจริง ใช้ deactivated_at แทน
 
@@ -166,7 +165,6 @@ erDiagram
 | `prefix` | varchar(30) | – | `''` | คำนำหน้า เช่น นาย นาง นางสาว |
 | `first_name` | varchar(120) | – | – | ชื่อ |
 | `last_name` | varchar(120) | – | `''` | นามสกุล; ว่างได้ในเชิงธุรกิจสำหรับบัญชีระบบ แต่เก็บเป็นข้อความว่างแทน NULL |
-| `position` | varchar(120) | – | – | ตำแหน่ง เช่น ครู ภาษาไทย |
 | `is_exec` | boolean | – | `false` | ผู้บริหาร: ไม่ต้องส่ง เห็นภาพรวมทุกฝ่าย |
 | `is_admin` | boolean | – | `false` | แอดมินกลาง: จัดการบุคลากร ฝ่าย ปีการศึกษา |
 | `deactivated_at` | timestamptz | ✓ | – | เวลาที่ปิดใช้งาน ว่าง = ใช้งานอยู่ ปิดแล้วเข้าระบบไม่ได้ แต่คำตอบเดิมยังอยู่ |
@@ -176,7 +174,7 @@ erDiagram
 
 - PK uuid
 - UNIQUE username
-- CHECK chk_users_username (รูปแบบชื่อผู้ใช้)
+- CHECK chk_accounts_username (รูปแบบชื่อผู้ใช้)
 - INDEX deactivated_at
 
 **หมายเหตุ**
@@ -192,7 +190,7 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | `uuid` | uuid | – | UUIDv7 | รหัส session |
 | `token_hash` | varchar(64) | – | – | sha256 (hex) ของ token ใน cookie |
-| `user_uuid` | uuid | – | – | → users.uuid |
+| `user_uuid` | uuid | – | – | → accounts.uuid |
 | `expires_at` | timestamptz | – | – | หมดอายุ (แนะนำ 30 วัน) |
 | `last_seen_at` | timestamptz | – | – | ใช้งานล่าสุด |
 | `ip` | varchar(45) | ✓ | – | IP ตอนเข้าสู่ระบบ (รองรับ IPv6) |
@@ -203,7 +201,7 @@ erDiagram
 
 - PK uuid
 - UNIQUE token_hash
-- FK user_uuid → users ON DELETE CASCADE
+- FK user_uuid → accounts ON DELETE CASCADE
 - INDEX user_uuid, expires_at
 
 **หมายเหตุ**
@@ -224,14 +222,14 @@ erDiagram
 | `name` | varchar(120) | – | – | ชื่อเต็ม เช่น ฝ่ายบริหารวิชาการ |
 | `short_name` | varchar(60) | – | – | ชื่อย่อ เช่น วิชาการ |
 | `sort_order` | smallint | – | – | ลำดับการแสดง |
-| `head_user_uuid` | uuid | ✓ | – | หัวหน้าฝ่าย → users.uuid ว่าง = ยังไม่ตั้ง |
+| `head_user_uuid` | uuid | ✓ | – | หัวหน้าฝ่าย → accounts.uuid ว่าง = ยังไม่ตั้ง |
 
 **คีย์และ index**
 
 - PK uuid
 - UNIQUE code
 - UNIQUE head_user_uuid (1 คนเป็นหัวหน้าได้ฝ่ายเดียว)
-- FK head_user_uuid → users ON DELETE SET NULL
+- FK head_user_uuid → accounts ON DELETE SET NULL
 
 **หมายเหตุ**
 
@@ -244,7 +242,7 @@ erDiagram
 | คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
 | --- | --- | --- | --- | --- |
 | `uuid` | uuid | – | UUIDv7 | รหัสการสังกัดฝ่าย |
-| `user_uuid` | uuid | – | – | → users.uuid |
+| `user_uuid` | uuid | – | – | → accounts.uuid |
 | `division_uuid` | uuid | – | – | → divisions.uuid |
 
 **คีย์และ index**
@@ -298,7 +296,7 @@ erDiagram
 | `due_date` | date | – | – | กำหนดส่ง (เก็บเป็น ค.ศ. แสดงเป็น พ.ศ.) |
 | `is_open` | boolean | – | `true` | เปิดรับอยู่หรือไม่ |
 | `is_secret` | boolean | – | `false` | หัวข้อลับ |
-| `created_by_uuid` | uuid | – | – | คนสร้าง → users.uuid |
+| `created_by_uuid` | uuid | – | – | คนสร้าง → accounts.uuid |
 | `closed_at` | timestamptz | ✓ | – | เวลาปิดรับล่าสุด |
 | `created_at / updated_at` | timestamptz | ✓ | – |  |
 
@@ -349,7 +347,7 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | `uuid` | uuid | – | UUIDv7 | รหัสผู้รับมอบหมาย |
 | `topic_uuid` | uuid | – | – | → topics.uuid |
-| `user_uuid` | uuid | – | – | → users.uuid |
+| `user_uuid` | uuid | – | – | → accounts.uuid |
 
 **คีย์และ index**
 
@@ -374,7 +372,7 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | `uuid` | uuid | – | UUIDv7 | รหัสคำตอบ |
 | `topic_uuid` | uuid | – | – | → topics.uuid |
-| `user_uuid` | uuid | – | – | คนส่ง → users.uuid |
+| `user_uuid` | uuid | – | – | คนส่ง → accounts.uuid |
 | `values` | jsonb | – | `'{}'` | คำตอบทุกช่อง ดูรูปแบบในหัวข้อ "รูปแบบ JSON" |
 | `submitted_at` | timestamptz | – | – | ส่งครั้งแรก ไม่เปลี่ยนเมื่อแก้ ใช้ตัดสินว่าช้า |
 | `updated_at` | timestamptz | ✓ | – | แก้ล่าสุด |
@@ -400,7 +398,7 @@ erDiagram
 | `topic_uuid` | uuid | – | – | → topics.uuid |
 | `field_uuid` | uuid | – | – | ช่องที่แนบ → topic_fields.uuid |
 | `submission_uuid` | uuid | ✓ | – | คำตอบที่ผูก ว่าง = ยังไม่ได้ส่ง (staged) |
-| `uploaded_by_uuid` | uuid | – | – | คนอัปโหลด → users.uuid |
+| `uploaded_by_uuid` | uuid | – | – | คนอัปโหลด → accounts.uuid |
 | `object_key` | varchar(512) | – | – | key ของ object ใน R2 หรือ path สัมพัทธ์ของ local storage |
 | `original_name` | varchar(255) | – | – | ชื่อไฟล์เดิมที่ผู้ใช้อัปโหลด |
 | `mime_type` | varchar(120) | – | – | เช่น application/pdf |
@@ -481,10 +479,10 @@ object ที่ key คือ `topic_fields.uuid` (เป็นข้อคว�
 
 | code | name | short_name | sort_order |
 | --- | --- | --- | --- |
-| `aca` | ฝ่ายบริหารวิชาการ | วิชาการ | 1 |
-| `bud` | ฝ่ายบริหารงบประมาณ | งบประมาณ | 2 |
-| `per` | ฝ่ายบริหารงานบุคคล | บุคคล | 3 |
-| `gen` | ฝ่ายบริหารทั่วไป | ทั่วไป | 4 |
+| `aca` | ฝ่ายวิชาการ | วิชาการ | 1 |
+| `bud` | ฝ่ายงบประมาณ | งบประมาณ | 2 |
+| `per` | ฝ่ายบุคคล | บุคคล | 3 |
+| `gen` | ฝ่ายทั่วไป | ทั่วไป | 4 |
 
 ### academic_years
 
@@ -496,14 +494,13 @@ object ที่ key คือ `topic_fields.uuid` (เป็นข้อคว�
 
 ## 8. GORM models
 
-โมเดลที่ใช้งานจริงอยู่ใน [`internal/model/models.go`](internal/model/models.go) และ migration สำหรับข้อมูลเดิมอยู่ใน [`internal/migration/uuid_migration.go`](internal/migration/uuid_migration.go)
+โมเดลที่ใช้งานจริงอยู่ใน [`internal/model/models.go`](internal/model/models.go) และ initializer/migration อยู่ใน [`internal/migration/migration.go`](internal/migration/migration.go)
 
 - ทุก model embed `UUIDModel` ซึ่งสร้าง UUIDv7 อัตโนมัติใน `BeforeCreate`
 - ตารางเชื่อม `user_divisions` และ `topic_assignees` มี `uuid` ของตัวเอง พร้อม unique composite key ป้องกันความสัมพันธ์ซ้ำ
-- migration เพิ่ม UUIDv7 และ UUID foreign keys ให้แถวเดิมก่อนถอด bigint/natural primary keys
-- key ภายใน `submissions.values` ถูกแปลงจาก `topic_fields.id` เดิมเป็น `topic_fields.uuid` โดยคง key ที่ไม่รู้จักไว้เพื่อไม่ทำข้อมูลสูญหาย
-- ทุกขั้นตอนทำใน transaction เดียว และรันซ้ำได้
-- รายการ model ทั้งหมดอยู่ใน `migration.SchemaModels()` ใช้ทั้งกับ AutoMigrate และการเปิด RLS จึงไม่มีตารางใหม่หลุดการป้องกัน
+- migration เปลี่ยนชื่อตารางเดิม `users` เป็น `accounts` โดยรักษาข้อมูลและ foreign key เดิมไว้ แล้วลบคอลัมน์ `position`
+- ฐานข้อมูลใหม่สร้าง schema ด้วย AutoMigrate และเติมข้อมูลตั้งต้นใน transaction เดียว
+- รายการ model ทั้งหมดอยู่ใน `migration.SchemaModels()` เพื่อให้ตารางที่ initializer สร้างตรงกับระบบปัจจุบัน
 
 โครงหลักของ primary key:
 
@@ -562,13 +559,12 @@ const (
 // User บุคลากร 1 คน — ไม่ลบจริง ใช้ DeactivatedAt แทน
 type User struct {
 	ID            uint64     `gorm:"primaryKey"`
-	Username      string     `gorm:"size:32;not null;uniqueIndex;check:chk_users_username,username ~ '^[a-z0-9._-]{3,32}$'"`
+	Username      string     `gorm:"size:32;not null;uniqueIndex;check:chk_accounts_username,username ~ '^[a-z0-9._-]{3,32}$'"`
 	PasswordHash  string     `gorm:"not null" json:"-"`
 	Prefix        string     `gorm:"size:30;not null;default:''"`
 	FirstName     string     `gorm:"size:120;not null"`
 	LastName      string     `gorm:"size:120;not null;default:''"`
 	FullName      string     `gorm:"-" json:"-"` // ค่าแสดงผลที่ประกอบจาก 3 ช่อง ไม่เก็บซ้ำในฐานข้อมูล
-	Position      string     `gorm:"size:120;not null"`
 	IsExec        bool       `gorm:"not null;default:false"`
 	IsAdmin       bool       `gorm:"not null;default:false"`
 	DeactivatedAt *time.Time `gorm:"index"`

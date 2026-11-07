@@ -54,7 +54,7 @@ Issue ฝั่ง BE (Go Fiber + PostgreSQL) 17 ข้อ สำหรับร
 
 ### BE-02 · สร้างตารางฐานข้อมูล + ข้อมูลเริ่มต้น
 
-ตาราง users, divisions, user_divisions, academic_years, topics, topic_fields, submissions, files
+ตาราง accounts, divisions, user_divisions, academic_years, topics, topic_fields, submissions, files
 
 ต้องทำก่อน: BE-01
 
@@ -77,7 +77,7 @@ go run ./cmd/migrate
 
 ```powershell
 $env:INITIAL_ADMIN_PASSWORD = "sdms-admin!"
-go run ./cmd/create-admin -username admin -first-name "ผู้ดูแลระบบ" -position "ผู้ดูแลระบบ"
+go run ./cmd/create-admin -username admin -first-name "ผู้ดูแลระบบ"
 Remove-Item Env:INITIAL_ADMIN_PASSWORD
 ```
 
@@ -93,7 +93,7 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 - [x] รหัสผิดหรือไม่มีผู้ใช้นี้ → 401 ข้อความเดียวกันทั้งสองกรณี
 - [x] บัญชีที่ปิดใช้งานแล้วเข้าระบบไม่ได้
 - [x] รหัสผ่านเก็บเป็น hash (bcrypt)
-- [x] `/api/me` คืนชื่อ ตำแหน่ง บทบาทหลัก ฝ่ายที่สังกัด ฝ่ายที่เป็นหัวหน้า และ flag `is_exec`/`is_admin` สำหรับบัญชีที่มีหลายบทบาท
+- [x] `/api/me` คืนชื่อ บทบาทหลัก ฝ่ายที่สังกัด ฝ่ายที่เป็นหัวหน้า และ flag `is_exec`/`is_admin` สำหรับบัญชีที่มีหลายบทบาท
 
 ### BE-04 · Middleware ตรวจ login และสิทธิ์
 
@@ -122,20 +122,20 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 **เกณฑ์เสร็จ**
 
 - [x] ใช้ได้เฉพาะแอดมิน
-- [x] เพิ่มบุคลากรด้วยคำนำหน้า ชื่อ นามสกุล username รหัสผ่านเริ่มต้น ตำแหน่ง ฝ่าย (หลายฝ่ายได้) และบทบาทผู้บริหาร/แอดมิน
+- [x] เพิ่มบุคลากรด้วยคำนำหน้า ชื่อ นามสกุล username รหัสผ่านเริ่มต้น ฝ่าย (หลายฝ่ายได้) และบทบาทผู้บริหาร/แอดมิน
 - [x] username ซ้ำ → 409
 - [x] ปิดใช้งานแทนการลบ คำตอบเดิมของคนนั้นยังอยู่
 - [x] ตั้งรหัสผ่านใหม่แล้ว session เดิมของคนนั้นใช้ไม่ได้
 
 **Request fields**
 
-- `POST /api/admin/users`: `username`, `password`, `prefix`, `first_name`, `last_name`, `position`, `division_uuids`, `is_exec`, `is_admin`
+- `POST /api/admin/users`: `username`, `password`, `prefix`, `first_name`, `last_name`, `division_uuids`, `is_exec`, `is_admin`
 - `PATCH /api/admin/users/{uuid}`: ส่งเฉพาะ field ที่ต้องแก้ โดยใช้ `is_active: false` เพื่อปิดบัญชี
 - `POST /api/admin/users/{uuid}/password`: `password`
 
 ทุก response ที่มีข้อมูลบุคลากรคืนทั้ง `prefix`, `first_name`, `last_name` และ `full_name` ที่ประกอบขึ้นเพื่อให้ frontend รุ่นเดิมยังใช้งานได้ ส่วน request ยังรับ `full_name` แบบเดิมชั่วคราว แต่ห้ามส่งพร้อมช่องชื่อแบบใหม่
 
-`GET /api/users` ใช้ได้หลัง login และคืนเฉพาะบัญชีที่เปิดใช้งาน พร้อม UUID, ชื่อ, ตำแหน่ง และฝ่าย แต่ไม่คืน username, password hash, บทบาท หรือข้อมูลสถานะสำหรับงานแอดมิน ใช้รายการนี้สร้างตัวกรอง `by` ในหน้าค้นหาได้
+`GET /api/users` ใช้ได้หลัง login และคืนเฉพาะบัญชีที่เปิดใช้งาน พร้อม UUID, ชื่อ และฝ่าย แต่ไม่คืน username, password hash, บทบาท หรือข้อมูลสถานะสำหรับงานแอดมิน ใช้รายการนี้สร้างตัวกรอง `by` ในหน้าค้นหาได้
 
 ### BE-06 · นำเข้าบุคลากรจาก Excel/CSV
 
@@ -145,7 +145,7 @@ Remove-Item Env:INITIAL_ADMIN_PASSWORD
 
 **เกณฑ์เสร็จ**
 
-- [x] รับไฟล์ .xlsx และ .csv คอลัมน์: คำนำหน้า, ชื่อ, นามสกุล, username, รหัสผ่านเริ่มต้น, ตำแหน่ง, ฝ่าย
+- [x] รับไฟล์ .xlsx และ .csv คอลัมน์: คำนำหน้า, ชื่อ, นามสกุล, username, รหัสผ่านเริ่มต้น, ฝ่าย
 - [x] ตรวจทุกแถวก่อนบันทึก ถ้ามีแถวผิดให้คืนรายการผิดทีละบรรทัด และไม่บันทึกเลยสักแถว
 - [x] มีไฟล์ตัวอย่างให้ดาวน์โหลด
 

@@ -42,10 +42,10 @@ func TestTopicSubmissionTableWithPostgreSQL(t *testing.T) {
 	}
 	suffix := uuid.NewString()[:8]
 	users := []model.User{
-		{Username: "be13.creator." + suffix, PasswordHash: "hash", FullName: "ผู้สร้าง BE-13", Position: "หัวหน้าฝ่าย"},
-		{Username: "be13.ontime." + suffix, PasswordHash: "hash", FullName: "ก ส่งทัน", Position: "ครู"},
-		{Username: "be13.late." + suffix, PasswordHash: "hash", FullName: "ข ส่งช้า", Position: "ครู"},
-		{Username: "be13.pending." + suffix, PasswordHash: "hash", FullName: "ค ยังไม่ส่ง", Position: "ครู"},
+		{Username: "be13.creator." + suffix, PasswordHash: "hash", FullName: "ผู้สร้าง BE-13"},
+		{Username: "be13.ontime." + suffix, PasswordHash: "hash", FullName: "ก ส่งทัน"},
+		{Username: "be13.late." + suffix, PasswordHash: "hash", FullName: "ข ส่งช้า"},
+		{Username: "be13.pending." + suffix, PasswordHash: "hash", FullName: "ค ยังไม่ส่ง"},
 	}
 	if err := tx.Create(&users).Error; err != nil {
 		t.Fatalf("create users: %v", err)

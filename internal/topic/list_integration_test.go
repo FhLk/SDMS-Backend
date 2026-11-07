@@ -48,10 +48,10 @@ func TestListDivisionTopicsWithPostgreSQL(t *testing.T) {
 
 	inactiveAt := time.Now().UTC()
 	users := []model.User{
-		{Username: "be10." + suffix + ".creator", PasswordHash: "integration-hash", FullName: "ผู้สร้าง", Position: "ครู"},
-		{Username: "be10." + suffix + ".target", PasswordHash: "integration-hash", FullName: "ผู้ใช้ปัจจุบัน", Position: "ครู"},
-		{Username: "be10." + suffix + ".exec", PasswordHash: "integration-hash", FullName: "ผู้บริหาร", Position: "ผู้อำนวยการ", IsExec: true},
-		{Username: "be10." + suffix + ".inactive", PasswordHash: "integration-hash", FullName: "บัญชีปิด", Position: "ครู", DeactivatedAt: &inactiveAt},
+		{Username: "be10." + suffix + ".creator", PasswordHash: "integration-hash", FullName: "ผู้สร้าง"},
+		{Username: "be10." + suffix + ".target", PasswordHash: "integration-hash", FullName: "ผู้ใช้ปัจจุบัน"},
+		{Username: "be10." + suffix + ".exec", PasswordHash: "integration-hash", FullName: "ผู้บริหาร", IsExec: true},
+		{Username: "be10." + suffix + ".inactive", PasswordHash: "integration-hash", FullName: "บัญชีปิด", DeactivatedAt: &inactiveAt},
 	}
 	if err := tx.Create(&users).Error; err != nil {
 		t.Fatalf("create users: %v", err)

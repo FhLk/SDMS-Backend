@@ -51,7 +51,7 @@ const (
 // User บุคลากร 1 คน — ไม่ลบจริง ใช้ DeactivatedAt แทน
 type User struct {
 	UUIDModel
-	Username     string `gorm:"size:32;not null;uniqueIndex;check:chk_users_username,username ~ '^[a-z0-9._-]{3,32}$'"`
+	Username     string `gorm:"size:32;not null;uniqueIndex;check:chk_accounts_username,username ~ '^[a-z0-9._-]{3,32}$'"`
 	PasswordHash string `gorm:"not null" json:"-"`
 	Prefix       string `gorm:"size:30;not null;default:''"`
 	FirstName    string `gorm:"size:120;not null"`
@@ -60,7 +60,6 @@ type User struct {
 	// still construct User values with a display name. New code stores the three
 	// name components above and uses DisplayName when rendering a name.
 	FullName      string     `gorm:"-" json:"-"`
-	Position      string     `gorm:"size:120;not null"`
 	IsExec        bool       `gorm:"not null;default:false"`
 	IsAdmin       bool       `gorm:"not null;default:false"`
 	DeactivatedAt *time.Time `gorm:"index"`
@@ -68,6 +67,12 @@ type User struct {
 	UpdatedAt     time.Time
 
 	Divisions []Division `gorm:"many2many:user_divisions;foreignKey:UUID;joinForeignKey:UserUUID;references:UUID;joinReferences:DivisionUUID"`
+}
+
+// TableName keeps the domain model named User while storing accounts in the
+// explicitly named database table.
+func (User) TableName() string {
+	return "accounts"
 }
 
 // Division ฝ่าย 4 ฝ่าย — หัวหน้าฝ่ายละ 1 คน และ 1 คนเป็นหัวหน้าได้ฝ่ายเดียว

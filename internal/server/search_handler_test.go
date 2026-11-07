@@ -63,7 +63,6 @@ func TestSearchParsesFiltersAndReturnsPagination(t *testing.T) {
 						Prefix:    "นาย",
 						FirstName: "ครู",
 						LastName:  "หนึ่ง",
-						Position:  "ครู",
 					},
 					Values: json.RawMessage(`{"note":"ข้อมูล"}`),
 					Files: []searchdomain.File{{

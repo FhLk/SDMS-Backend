@@ -51,6 +51,7 @@ export class SDMSContainer extends DurableObject {
 					DB_MAX_IDLE_CONNS: "2",
 					DB_MAX_OPEN_CONNS: "10",
 					DB_CONN_MAX_LIFETIME: "1h",
+					DB_CONN_MAX_IDLE_TIME: "5m",
 					SESSION_TTL: "24h",
 					SESSION_COOKIE_NAME: "sdms_session",
 					SESSION_COOKIE_SECURE: "true",

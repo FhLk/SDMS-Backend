@@ -34,3 +34,9 @@ func TestUUIDModelPreservesSuppliedKey(t *testing.T) {
 		t.Fatalf("UUID = %s, want supplied UUID %s", model.UUID, want)
 	}
 }
+
+func TestUserUsesAccountsTable(t *testing.T) {
+	if got, want := (User{}).TableName(), "accounts"; got != want {
+		t.Fatalf("User.TableName() = %q, want %q", got, want)
+	}
+}

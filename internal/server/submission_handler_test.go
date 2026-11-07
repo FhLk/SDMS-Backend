@@ -165,7 +165,7 @@ func TestSubmissionHandlerListsTopicTableWithFilter(t *testing.T) {
 					}},
 				},
 				Rows: []submission.TopicTableRow{{
-					User:           model.User{UUIDModel: model.UUIDModel{UUID: userUUID}, Username: "teacher", FullName: "ครูทดสอบ", Position: "ครู"},
+					User:           model.User{UUIDModel: model.UUIDModel{UUID: userUUID}, Username: "teacher", FullName: "ครูทดสอบ"},
 					SubmissionUUID: &submissionUUID,
 					Values:         datatypes.JSON([]byte(`{"` + fieldUUID.String() + `":"ส่งแล้ว"}`)),
 					Files:          []model.File{},

@@ -38,9 +38,9 @@ func TestSubmissionServiceWithPostgreSQL(t *testing.T) {
 	}
 	suffix := uuid.NewString()[:8]
 	users := []model.User{
-		{Username: "be12.creator." + suffix, PasswordHash: "hash", FullName: "ผู้สร้าง BE-12", Position: "ครู"},
-		{Username: "be12.assignee." + suffix, PasswordHash: "hash", FullName: "ผู้ส่ง BE-12", Position: "ครู"},
-		{Username: "be12.outsider." + suffix, PasswordHash: "hash", FullName: "คนนอก BE-12", Position: "ครู"},
+		{Username: "be12.creator." + suffix, PasswordHash: "hash", FullName: "ผู้สร้าง BE-12"},
+		{Username: "be12.assignee." + suffix, PasswordHash: "hash", FullName: "ผู้ส่ง BE-12"},
+		{Username: "be12.outsider." + suffix, PasswordHash: "hash", FullName: "คนนอก BE-12"},
 	}
 	if err := tx.Create(&users).Error; err != nil {
 		t.Fatalf("create users: %v", err)

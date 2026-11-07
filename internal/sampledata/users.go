@@ -41,7 +41,6 @@ type SampleUser struct {
 	Prefix        string   `json:"prefix"`
 	FirstName     string   `json:"first_name"`
 	LastName      string   `json:"last_name"`
-	Position      string   `json:"position"`
 	DivisionCodes []string `json:"division_codes"`
 	IsExec        bool     `json:"is_exec"`
 	IsAdmin       bool     `json:"is_admin"`
@@ -115,14 +114,12 @@ func Sync(ctx context.Context, db *gorm.DB, dataset Dataset, repairEmptyTopics b
 				prefix := sample.Prefix
 				firstName := sample.FirstName
 				lastName := sample.LastName
-				position := sample.Position
 				isExec := sample.IsExec
 				isAdmin := sample.IsAdmin
 				user, err = userService.UpdateUser(ctx, user.UUID, admin.UpdateUserInput{
 					Prefix:        &prefix,
 					FirstName:     &firstName,
 					LastName:      &lastName,
-					Position:      &position,
 					DivisionUUIDs: &memberships,
 					IsExec:        &isExec,
 					IsAdmin:       &isAdmin,
@@ -138,7 +135,6 @@ func Sync(ctx context.Context, db *gorm.DB, dataset Dataset, repairEmptyTopics b
 					Prefix:        sample.Prefix,
 					FirstName:     sample.FirstName,
 					LastName:      sample.LastName,
-					Position:      sample.Position,
 					DivisionUUIDs: memberships,
 					IsExec:        sample.IsExec,
 					IsAdmin:       sample.IsAdmin,
@@ -293,7 +289,7 @@ func repairEmptyOpenTopics(db *gorm.DB) (int, int, error) {
 	err := db.Table("topics AS t").
 		Select("t.uuid AS topic_uuid, u.uuid AS user_uuid").
 		Joins("JOIN user_divisions AS ud ON ud.division_uuid = t.division_uuid").
-		Joins("JOIN users AS u ON u.uuid = ud.user_uuid").
+		Joins("JOIN accounts AS u ON u.uuid = ud.user_uuid").
 		Where("t.is_open = ?", true).
 		Where("u.is_exec = ?", false).
 		Where("u.deactivated_at IS NULL").

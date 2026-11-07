@@ -47,7 +47,6 @@ func TestUserServiceWithPostgreSQL(t *testing.T) {
 		Username:      username,
 		Password:      "old-password",
 		FullName:      "ผู้ใช้ทดสอบ BE-05",
-		Position:      "ครู",
 		DivisionUUIDs: []uuid.UUID{divisions[0].UUID, divisions[1].UUID},
 	})
 	if err != nil {
@@ -64,7 +63,6 @@ func TestUserServiceWithPostgreSQL(t *testing.T) {
 		Username: username,
 		Password: "other-password",
 		FullName: "ชื่อซ้ำ",
-		Position: "ครู",
 	})
 	if !errors.Is(err, ErrUsernameExists) {
 		t.Fatalf("duplicate CreateUser() error = %v, want ErrUsernameExists", err)
@@ -188,7 +186,7 @@ func TestUserImportServiceWithPostgreSQL(t *testing.T) {
 	firstUsername := "be06." + suffix + ".one"
 	secondUsername := "be06." + suffix + ".two"
 	validCSV := fmt.Sprintf(
-		"ชื่อ-สกุล,username,รหัสผ่านเริ่มต้น,ตำแหน่ง,ฝ่าย\nครู หนึ่ง,%s,safe-password,ครู,%s|%s\nครู สอง,%s,other-password,ครู,%s\n",
+		"ชื่อ-สกุล,username,รหัสผ่านเริ่มต้น,ฝ่าย\nครู หนึ่ง,%s,safe-password,%s|%s\nครู สอง,%s,other-password,%s\n",
 		firstUsername,
 		divisions[0].Code,
 		divisions[1].ShortName,
@@ -220,7 +218,7 @@ func TestUserImportServiceWithPostgreSQL(t *testing.T) {
 	atomicUsername := "be06." + suffix + ".atomic"
 	invalidUsername := "be06." + suffix + ".invalid"
 	invalidCSV := fmt.Sprintf(
-		"ชื่อ-สกุล,username,รหัสผ่านเริ่มต้น,ตำแหน่ง,ฝ่าย\nครู ผ่าน,%s,safe-password,ครู,%s\nครู ไม่ผ่าน,%s,safe-password,ครู,ฝ่ายที่ไม่มี\n",
+		"ชื่อ-สกุล,username,รหัสผ่านเริ่มต้น,ฝ่าย\nครู ผ่าน,%s,safe-password,%s\nครู ไม่ผ่าน,%s,safe-password,ฝ่ายที่ไม่มี\n",
 		atomicUsername,
 		divisions[0].Code,
 		invalidUsername,

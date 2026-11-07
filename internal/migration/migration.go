@@ -2,6 +2,7 @@
 package migration
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -58,6 +59,9 @@ func Up(db *gorm.DB, now time.Time) error {
 		if err := tx.SetupJoinTable(&model.User{}, "Divisions", &model.UserDivision{}); err != nil {
 			return fmt.Errorf("configure user division join table: %w", err)
 		}
+		if err := migrateAccountsTable(tx); err != nil {
+			return err
+		}
 
 		if err := tx.AutoMigrate(SchemaModels()...); err != nil {
 			return fmt.Errorf("create database schema: %w", err)
@@ -71,6 +75,56 @@ func Up(db *gorm.DB, now time.Time) error {
 
 		return nil
 	})
+}
+
+// migrateAccountsTable preserves existing installations when the personnel
+// table changes from users to accounts. AutoMigrate alone would create a new,
+// empty accounts table and leave the old data behind, and it does not remove
+// the obsolete position column.
+func migrateAccountsTable(db *gorm.DB) error {
+	migrator := db.Migrator()
+	hasUsers := migrator.HasTable("users")
+	hasAccounts := migrator.HasTable("accounts")
+	if hasUsers && hasAccounts {
+		return errors.New("both users and accounts tables exist; resolve the duplicate personnel tables before migrating")
+	}
+	if hasUsers {
+		if err := migrator.RenameTable("users", "accounts"); err != nil {
+			return fmt.Errorf("rename users table to accounts: %w", err)
+		}
+		hasAccounts = true
+	}
+	if !hasAccounts {
+		return nil
+	}
+
+	for _, index := range []struct{ old, new string }{
+		{old: "idx_users_username", new: "idx_accounts_username"},
+		{old: "idx_users_deactivated_at", new: "idx_accounts_deactivated_at"},
+	} {
+		if migrator.HasIndex("accounts", index.old) && !migrator.HasIndex("accounts", index.new) {
+			if err := migrator.RenameIndex("accounts", index.old, index.new); err != nil {
+				return fmt.Errorf("rename accounts index %q: %w", index.old, err)
+			}
+		}
+	}
+	for _, constraint := range []struct{ old, new string }{
+		{old: "users_pkey", new: "accounts_pkey"},
+		{old: "chk_users_username", new: "chk_accounts_username"},
+	} {
+		if migrator.HasConstraint("accounts", constraint.old) && !migrator.HasConstraint("accounts", constraint.new) {
+			statement := fmt.Sprintf("ALTER TABLE accounts RENAME CONSTRAINT %s TO %s", constraint.old, constraint.new)
+			if err := db.Exec(statement).Error; err != nil {
+				return fmt.Errorf("rename accounts constraint %q: %w", constraint.old, err)
+			}
+		}
+	}
+	if migrator.HasColumn("accounts", "position") {
+		if err := migrator.DropColumn("accounts", "position"); err != nil {
+			return fmt.Errorf("drop accounts position column: %w", err)
+		}
+	}
+	return nil
 }
 
 // SchemaModels รวมเฉพาะตารางที่ระบบปัจจุบันใช้งานจริงตามลำดับการสร้าง.

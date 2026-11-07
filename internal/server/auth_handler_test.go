@@ -156,7 +156,6 @@ func TestMeReturnsIdentityRoleAndDivisions(t *testing.T) {
 					Prefix:    "นาง",
 					FirstName: "หัวหน้าฝ่าย",
 					LastName:  "ตัวอย่าง",
-					Position:  "ครู",
 				},
 				Divisions: []model.Division{{
 					UUIDModel: model.UUIDModel{UUID: uuid.MustParse("0199d16f-4f09-7c20-8cc7-e8c3363ea1b1")},
@@ -189,8 +188,8 @@ func TestMeReturnsIdentityRoleAndDivisions(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Prefix != "นาง" || body.FirstName != "หัวหน้าฝ่าย" || body.LastName != "ตัวอย่าง" || body.FullName != "นางหัวหน้าฝ่าย ตัวอย่าง" || body.Position != "ครู" || body.Role != "division_head" {
-		t.Fatalf("identity = %+v, want name, position, and division_head role", body)
+	if body.Prefix != "นาง" || body.FirstName != "หัวหน้าฝ่าย" || body.LastName != "ตัวอย่าง" || body.FullName != "นางหัวหน้าฝ่าย ตัวอย่าง" || body.Role != "division_head" {
+		t.Fatalf("identity = %+v, want name and division_head role", body)
 	}
 	if got, want := body.UUID.String(), "0199d16f-4f09-7c20-8cc7-e8c3363ea1b0"; got != want {
 		t.Fatalf("uuid = %q, want %q", got, want)

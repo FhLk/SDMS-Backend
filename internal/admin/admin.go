@@ -27,7 +27,6 @@ type CreateInput struct {
 	LastName  string
 	// FullName is retained as a CLI compatibility fallback.
 	FullName string
-	Position string
 }
 
 // Create ตรวจข้อมูล, hash รหัสผ่านด้วย bcrypt และบันทึกบัญชีแอดมิน.
@@ -41,7 +40,6 @@ func Create(ctx context.Context, db *gorm.DB, input CreateInput) (*model.User, e
 		input.FirstName = input.FullName
 		input.FullName = ""
 	}
-	input.Position = strings.TrimSpace(input.Position)
 
 	if err := validate(input); err != nil {
 		return nil, err
@@ -68,7 +66,6 @@ func Create(ctx context.Context, db *gorm.DB, input CreateInput) (*model.User, e
 		Prefix:       input.Prefix,
 		FirstName:    input.FirstName,
 		LastName:     input.LastName,
-		Position:     input.Position,
 		IsAdmin:      true,
 	}
 	if err := db.WithContext(ctx).Create(&user).Error; err != nil {
@@ -93,9 +90,6 @@ func validate(input CreateInput) error {
 	}
 	if input.FirstName == "" {
 		return errors.New("first name is required")
-	}
-	if input.Position == "" {
-		return errors.New("position is required")
 	}
 	return nil
 }

@@ -108,7 +108,6 @@ func TestAdminListsUsersWithoutPasswordHash(t *testing.T) {
 				Prefix:       "นาง",
 				FirstName:    "ครู",
 				LastName:     "หนึ่ง",
-				Position:     "ครู",
 			}}, nil
 		},
 	}
@@ -136,6 +135,9 @@ func TestAdminListsUsersWithoutPasswordHash(t *testing.T) {
 	if _, exists := body[0]["password_hash"]; exists {
 		t.Fatal("response contains password_hash")
 	}
+	if _, exists := body[0]["position"]; exists {
+		t.Fatal("response contains removed position field")
+	}
 }
 
 func TestAuthenticatedUserListsActivePersonnel(t *testing.T) {
@@ -147,7 +149,7 @@ func TestAuthenticatedUserListsActivePersonnel(t *testing.T) {
 			return []model.User{
 				{
 					UUIDModel: model.UUIDModel{UUID: activeUUID}, Username: "teacher.one",
-					Prefix: "นาง", FirstName: "ครู", LastName: "หนึ่ง", Position: "ครู",
+					Prefix: "นาง", FirstName: "ครู", LastName: "หนึ่ง",
 					IsAdmin:   true,
 					Divisions: []model.Division{{Code: "aca", Name: "ฝ่ายวิชาการ", ShortName: "วิชาการ"}},
 				},
@@ -178,7 +180,7 @@ func TestAuthenticatedUserListsActivePersonnel(t *testing.T) {
 	if !ok || len(divisions) != 1 {
 		t.Fatalf("divisions = %+v", body[0]["divisions"])
 	}
-	for _, forbidden := range []string{"username", "password_hash", "is_exec", "is_admin", "is_active", "deactivated_at"} {
+	for _, forbidden := range []string{"username", "password_hash", "position", "is_exec", "is_admin", "is_active", "deactivated_at"} {
 		if _, exists := body[0][forbidden]; exists {
 			t.Fatalf("public directory response contains %q", forbidden)
 		}
@@ -198,13 +200,12 @@ func TestAdminCreatesUser(t *testing.T) {
 				Prefix:    input.Prefix,
 				FirstName: input.FirstName,
 				LastName:  input.LastName,
-				Position:  input.Position,
 				IsExec:    input.IsExec,
 			}, nil
 		},
 	}
 	app := adminUsersTestApp(users)
-	body := `{"username":"teacher.one","password":"safe-password","prefix":"นาง","first_name":"ครู","last_name":"หนึ่ง","position":"ครู","division_uuids":["` + divisionUUID.String() + `"],"is_exec":true}`
+	body := `{"username":"teacher.one","password":"safe-password","prefix":"นาง","first_name":"ครู","last_name":"หนึ่ง","division_uuids":["` + divisionUUID.String() + `"],"is_exec":true}`
 	req := adminRequest(http.MethodPost, "/api/admin/users", body)
 
 	res, err := app.Test(req)
@@ -230,7 +231,7 @@ func TestAdminCreateDuplicateUsernameReturnsConflict(t *testing.T) {
 		},
 	}
 	app := adminUsersTestApp(users)
-	req := adminRequest(http.MethodPost, "/api/admin/users", `{"username":"duplicate","password":"safe-password","first_name":"ชื่อ","last_name":"ซ้ำ","position":"ครู"}`)
+	req := adminRequest(http.MethodPost, "/api/admin/users", `{"username":"duplicate","password":"safe-password","first_name":"ชื่อ","last_name":"ซ้ำ"}`)
 
 	res, err := app.Test(req)
 	if err != nil {
@@ -252,7 +253,7 @@ func TestAdminUpdatesUserWithPatchFields(t *testing.T) {
 				t.Fatalf("user UUID = %s, want %s", gotUUID, userUUID)
 			}
 			received = input
-			return model.User{UUIDModel: model.UUIDModel{UUID: userUUID}, Username: "teacher.one", FirstName: *input.FirstName, LastName: *input.LastName, Position: "ครู"}, nil
+			return model.User{UUIDModel: model.UUIDModel{UUID: userUUID}, Username: "teacher.one", FirstName: *input.FirstName, LastName: *input.LastName}, nil
 		},
 	}
 	app := adminUsersTestApp(users)
@@ -272,7 +273,7 @@ func TestAdminUpdatesUserWithPatchFields(t *testing.T) {
 	if received.DivisionUUIDs == nil || len(*received.DivisionUUIDs) != 0 {
 		t.Fatalf("division UUIDs = %v, want an explicit empty slice", received.DivisionUUIDs)
 	}
-	if received.Username != nil || received.Prefix != nil || received.Position != nil || received.IsAdmin != nil || received.IsExec != nil {
+	if received.Username != nil || received.Prefix != nil || received.IsAdmin != nil || received.IsExec != nil {
 		t.Fatalf("unsent PATCH fields were populated: %+v", received)
 	}
 }
@@ -306,7 +307,7 @@ func TestAdminResetsPassword(t *testing.T) {
 }
 
 func TestAdminImportsUsersFromMultipartFile(t *testing.T) {
-	const csvContent = "ชื่อ-สกุล,username,รหัสผ่านเริ่มต้น,ตำแหน่ง,ฝ่าย\nครู หนึ่ง,teacher.one,safe-password,ครู,วิชาการ\n"
+	const csvContent = "ชื่อ-สกุล,username,รหัสผ่านเริ่มต้น,ฝ่าย\nครู หนึ่ง,teacher.one,safe-password,วิชาการ\n"
 	users := fakeAdminUserService{
 		importUsers: func(_ context.Context, filename string, content []byte) (admin.ImportResult, error) {
 			if filename != "users.csv" {

@@ -48,11 +48,11 @@ func TestTopicServiceWithPostgreSQL(t *testing.T) {
 
 	inactiveAt := time.Now()
 	users := []model.User{
-		{Username: "be08." + suffix + ".admin", PasswordHash: "integration-hash", FullName: "ผู้สร้าง", Position: "แอดมิน", IsAdmin: true},
-		{Username: "be08." + suffix + ".teacher", PasswordHash: "integration-hash", FullName: "ครูที่ต้องส่ง", Position: "ครู"},
-		{Username: "be08." + suffix + ".exec", PasswordHash: "integration-hash", FullName: "ผู้บริหาร", Position: "ผู้อำนวยการ", IsExec: true},
-		{Username: "be08." + suffix + ".inactive", PasswordHash: "integration-hash", FullName: "บัญชีปิด", Position: "ครู", DeactivatedAt: &inactiveAt},
-		{Username: "be08." + suffix + ".other", PasswordHash: "integration-hash", FullName: "ครูต่างฝ่าย", Position: "ครู"},
+		{Username: "be08." + suffix + ".admin", PasswordHash: "integration-hash", FullName: "ผู้สร้าง", IsAdmin: true},
+		{Username: "be08." + suffix + ".teacher", PasswordHash: "integration-hash", FullName: "ครูที่ต้องส่ง"},
+		{Username: "be08." + suffix + ".exec", PasswordHash: "integration-hash", FullName: "ผู้บริหาร", IsExec: true},
+		{Username: "be08." + suffix + ".inactive", PasswordHash: "integration-hash", FullName: "บัญชีปิด", DeactivatedAt: &inactiveAt},
+		{Username: "be08." + suffix + ".other", PasswordHash: "integration-hash", FullName: "ครูต่างฝ่าย"},
 	}
 	if err := tx.Create(&users).Error; err != nil {
 		t.Fatalf("create users: %v", err)
@@ -214,7 +214,6 @@ func TestTopicManagementServiceWithPostgreSQL(t *testing.T) {
 		Username:     "be09." + suffix,
 		PasswordHash: "integration-hash",
 		FullName:     "ผู้สร้างหัวข้อ BE-09",
-		Position:     "ครู",
 	}
 	if err := tx.Create(&creator).Error; err != nil {
 		t.Fatalf("create user: %v", err)
