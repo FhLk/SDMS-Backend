@@ -30,6 +30,10 @@ func New(dependencies ...Dependencies) *fiber.App {
 	// Fiber does not recover panics by default. Register recovery before routes
 	// so unexpected panics are forwarded to handleError as a JSON 500 response.
 	app.Use(recoverer.New())
+	// Serve the embedded OpenAPI contract and its Swagger UI before the API
+	// group. The middleware handles only /api/docs and /api/openapi.yaml, then
+	// forwards every other request to the normal route tree.
+	app.Use(swaggerDocumentation())
 
 	// Grouping under /api keeps the public API prefix in one place.
 	api := app.Group("/api")
@@ -95,5 +99,5 @@ func New(dependencies ...Dependencies) *fiber.App {
 // health is a lightweight liveness endpoint. Database reachability is already
 // enforced during startup, so a running process can answer this without a query.
 func health(c fiber.Ctx) error {
-	return c.Status(fiber.StatusOK).JSON(healthResponse{Status: "ok"})
+	return ResponseSuccess(c, healthResponse{Status: "ok"})
 }

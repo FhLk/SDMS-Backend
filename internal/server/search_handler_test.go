@@ -96,9 +96,7 @@ func TestSearchParsesFiltersAndReturnsPagination(t *testing.T) {
 		t.Fatalf("status = %d, want 200", res.StatusCode)
 	}
 	var response searchResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &response)
 	if len(response.Items) != 1 || response.Items[0].SubmissionUUID != submissionUUID || response.Items[0].Topic.UUID != topicUUID {
 		t.Fatalf("items = %+v", response.Items)
 	}
@@ -173,13 +171,7 @@ func TestSearchRejectsInvalidQueryParametersBeforeService(t *testing.T) {
 			if called {
 				t.Fatal("search service was called for invalid query parameters")
 			}
-			var body map[string]any
-			if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-				t.Fatalf("decode error response: %v", err)
-			}
-			if body["code"] != "VALIDATION_ERROR" {
-				t.Fatalf("error code = %v", body["code"])
-			}
+			assertErrorResponse(t, res, "VALIDATION_ERROR")
 		})
 	}
 }

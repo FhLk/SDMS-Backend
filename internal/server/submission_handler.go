@@ -82,7 +82,7 @@ func (h submissionHandler) listPending(c fiber.Ctx) error {
 	for _, item := range items {
 		response = append(response, newPendingSubmissionResponse(item))
 	}
-	return c.JSON(response)
+	return ResponseSuccess(c, response)
 }
 
 // getMine คืนแบบฟอร์มพร้อมคำตอบเดิม; submission เป็น null เมื่อผู้ใช้ยังไม่เคยส่ง.
@@ -106,7 +106,7 @@ func (h submissionHandler) getMine(c fiber.Ctx) error {
 	if err != nil {
 		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
 	}
-	return c.JSON(response)
+	return ResponseSuccess(c, response)
 }
 
 // upsert สร้างหรือแก้คำตอบเดิมจาก values object และคืน snapshot หลัง commit.
@@ -138,7 +138,7 @@ func (h submissionHandler) upsert(c fiber.Ctx) error {
 	if err != nil {
 		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
 	}
-	return c.JSON(response)
+	return ResponseSuccess(c, response)
 }
 
 func mapSubmissionError(err error) error {

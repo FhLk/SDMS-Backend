@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -77,9 +76,7 @@ func TestHomeReturnsPersonalAndOverviewData(t *testing.T) {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	var response homeResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &response)
 	if response.My.Counts.RequiredCount != 3 || len(response.My.PendingTopics) != 1 || len(response.My.RecentSubmissions) != 1 {
 		t.Fatalf("personal response = %+v", response.My)
 	}
@@ -111,9 +108,7 @@ func TestDivisionStatisticsUsesPathCodeAndMapsErrors(t *testing.T) {
 		t.Fatalf("status = %d, want 200", res.StatusCode)
 	}
 	var response divisionStatisticsResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &response)
 	if response.Division.Code != "aca" || response.Stats.RequiredCount != 5 {
 		t.Fatalf("response = %+v", response)
 	}

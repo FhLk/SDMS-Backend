@@ -1,0 +1,1517 @@
+openapi: 3.0.3
+info:
+  title: SDMS API
+  version: 1.0.0
+  description: |
+    API contract for the School Document Management System.
+    Every JSON success response has `status`, optional `data`, and `message`.
+    Every JSON error response has `status` and `message`.
+servers:
+  - url: /
+    description: Current server
+security:
+  - cookieAuth: []
+tags:
+  - name: System
+  - name: Authentication
+  - name: Directory
+  - name: Topics
+  - name: Submissions
+  - name: Files
+  - name: Dashboard
+  - name: Portfolio
+  - name: Search
+  - name: Admin Users
+  - name: Admin Organization
+
+paths:
+  /api/health:
+    get:
+      tags: [System]
+      summary: Check service health
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Health'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Sign in and create a session cookie
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessNoData'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke the current session
+      operationId: logout
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessNoData'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/me:
+    get:
+      tags: [Authentication]
+      summary: Get the signed-in user profile
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CurrentUser'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/users:
+    get:
+      tags: [Directory]
+      summary: List active users available to authenticated users
+      operationId: listDirectoryUsers
+      responses:
+        '200':
+          description: User directory
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DirectoryUser'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/years:
+    get:
+      tags: [Directory]
+      summary: List academic years
+      operationId: listPublicAcademicYears
+      responses:
+        '200':
+          description: Academic years
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AcademicYear'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/topics:
+    post:
+      tags: [Topics]
+      summary: Create a topic and select its assignees
+      operationId: createTopic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTopicRequest'
+      responses:
+        '200':
+          description: Created topic
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Topic'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/topics/{uuid}:
+    parameters:
+      - $ref: '#/components/parameters/TopicUUID'
+    get:
+      tags: [Submissions]
+      summary: Get a topic submission table
+      operationId: getTopicSubmissionTable
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: Optional submission status filter
+      responses:
+        '200':
+          description: Topic and submission rows
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TopicSubmissionTable'
+        default:
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [Topics]
+      summary: Update a topic, its fields, or its assignees
+      operationId: updateTopic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTopicRequest'
+      responses:
+        '200':
+          description: Updated topic
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Topic'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      tags: [Topics]
+      summary: Delete a topic without submissions
+      operationId: deleteTopic
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessNoData'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/topics/{uuid}/close:
+    parameters:
+      - $ref: '#/components/parameters/TopicUUID'
+    post:
+      tags: [Topics]
+      summary: Close a topic
+      operationId: closeTopic
+      responses:
+        '200':
+          description: Closed topic
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Topic'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/topics/{uuid}/reopen:
+    parameters:
+      - $ref: '#/components/parameters/TopicUUID'
+    post:
+      tags: [Topics]
+      summary: Reopen a topic
+      operationId: reopenTopic
+      responses:
+        '200':
+          description: Reopened topic
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Topic'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/divisions:
+    get:
+      tags: [Directory]
+      summary: List divisions
+      operationId: listDivisions
+      responses:
+        '200':
+          description: Divisions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DivisionWithSort'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/divisions/{code}/topics:
+    parameters:
+      - $ref: '#/components/parameters/DivisionCode'
+    get:
+      tags: [Topics]
+      summary: List topics for a division
+      operationId: listDivisionTopics
+      parameters:
+        - $ref: '#/components/parameters/YearQuery'
+      responses:
+        '200':
+          description: Division topics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DivisionTopics'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/uploads:
+    post:
+      tags: [Files]
+      summary: Stage a file for a submission
+      operationId: uploadFile
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [topic_uuid, field_uuid, file]
+              properties:
+                topic_uuid:
+                  type: string
+                  format: uuid
+                field_uuid:
+                  type: string
+                  format: uuid
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Staged upload
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Upload'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/uploads/{uuid}:
+    parameters:
+      - $ref: '#/components/parameters/UploadUUID'
+    delete:
+      tags: [Files]
+      summary: Delete the current user's staged upload
+      operationId: deleteUpload
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessNoData'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/files/{uuid}:
+    parameters:
+      - $ref: '#/components/parameters/FileUUID'
+    get:
+      tags: [Files]
+      summary: Download a permitted file
+      operationId: downloadFile
+      parameters:
+        - name: download
+          in: query
+          description: Force attachment download instead of inline preview.
+          schema: {type: boolean, default: false}
+      responses:
+        '200':
+          description: File stream
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/me/pending:
+    get:
+      tags: [Submissions]
+      summary: List topics the current user still needs to submit
+      operationId: listMyPendingTopics
+      responses:
+        '200':
+          description: Pending topics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PendingTopic'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/topics/{uuid}/my-submission:
+    parameters:
+      - $ref: '#/components/parameters/TopicUUID'
+    get:
+      tags: [Submissions]
+      summary: Get the current user's submission and topic form
+      operationId: getMySubmission
+      responses:
+        '200':
+          description: Topic form and submission, if any
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MySubmission'
+        default:
+          $ref: '#/components/responses/Error'
+    put:
+      tags: [Submissions]
+      summary: Create or replace the current user's submission
+      operationId: upsertMySubmission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertSubmissionRequest'
+      responses:
+        '200':
+          description: Updated submission
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MySubmission'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/topics/{uuid}/pending-names:
+    parameters:
+      - $ref: '#/components/parameters/TopicUUID'
+    get:
+      tags: [Submissions]
+      summary: List assignees who have not submitted
+      operationId: listTopicPendingNames
+      responses:
+        '200':
+          description: Pending assignees
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubmissionUser'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/home:
+    get:
+      tags: [Dashboard]
+      summary: Get dashboard data
+      operationId: getHomeDashboard
+      responses:
+        '200':
+          description: Dashboard data scoped to the current user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Home'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/divisions/{code}/stats:
+    parameters:
+      - $ref: '#/components/parameters/DivisionCode'
+    get:
+      tags: [Dashboard]
+      summary: Get division statistics
+      operationId: getDivisionStatistics
+      responses:
+        '200':
+          description: Division statistics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DivisionStatistics'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/me/submissions:
+    get:
+      tags: [Portfolio]
+      summary: List the current user's submission portfolio
+      operationId: listMySubmissions
+      parameters:
+        - $ref: '#/components/parameters/YearQuery'
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Optional text search
+      responses:
+        '200':
+          description: Submission portfolio grouped by academic year
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Portfolio'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/me/files.zip:
+    get:
+      tags: [Portfolio]
+      summary: Download all permitted portfolio files as ZIP
+      operationId: downloadMyFilesArchive
+      parameters:
+        - $ref: '#/components/parameters/YearQuery'
+      responses:
+        '200':
+          description: ZIP archive
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/search:
+    get:
+      tags: [Search]
+      summary: Search submissions and topics within the current user's scope
+      operationId: search
+      parameters:
+        - name: q
+          in: query
+          schema: {type: string}
+        - name: division
+          in: query
+          schema: {type: string}
+        - name: year
+          in: query
+          schema: {type: integer, format: int32}
+        - name: semester
+          in: query
+          schema: {type: integer, format: int32}
+        - name: by
+          in: query
+          schema: {type: string, format: uuid}
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1, default: 1}
+        - name: page_size
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+      responses:
+        '200':
+          description: Search result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SearchResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/admin/users:
+    get:
+      tags: [Admin Users]
+      summary: List all users
+      operationId: listAdminUsers
+      responses:
+        '200':
+          description: Users
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AdminUser'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [Admin Users]
+      summary: Create a user
+      operationId: createAdminUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '200':
+          description: Created user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdminUser'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/admin/users/import:
+    post:
+      tags: [Admin Users]
+      summary: Import users from CSV or XLSX
+      operationId: importAdminUsers
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Import totals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ImportResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/admin/users/import/template.csv:
+    get:
+      tags: [Admin Users]
+      summary: Download the CSV user import template
+      operationId: downloadUserImportCsvTemplate
+      responses:
+        '200':
+          description: CSV template
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/admin/users/import/template.xlsx:
+    get:
+      tags: [Admin Users]
+      summary: Download the XLSX user import template
+      operationId: downloadUserImportXlsxTemplate
+      responses:
+        '200':
+          description: XLSX template
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/admin/users/{uuid}:
+    parameters:
+      - $ref: '#/components/parameters/UserUUID'
+    patch:
+      tags: [Admin Users]
+      summary: Update a user
+      operationId: updateAdminUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdminUser'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/admin/users/{uuid}/password:
+    parameters:
+      - $ref: '#/components/parameters/UserUUID'
+    post:
+      tags: [Admin Users]
+      summary: Reset a user's password and revoke existing sessions
+      operationId: resetAdminUserPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessNoData'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/admin/divisions:
+    get:
+      tags: [Admin Organization]
+      summary: List divisions and their heads
+      operationId: listAdminDivisions
+      responses:
+        '200':
+          description: Divisions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AdminDivision'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/admin/divisions/{code}/head:
+    parameters:
+      - $ref: '#/components/parameters/DivisionCode'
+    put:
+      tags: [Admin Organization]
+      summary: Assign a division head
+      operationId: setDivisionHead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetDivisionHeadRequest'
+      responses:
+        '200':
+          description: Updated division
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdminDivision'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/admin/years:
+    get:
+      tags: [Admin Organization]
+      summary: List academic years with topic totals
+      operationId: listAdminAcademicYears
+      responses:
+        '200':
+          description: Academic years
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AdminAcademicYear'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [Admin Organization]
+      summary: Create an academic year
+      operationId: createAcademicYear
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAcademicYearRequest'
+      responses:
+        '200':
+          description: Created academic year
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdminAcademicYear'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/admin/years/{year}/current:
+    parameters:
+      - name: year
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+    post:
+      tags: [Admin Organization]
+      summary: Make an academic year current
+      operationId: setCurrentAcademicYear
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetCurrentAcademicYearRequest'
+      responses:
+        '200':
+          description: Current academic year
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdminAcademicYear'
+        default:
+          $ref: '#/components/responses/Error'
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sdms_session
+
+  parameters:
+    TopicUUID:
+      name: uuid
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    UploadUUID:
+      name: uuid
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    FileUUID:
+      name: uuid
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    UserUUID:
+      name: uuid
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    DivisionCode:
+      name: code
+      in: path
+      required: true
+      schema: {type: string}
+    YearQuery:
+      name: year
+      in: query
+      required: false
+      schema: {type: integer, format: int32}
+
+  responses:
+    SuccessNoData:
+      description: Successful operation without a data payload
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SuccessNoData'
+    Error:
+      description: Error response; the HTTP status is repeated in the body
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    SuccessResponse:
+      type: object
+      required: [status, message]
+      properties:
+        status:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: success
+    SuccessNoData:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+      example:
+        status: 200
+        message: success
+    ErrorResponse:
+      type: object
+      required: [status, message]
+      properties:
+        status:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid request body
+
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, example: ok}
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: {type: string}
+        password: {type: string, format: password}
+    Division:
+      type: object
+      required: [uuid, code, name, short_name]
+      properties:
+        uuid: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        short_name: {type: string}
+    DivisionWithSort:
+      allOf:
+        - $ref: '#/components/schemas/Division'
+        - type: object
+          required: [sort_order]
+          properties:
+            sort_order: {type: integer, format: int32}
+    CurrentUser:
+      type: object
+      required: [uuid, username, prefix, first_name, last_name, full_name, role, is_exec, is_admin, divisions, head_divisions]
+      properties:
+        uuid: {type: string, format: uuid}
+        username: {type: string}
+        prefix: {type: string}
+        first_name: {type: string}
+        last_name: {type: string}
+        full_name: {type: string}
+        role: {type: string}
+        is_exec: {type: boolean}
+        is_admin: {type: boolean}
+        divisions:
+          type: array
+          items: {$ref: '#/components/schemas/Division'}
+        head_divisions:
+          type: array
+          items: {$ref: '#/components/schemas/Division'}
+    DirectoryUser:
+      type: object
+      required: [uuid, prefix, first_name, last_name, full_name, divisions, is_topic_assignee_eligible]
+      properties:
+        uuid: {type: string, format: uuid}
+        prefix: {type: string}
+        first_name: {type: string}
+        last_name: {type: string}
+        full_name: {type: string}
+        divisions:
+          type: array
+          items: {$ref: '#/components/schemas/Division'}
+        is_topic_assignee_eligible: {type: boolean}
+    AcademicYear:
+      type: object
+      required: [uuid, year, is_current, current_semester]
+      properties:
+        uuid: {type: string, format: uuid}
+        year: {type: integer, format: int32}
+        is_current: {type: boolean}
+        current_semester: {type: integer, format: int32}
+
+    TopicField:
+      type: object
+      required: [uuid, position, type, label, required, options]
+      properties:
+        uuid: {type: string, format: uuid}
+        position: {type: integer, format: int32}
+        type:
+          type: string
+          enum: [text, para, num, date, choice, file]
+        label: {type: string}
+        required: {type: boolean}
+        options:
+          type: array
+          items: {type: string}
+    Topic:
+      type: object
+      required: [uuid, division, academic_year, semester, title, due_date, is_open, is_secret, created_by_uuid, fields, assignee_count, created_at, updated_at]
+      properties:
+        uuid: {type: string, format: uuid}
+        division: {$ref: '#/components/schemas/Division'}
+        academic_year:
+          type: object
+          required: [uuid, year]
+          properties:
+            uuid: {type: string, format: uuid}
+            year: {type: integer, format: int32}
+        semester: {type: integer, format: int32}
+        title: {type: string}
+        due_date: {type: string, format: date}
+        is_open: {type: boolean}
+        is_secret: {type: boolean}
+        created_by_uuid: {type: string, format: uuid}
+        fields:
+          type: array
+          items: {$ref: '#/components/schemas/TopicField'}
+        assignee_count: {type: integer}
+        assignee_uuids:
+          type: array
+          description: Included for users allowed to manage the topic.
+          items: {type: string, format: uuid}
+        closed_at: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    TopicFieldInput:
+      type: object
+      required: [position, type, label]
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Required for an existing field during topic update.
+        position: {type: integer, format: int32}
+        type:
+          type: string
+          enum: [text, para, num, date, choice, file]
+        label: {type: string}
+        required: {type: boolean, default: true}
+        options:
+          type: array
+          items: {type: string}
+    CreateTopicRequest:
+      type: object
+      required: [division_uuid, title, due_date, fields]
+      properties:
+        division_uuid: {type: string, format: uuid}
+        title: {type: string}
+        due_date: {type: string, format: date}
+        is_secret: {type: boolean, default: false}
+        fields:
+          type: array
+          items: {$ref: '#/components/schemas/TopicFieldInput'}
+        assignee_uuids:
+          type: array
+          nullable: true
+          description: Exact users required to submit. Omit or use null to assign all eligible division members.
+          items: {type: string, format: uuid}
+    UpdateTopicRequest:
+      type: object
+      properties:
+        title: {type: string}
+        due_date: {type: string, format: date}
+        is_secret: {type: boolean}
+        fields:
+          type: array
+          items: {$ref: '#/components/schemas/TopicFieldInput'}
+        assignee_uuids:
+          type: array
+          description: Full replacement list of users required to submit.
+          items: {type: string, format: uuid}
+    TopicListItem:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        semester: {type: integer}
+        title: {type: string}
+        due_date: {type: string, format: date}
+        is_open: {type: boolean}
+        is_secret: {type: boolean}
+        submitted_count: {type: integer, format: int64}
+        assignee_count: {type: integer, format: int64}
+        is_assigned: {type: boolean}
+        my_status: {type: string, nullable: true}
+        my_submitted_at: {type: string, format: date-time, nullable: true}
+        closed_at: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    DivisionTopics:
+      type: object
+      required: [division, academic_year, topics]
+      properties:
+        division: {$ref: '#/components/schemas/DivisionWithSort'}
+        academic_year:
+          type: object
+          required: [uuid, year, is_current]
+          properties:
+            uuid: {type: string, format: uuid}
+            year: {type: integer, format: int32}
+            is_current: {type: boolean}
+        topics:
+          type: array
+          items: {$ref: '#/components/schemas/TopicListItem'}
+
+    SubmissionFile:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        field_uuid: {type: string, format: uuid}
+        original_name: {type: string}
+        mime_type: {type: string}
+        size_bytes: {type: integer, format: int64}
+        position: {type: integer}
+    SubmissionUser:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        username: {type: string}
+        prefix: {type: string}
+        first_name: {type: string}
+        last_name: {type: string}
+        full_name: {type: string}
+    SubmissionItem:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        values:
+          type: object
+          additionalProperties: true
+        files:
+          type: array
+          items: {$ref: '#/components/schemas/SubmissionFile'}
+        status: {type: string}
+        submitted_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    MySubmission:
+      type: object
+      required: [topic, submission]
+      properties:
+        topic: {$ref: '#/components/schemas/Topic'}
+        submission:
+          allOf:
+            - $ref: '#/components/schemas/SubmissionItem'
+          nullable: true
+    UpsertSubmissionRequest:
+      type: object
+      required: [values]
+      properties:
+        values:
+          type: object
+          description: Object keyed by topic field UUID. File fields contain upload UUID values.
+          additionalProperties: true
+    PendingTopic:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        division: {$ref: '#/components/schemas/Division'}
+        academic_year:
+          type: object
+          properties:
+            uuid: {type: string, format: uuid}
+            year: {type: integer}
+        semester: {type: integer}
+        title: {type: string}
+        due_date: {type: string, format: date}
+        is_secret: {type: boolean}
+        status: {type: string}
+        created_by_uuid: {type: string, format: uuid}
+    TopicSubmissionRow:
+      type: object
+      properties:
+        user: {$ref: '#/components/schemas/SubmissionUser'}
+        submission_uuid: {type: string, format: uuid, nullable: true}
+        values:
+          type: object
+          additionalProperties: true
+        files:
+          type: array
+          items: {$ref: '#/components/schemas/SubmissionFile'}
+        status: {type: string}
+        submitted_at: {type: string, format: date-time, nullable: true}
+        updated_at: {type: string, format: date-time, nullable: true}
+    TopicSubmissionTable:
+      type: object
+      properties:
+        topic: {$ref: '#/components/schemas/Topic'}
+        rows:
+          type: array
+          items: {$ref: '#/components/schemas/TopicSubmissionRow'}
+    Upload:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        topic_uuid: {type: string, format: uuid}
+        field_uuid: {type: string, format: uuid}
+        original_name: {type: string}
+        mime_type: {type: string}
+        size_bytes: {type: integer, format: int64}
+        status: {type: string, example: staged}
+        created_at: {type: string, format: date-time}
+
+    Counts:
+      type: object
+      properties:
+        topic_count: {type: integer, format: int64}
+        required_count: {type: integer, format: int64}
+        submitted_count: {type: integer, format: int64}
+        pending_count: {type: integer, format: int64}
+        overdue_count: {type: integer, format: int64}
+    Home:
+      type: object
+      description: Dashboard aggregates. `overview` is null when the user has no overview permission.
+      required: [my, overview]
+      properties:
+        my:
+          type: object
+          properties:
+            counts: {$ref: '#/components/schemas/Counts'}
+            pending_topics:
+              type: array
+              items: {$ref: '#/components/schemas/HomePendingTopic'}
+            recent_submissions:
+              type: array
+              items: {$ref: '#/components/schemas/HomeRecentSubmission'}
+            divisions:
+              type: array
+              items: {$ref: '#/components/schemas/DivisionSummary'}
+        overview:
+          type: object
+          nullable: true
+          properties:
+            school: {$ref: '#/components/schemas/Counts'}
+            divisions:
+              type: array
+              items: {$ref: '#/components/schemas/DivisionSummary'}
+    HomePendingTopic:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        title: {type: string}
+        division: {$ref: '#/components/schemas/DivisionWithSort'}
+        academic_year: {type: integer, format: int32}
+        semester: {type: integer, format: int32}
+        due_date: {type: string, format: date}
+        is_secret: {type: boolean}
+        status: {type: string}
+    HomeRecentSubmission:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        topic_uuid: {type: string, format: uuid}
+        title: {type: string}
+        division: {$ref: '#/components/schemas/DivisionWithSort'}
+        academic_year: {type: integer, format: int32}
+        semester: {type: integer, format: int32}
+        due_date: {type: string, format: date}
+        status: {type: string}
+        submitted_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    DivisionSummary:
+      type: object
+      properties:
+        division: {$ref: '#/components/schemas/DivisionWithSort'}
+        counts: {$ref: '#/components/schemas/Counts'}
+    DivisionStatistics:
+      type: object
+      properties:
+        division: {$ref: '#/components/schemas/DivisionWithSort'}
+        stats: {$ref: '#/components/schemas/Counts'}
+
+    PortfolioFile:
+      allOf:
+        - $ref: '#/components/schemas/SubmissionFile'
+        - type: object
+          properties:
+            created_at: {type: string, format: date-time}
+    PortfolioSubmission:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        topic_uuid: {type: string, format: uuid}
+        topic_title: {type: string}
+        division: {$ref: '#/components/schemas/Division'}
+        semester: {type: integer}
+        due_date: {type: string, format: date}
+        is_open: {type: boolean}
+        is_secret: {type: boolean}
+        values: {type: object, additionalProperties: true}
+        status: {type: string}
+        submitted_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        files:
+          type: array
+          items: {$ref: '#/components/schemas/PortfolioFile'}
+    Portfolio:
+      type: object
+      properties:
+        years:
+          type: array
+          items:
+            type: object
+            properties:
+              academic_year: {type: integer}
+              submissions:
+                type: array
+                items: {$ref: '#/components/schemas/PortfolioSubmission'}
+
+    SearchTopic:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        title: {type: string}
+        division: {$ref: '#/components/schemas/Division'}
+        academic_year: {type: integer}
+        semester: {type: integer}
+        due_date: {type: string, format: date}
+        is_open: {type: boolean}
+        is_secret: {type: boolean}
+    SearchItem:
+      type: object
+      properties:
+        submission_uuid: {type: string, format: uuid}
+        topic: {$ref: '#/components/schemas/SearchTopic'}
+        submitted_by: {$ref: '#/components/schemas/SubmissionUser'}
+        values: {type: object, additionalProperties: true}
+        files:
+          type: array
+          items: {$ref: '#/components/schemas/PortfolioFile'}
+        status: {type: string}
+        submitted_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    SearchResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/SearchItem'}
+        topics:
+          type: array
+          items: {$ref: '#/components/schemas/SearchTopic'}
+        topic_total: {type: integer, format: int64}
+        pagination:
+          type: object
+          properties:
+            page: {type: integer}
+            page_size: {type: integer}
+            total: {type: integer, format: int64}
+            total_pages: {type: integer, format: int64}
+
+    AdminUser:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        username: {type: string}
+        prefix: {type: string}
+        first_name: {type: string}
+        last_name: {type: string}
+        full_name: {type: string}
+        is_exec: {type: boolean}
+        is_admin: {type: boolean}
+        is_active: {type: boolean}
+        divisions:
+          type: array
+          items: {$ref: '#/components/schemas/Division'}
+        deactivated_at: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    CreateUserRequest:
+      type: object
+      required: [username, password, prefix, first_name, last_name, division_uuids]
+      properties:
+        username: {type: string}
+        password: {type: string, format: password}
+        prefix: {type: string}
+        first_name: {type: string}
+        last_name: {type: string}
+        full_name: {type: string, deprecated: true}
+        division_uuids:
+          type: array
+          items: {type: string, format: uuid}
+        is_exec: {type: boolean}
+        is_admin: {type: boolean}
+    UpdateUserRequest:
+      type: object
+      properties:
+        username: {type: string}
+        prefix: {type: string}
+        first_name: {type: string}
+        last_name: {type: string}
+        full_name: {type: string, deprecated: true}
+        division_uuids:
+          type: array
+          items: {type: string, format: uuid}
+        is_exec: {type: boolean}
+        is_admin: {type: boolean}
+        is_active: {type: boolean}
+    ResetPasswordRequest:
+      type: object
+      required: [password]
+      properties:
+        password: {type: string, format: password}
+    ImportResult:
+      type: object
+      properties:
+        imported: {type: integer}
+    DivisionHeadUser:
+      allOf:
+        - $ref: '#/components/schemas/SubmissionUser'
+    AdminDivision:
+      allOf:
+        - $ref: '#/components/schemas/DivisionWithSort'
+        - type: object
+          required: [head_user]
+          properties:
+            head_user:
+              allOf:
+                - $ref: '#/components/schemas/DivisionHeadUser'
+              nullable: true
+    SetDivisionHeadRequest:
+      type: object
+      required: [user_uuid]
+      properties:
+        user_uuid: {type: string, format: uuid}
+    AdminAcademicYear:
+      type: object
+      properties:
+        uuid: {type: string, format: uuid}
+        year: {type: integer, format: int32}
+        is_current: {type: boolean}
+        current_semester: {type: integer, format: int32}
+        topic_count: {type: integer, format: int64}
+        created_at: {type: string, format: date-time}
+    CreateAcademicYearRequest:
+      type: object
+      required: [year]
+      properties:
+        year: {type: integer, format: int32}
+        current_semester: {type: integer, format: int32, nullable: true}
+    SetCurrentAcademicYearRequest:
+      type: object
+      properties:
+        current_semester: {type: integer, format: int32, nullable: true}

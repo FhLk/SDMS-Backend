@@ -25,9 +25,7 @@ func TestHealth(t *testing.T) {
 	}
 
 	var body healthResponse
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &body)
 	if got, want := body.Status, "ok"; got != want {
 		t.Fatalf("status body = %q, want %q", got, want)
 	}
@@ -68,7 +66,7 @@ func TestPanicUsesStandardErrorResponse(t *testing.T) {
 	assertErrorResponse(t, res, "INTERNAL_SERVER_ERROR")
 }
 
-func assertErrorResponse(t *testing.T, res *http.Response, wantCode string) {
+func assertErrorResponse(t *testing.T, res *http.Response, _ string) {
 	t.Helper()
 
 	contentType, _, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
@@ -79,17 +77,45 @@ func assertErrorResponse(t *testing.T, res *http.Response, wantCode string) {
 		t.Fatalf("Content-Type = %q, want application/json", contentType)
 	}
 
-	var body map[string]any
+	var body errorResponse
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if len(body) != 2 {
-		t.Fatalf("response fields = %v, want exactly code and message", body)
+	if got, want := body.Status, res.StatusCode; got != want {
+		t.Fatalf("body status = %d, want %d", got, want)
 	}
-	if got := body["code"]; got != wantCode {
-		t.Fatalf("code = %v, want %q", got, wantCode)
+	if body.Message == "" {
+		t.Fatal("message is empty")
 	}
-	if message, ok := body["message"].(string); !ok || message == "" {
-		t.Fatalf("message = %v, want a non-empty string", body["message"])
+}
+
+func decodeSuccessData(t *testing.T, res *http.Response, target any) {
+	t.Helper()
+
+	var body struct {
+		Status  int             `json:"status"`
+		Data    json.RawMessage `json:"data"`
+		Message string          `json:"message"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode success response: %v", err)
+	}
+	if body.Status != http.StatusOK {
+		t.Fatalf("body status = %d, want %d", body.Status, http.StatusOK)
+	}
+	if body.Message != successMessage {
+		t.Fatalf("message = %q, want %q", body.Message, successMessage)
+	}
+	if target == nil {
+		if len(body.Data) != 0 {
+			t.Fatalf("data = %s, want omitted", body.Data)
+		}
+		return
+	}
+	if len(body.Data) == 0 {
+		t.Fatal("data is missing")
+	}
+	if err := json.Unmarshal(body.Data, target); err != nil {
+		t.Fatalf("decode success data: %v", err)
 	}
 }

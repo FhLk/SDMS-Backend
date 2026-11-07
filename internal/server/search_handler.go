@@ -96,7 +96,7 @@ func (h searchHandler) search(c fiber.Ctx) error {
 	if err != nil {
 		return mapSearchError(err)
 	}
-	return c.JSON(newSearchResponse(result))
+	return ResponseSuccess(c, newSearchResponse(result))
 }
 
 func parseSearchInput(c fiber.Ctx, profile auth.Profile) (searchdomain.Input, error) {

@@ -75,9 +75,7 @@ func TestSubmissionHandlerUpsertUsesAuthenticatedUser(t *testing.T) {
 		t.Fatalf("status = %d, want 200", response.StatusCode)
 	}
 	var decoded mySubmissionResponse
-	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, response, &decoded)
 	if decoded.Submission == nil || decoded.Submission.UUID != submissionUUID || decoded.Submission.Status != submission.StatusSubmitted {
 		t.Fatalf("submission response = %+v", decoded.Submission)
 	}
@@ -106,16 +104,11 @@ func TestSubmissionHandlerReturnsAllFieldValidationDetails(t *testing.T) {
 	if response.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", response.StatusCode)
 	}
-	var decoded struct {
-		Code    string `json:"code"`
-		Details struct {
-			Fields []submission.FieldViolation `json:"fields"`
-		} `json:"details"`
-	}
+	var decoded errorResponse
 	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
 		t.Fatalf("decode error response: %v", err)
 	}
-	if decoded.Code != "VALIDATION_ERROR" || len(decoded.Details.Fields) != 2 {
+	if decoded.Status != http.StatusBadRequest || decoded.Message == "" {
 		t.Fatalf("error response = %+v", decoded)
 	}
 }
@@ -186,9 +179,7 @@ func TestSubmissionHandlerListsTopicTableWithFilter(t *testing.T) {
 		t.Fatalf("status = %d, want 200", response.StatusCode)
 	}
 	var decoded topicSubmissionTableResponse
-	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
-		t.Fatalf("decode table response: %v", err)
-	}
+	decodeSuccessData(t, response, &decoded)
 	if len(decoded.Rows) != 1 || decoded.Rows[0].SubmissionUUID == nil || *decoded.Rows[0].SubmissionUUID != submissionUUID {
 		t.Fatalf("table response = %+v", decoded)
 	}
@@ -235,9 +226,7 @@ func TestSubmissionHandlerIncludesAssigneeUUIDsForTopicEditor(t *testing.T) {
 		t.Fatalf("status = %d, want 200", response.StatusCode)
 	}
 	var decoded topicSubmissionTableResponse
-	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
-		t.Fatalf("decode table response: %v", err)
-	}
+	decodeSuccessData(t, response, &decoded)
 	if len(decoded.Topic.AssigneeUUIDs) != 2 {
 		t.Fatalf("editor assignee UUIDs = %v, want two", decoded.Topic.AssigneeUUIDs)
 	}

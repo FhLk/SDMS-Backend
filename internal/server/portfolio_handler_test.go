@@ -77,9 +77,7 @@ func TestPortfolioListUsesAuthenticatedUserAndReturnsYearGroups(t *testing.T) {
 		t.Fatalf("status = %d, want 200", res.StatusCode)
 	}
 	var response portfolioResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &response)
 	if len(response.Years) != 1 || response.Years[0].AcademicYear != 2569 || len(response.Years[0].Submissions) != 1 {
 		t.Fatalf("response years = %+v", response.Years)
 	}
@@ -159,13 +157,7 @@ func TestPortfolioRejectsInvalidYearBeforeCallingService(t *testing.T) {
 	if called {
 		t.Fatal("portfolio service was called for an invalid year")
 	}
-	var body map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		t.Fatalf("decode error response: %v", err)
-	}
-	if body["code"] != "VALIDATION_ERROR" {
-		t.Fatalf("error code = %v", body["code"])
-	}
+	assertErrorResponse(t, res, "VALIDATION_ERROR")
 }
 
 func portfolioTestApp(service portfolioService, userUUID uuid.UUID) *fiber.App {

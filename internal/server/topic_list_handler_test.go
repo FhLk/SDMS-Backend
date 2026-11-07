@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -46,9 +45,7 @@ func TestListDivisionsRequiresAuthenticationAndReturnsData(t *testing.T) {
 		t.Fatalf("status = %d, service called = %v", res.StatusCode, called)
 	}
 	var response []topicListDivisionResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &response)
 	if len(response) != 1 || response[0].Code != "aca" || response[0].SortOrder != 1 {
 		t.Fatalf("response = %+v", response)
 	}
@@ -103,9 +100,7 @@ func TestListDivisionTopicsUsesSessionUserAndOptionalYear(t *testing.T) {
 		t.Fatalf("status = %d, year = %v, user = %s", res.StatusCode, receivedYear, receivedUserUUID)
 	}
 	var response divisionTopicsResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &response)
 	if len(response.Topics) != 1 || response.Topics[0].SubmittedCount != 2 || response.Topics[0].AssigneeCount != 5 || response.Topics[0].MyStatus == nil || *response.Topics[0].MyStatus != topic.StatusPending {
 		t.Fatalf("response = %+v", response)
 	}
@@ -137,15 +132,5 @@ func TestListDivisionTopicsRejectsInvalidYear(t *testing.T) {
 	if res.StatusCode != http.StatusBadRequest || called {
 		t.Fatalf("status = %d, service called = %v", res.StatusCode, called)
 	}
-	var response struct {
-		Details struct {
-			Field string `json:"field"`
-		} `json:"details"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if response.Details.Field != "year" {
-		t.Fatalf("details.field = %q, want year", response.Details.Field)
-	}
+	assertErrorResponse(t, res, "VALIDATION_ERROR")
 }

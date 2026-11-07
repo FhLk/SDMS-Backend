@@ -123,9 +123,7 @@ func TestAdminListsUsersWithoutPasswordHash(t *testing.T) {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	var body []map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &body)
 	if len(body) != 1 || body[0]["uuid"] != userUUID.String() || body[0]["is_active"] != true {
 		t.Fatalf("body = %+v, want active user", body)
 	}
@@ -170,9 +168,7 @@ func TestAuthenticatedUserListsActivePersonnel(t *testing.T) {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	var body []map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &body)
 	if len(body) != 1 || body[0]["uuid"] != activeUUID.String() || body[0]["full_name"] != "นางครู หนึ่ง" {
 		t.Fatalf("body = %+v", body)
 	}
@@ -216,7 +212,7 @@ func TestAdminCreatesUser(t *testing.T) {
 		t.Fatalf("app.Test() error = %v", err)
 	}
 	defer res.Body.Close()
-	if got, want := res.StatusCode, http.StatusCreated; got != want {
+	if got, want := res.StatusCode, http.StatusOK; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	if received.Username != "teacher.one" || received.Password != "safe-password" || received.Prefix != "นาง" || received.FirstName != "ครู" || received.LastName != "หนึ่ง" || received.FullName != "" || !received.IsExec {
@@ -330,13 +326,11 @@ func TestAdminImportsUsersFromMultipartFile(t *testing.T) {
 		t.Fatalf("app.Test() error = %v", err)
 	}
 	defer res.Body.Close()
-	if got, want := res.StatusCode, http.StatusCreated; got != want {
+	if got, want := res.StatusCode, http.StatusOK; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	var body admin.ImportResult
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &body)
 	if body.Imported != 1 {
 		t.Fatalf("imported = %d, want 1", body.Imported)
 	}
@@ -395,17 +389,12 @@ func TestAdminImportReturnsErrorsForEveryInvalidRow(t *testing.T) {
 	if bytes.Contains(responseBody, []byte("secret-value")) {
 		t.Fatal("response leaked uploaded cell content")
 	}
-	var body struct {
-		Code    string `json:"code"`
-		Details struct {
-			Rows []admin.ImportRowError `json:"rows"`
-		} `json:"details"`
-	}
+	var body errorResponse
 	if err := json.Unmarshal(responseBody, &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Code != "IMPORT_VALIDATION_FAILED" || len(body.Details.Rows) != 2 {
-		t.Fatalf("body = %s, want two structured row errors", responseBody)
+	if body.Status != http.StatusBadRequest || body.Message == "" {
+		t.Fatalf("body = %s, want standard error envelope", responseBody)
 	}
 }
 

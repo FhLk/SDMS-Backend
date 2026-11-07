@@ -78,7 +78,7 @@ func (h adminOrganizationHandler) listDivisions(c fiber.Ctx) error {
 	for _, division := range divisions {
 		response = append(response, newAdminDivisionResponse(division))
 	}
-	return c.Status(fiber.StatusOK).JSON(response)
+	return ResponseSuccess(c, response)
 }
 
 // setDivisionHead รับ UUID ของบุคลากรคนใหม่ ส่วน service จะตรวจบทบาท
@@ -96,7 +96,7 @@ func (h adminOrganizationHandler) setDivisionHead(c fiber.Ctx) error {
 	if err != nil {
 		return mapAdminOrganizationError(err)
 	}
-	return c.Status(fiber.StatusOK).JSON(newAdminDivisionResponse(division))
+	return ResponseSuccess(c, newAdminDivisionResponse(division))
 }
 
 // listAcademicYears คืนทุกปีเรียงจากใหม่ไปเก่า พร้อมจำนวนหัวข้อของแต่ละปี.
@@ -109,7 +109,7 @@ func (h adminOrganizationHandler) listAcademicYears(c fiber.Ctx) error {
 	if err != nil {
 		return mapAdminOrganizationError(err)
 	}
-	return c.Status(fiber.StatusOK).JSON(years)
+	return ResponseSuccess(c, years)
 }
 
 // listPublicAcademicYears คืนรายการปีที่ใช้เป็นตัวเลือกในหน้าฝ่ายและหน้าค้นหา
@@ -132,7 +132,7 @@ func (h adminOrganizationHandler) listPublicAcademicYears(c fiber.Ctx) error {
 			CurrentSemester: year.CurrentSemester,
 		})
 	}
-	return c.Status(fiber.StatusOK).JSON(response)
+	return ResponseSuccess(c, response)
 }
 
 // createAcademicYear สร้างปีใหม่โดยยังไม่เปลี่ยนปีปัจจุบัน
@@ -153,7 +153,7 @@ func (h adminOrganizationHandler) createAcademicYear(c fiber.Ctx) error {
 	if err != nil {
 		return mapAdminOrganizationError(err)
 	}
-	return c.Status(fiber.StatusCreated).JSON(year)
+	return ResponseSuccess(c, year)
 }
 
 // setCurrentAcademicYear ยอมให้ไม่ส่ง body เพื่อใช้ภาคเรียนเดิมของปีเป้าหมาย
@@ -181,7 +181,7 @@ func (h adminOrganizationHandler) setCurrentAcademicYear(c fiber.Ctx) error {
 	if err != nil {
 		return mapAdminOrganizationError(err)
 	}
-	return c.Status(fiber.StatusOK).JSON(year)
+	return ResponseSuccess(c, year)
 }
 
 func parseAcademicYear(value string) (int16, error) {

@@ -102,7 +102,7 @@ func (h homeHandler) get(c fiber.Ctx) error {
 	if err != nil {
 		return mapHomeError(err)
 	}
-	return c.JSON(newHomeResponse(dashboard))
+	return ResponseSuccess(c, newHomeResponse(dashboard))
 }
 
 // divisionStats ส่งสถิติฝ่ายหลัง service ตรวจสิทธิ์ผู้บริหารหรือหัวหน้าฝ่ายนั้นแล้ว.
@@ -118,7 +118,7 @@ func (h homeHandler) divisionStats(c fiber.Ctx) error {
 	if err != nil {
 		return mapHomeError(err)
 	}
-	return c.JSON(divisionStatisticsResponse{
+	return ResponseSuccess(c, divisionStatisticsResponse{
 		Division: newHomeDivisionResponse(statistics.Division),
 		Stats:    newHomeCountsResponse(statistics.Counts),
 	})

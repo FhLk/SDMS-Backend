@@ -133,7 +133,7 @@ func (h topicHandler) create(c fiber.Ctx) error {
 	if err != nil {
 		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
 	}
-	return c.Status(fiber.StatusCreated).JSON(response)
+	return ResponseSuccess(c, response)
 }
 
 func mapTopicError(err error) error {

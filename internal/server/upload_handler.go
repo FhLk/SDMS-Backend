@@ -81,7 +81,7 @@ func (h uploadHandler) create(c fiber.Ctx) error {
 	if err != nil {
 		return mapUploadError(err)
 	}
-	return c.Status(fiber.StatusCreated).JSON(newUploadResponse(created))
+	return ResponseSuccess(c, newUploadResponse(created))
 }
 
 func (h uploadHandler) delete(c fiber.Ctx) error {
@@ -99,7 +99,7 @@ func (h uploadHandler) delete(c fiber.Ctx) error {
 	if err := h.service.Delete(c.Context(), fileUUID, profile.User.UUID); err != nil {
 		return mapUploadError(err)
 	}
-	return c.SendStatus(fiber.StatusNoContent)
+	return ResponseSuccess(c, nil)
 }
 
 // download ส่ง stream จาก storage หลัง service ตรวจสิทธิ์ของผู้ใช้กับเจ้าของ submission แล้ว.

@@ -81,7 +81,7 @@ func (h portfolioHandler) list(c fiber.Ctx) error {
 	if err != nil {
 		return mapPortfolioError(err)
 	}
-	return c.JSON(newPortfolioResponse(result))
+	return ResponseSuccess(c, newPortfolioResponse(result))
 }
 
 // downloadArchive ตั้ง response เป็นไฟล์แนบและส่ง pipe จาก service ให้ Fiber โดยตรง.

@@ -5,6 +5,8 @@
 ## ข้อมูลทั่วไป
 
 - Base URL สำหรับ local development ตามค่า default: `http://localhost:8081/api`
+- Swagger UI: `http://localhost:8081/api/docs`
+- OpenAPI 3.0 YAML: `http://localhost:8081/api/openapi.yaml`
 - Authentication ใช้ server-side session cookie ชื่อ `sdms_session`
 - Request และ response ปกติใช้ `application/json; charset=utf-8`
 - UUID ส่งเป็น JSON string ตามรูปแบบ UUID
@@ -13,6 +15,7 @@
 - การตัดสินกำหนดส่งใช้วันที่ตามเขตเวลา `Asia/Bangkok` และถือว่าส่งทันจนจบวันกำหนดส่ง
 - Array ที่ไม่มีข้อมูลจะคืนเป็น `[]` และค่าที่ไม่มีจะคืนเป็น `null` เว้นแต่ระบุไว้เป็นอย่างอื่น
 - ตัวอย่างที่ใช้ `{}` แทน object แบบย่อ ให้ดู schema เต็มของ object นั้นจากหัวข้อก่อนหน้า; response จริงจะคืน property ครบ ไม่ได้คืน object ว่าง
+- ตัวอย่าง response ของแต่ละ endpoint ด้านล่างแสดงเฉพาะค่าภายใน `data` เพื่อให้อ่าน schema ง่าย ยกเว้นตัวอย่างที่ระบุว่าเป็น envelope เต็ม
 
 ตัวอย่างเรียก API หลัง login ด้วย `curl`:
 
@@ -39,32 +42,46 @@ curl -b cookies.txt http://localhost:8081/api/me
 
 หมายเหตุ: แอดมินเป็นสิทธิ์ดูแลระบบ ไม่ได้ทำให้เห็นข้อมูลลับหรือสถิติฝ่ายโดยอัตโนมัติ เว้นแต่ endpoint นั้นกำหนดสิทธิ์แอดมินไว้โดยตรงหรือบัญชีมีบทบาทด้านเนื้อหาร่วมด้วย
 
-## รูปแบบ error
+## รูปแบบ response
 
-ทุก error เป็น JSON รูปแบบเดียวกัน:
+JSON response ที่สำเร็จและมีข้อมูล:
 
 ```json
 {
-  "code": "VALIDATION_ERROR",
-  "message": "at least one assignee is required",
-  "details": {
-    "field": "assignee_uuids"
-  }
+  "status": 200,
+  "data": {},
+  "message": "success"
 }
 ```
 
-`details` จะไม่มีใน response หาก error นั้นไม่มีรายละเอียดเพิ่มเติม
+JSON response ที่สำเร็จแต่ไม่มีข้อมูล เช่น login, logout, reset password และ delete:
 
-| HTTP | Code ที่พบบ่อย | ความหมาย |
-| --- | --- | --- |
-| `400` | `INVALID_REQUEST`, `VALIDATION_ERROR` | body, path หรือ query ไม่ถูกต้อง |
-| `401` | `UNAUTHORIZED`, `INVALID_CREDENTIALS` | ไม่มี session, session หมดอายุ หรือ login ไม่สำเร็จ |
-| `403` | `FORBIDDEN` | login แล้วแต่ไม่มีสิทธิ์ |
-| `404` | `NOT_FOUND` หรือ code เฉพาะ resource | ไม่พบข้อมูล |
-| `409` | code เฉพาะ conflict | สถานะปัจจุบันไม่อนุญาตให้ทำรายการ |
-| `413` | `FILE_TOO_LARGE`, `PAYLOAD_TOO_LARGE` | request หรือไฟล์ใหญ่เกินกำหนด |
-| `500` | `INTERNAL_SERVER_ERROR` | ข้อผิดพลาดภายในระบบ |
-| `503` | `SERVICE_UNAVAILABLE` | service ของ endpoint ยังไม่พร้อม |
+```json
+{
+  "status": 200,
+  "message": "success"
+}
+```
+
+ทุก error เป็น JSON รูปแบบเดียวกัน โดย `status` ใน body ตรงกับ HTTP status:
+
+```json
+{
+  "status": 400,
+  "message": "at least one assignee is required"
+}
+```
+
+| HTTP | ความหมาย |
+| --- | --- |
+| `400` | body, path หรือ query ไม่ถูกต้อง |
+| `401` | ไม่มี session, session หมดอายุ หรือ login ไม่สำเร็จ |
+| `403` | login แล้วแต่ไม่มีสิทธิ์ |
+| `404` | ไม่พบข้อมูล |
+| `409` | สถานะปัจจุบันไม่อนุญาตให้ทำรายการ |
+| `413` | request หรือไฟล์ใหญ่เกินกำหนด |
+| `500` | ข้อผิดพลาดภายในระบบ |
+| `503` | service ของ endpoint ยังไม่พร้อม |
 
 ## สรุป endpoint ทั้งหมด
 
@@ -235,7 +252,7 @@ curl -b cookies.txt http://localhost:8081/api/me
 Response `200 OK`:
 
 ```json
-{"status":"ok"}
+{"status":200,"data":{"status":"ok"},"message":"success"}
 ```
 
 ### `POST /auth/login`
@@ -254,10 +271,10 @@ Request:
 Response `200 OK`:
 
 ```json
-{"message":"Logged in"}
+{"status":200,"message":"success"}
 ```
 
-Errors: `400 VALIDATION_ERROR`, `401 INVALID_CREDENTIALS`
+กรณีผิดพลาด: request ไม่ครบตอบ `400`; credential ไม่ถูกต้องตอบ `401`
 
 ### `POST /auth/logout`
 
@@ -266,7 +283,7 @@ Errors: `400 VALIDATION_ERROR`, `401 INVALID_CREDENTIALS`
 Response `200 OK`:
 
 ```json
-{"message":"Logged out"}
+{"status":200,"message":"success"}
 ```
 
 ### `GET /me`
@@ -432,9 +449,9 @@ Request:
 - หากไม่ส่ง `assignee_uuids` ระบบเลือกสมาชิกฝ่ายที่เข้าเงื่อนไขทั้งหมดเพื่อรองรับ client รุ่นเดิม
 - ปีและภาคเรียนมาจากปีการศึกษาปัจจุบัน
 
-Response `201 Created`: Topic พร้อม `assignee_uuids`
+Response `200 OK`: Topic พร้อม `assignee_uuids`
 
-Errors ที่สำคัญ: `DIVISION_NOT_FOUND`, `CURRENT_ACADEMIC_YEAR_NOT_SET`, `TOPIC_HAS_NO_ASSIGNEES`, `VALIDATION_ERROR`
+กรณีผิดพลาดที่สำคัญ: ไม่พบฝ่ายหรือปีปัจจุบัน, ไม่มีผู้ต้องส่งที่เข้าเงื่อนไข หรือข้อมูลไม่ผ่าน validation
 
 ### `PATCH /topics/{uuid}`
 
@@ -454,10 +471,10 @@ Errors ที่สำคัญ: `DIVISION_NOT_FOUND`, `CURRENT_ACADEMIC_YEAR_NO
 - ต้องส่งอย่างน้อยหนึ่งใน `title`, `due_date`, `is_secret`, `fields`, `assignee_uuids`
 - `assignee_uuids` เป็นรายชื่อฉบับเต็ม: UUID ที่หายไปจะถูกถอด และ UUID ใหม่จะถูกเพิ่ม
 - UUID ที่เพิ่มใหม่ต้องเป็นสมาชิกฝ่ายที่เปิดใช้งานและไม่ใช่ผู้บริหาร ส่วนผู้ที่อยู่ในรายชื่อเดิมสามารถคงไว้ได้แม้สถานะสมาชิกเปลี่ยนภายหลัง
-- ถอดผู้ที่มี submission แล้วไม่ได้: `409 TOPIC_ASSIGNEE_HAS_SUBMISSION`
+- ถอดผู้ที่มี submission แล้วไม่ได้และตอบ `409`
 - ถ้าไม่ส่ง `assignee_uuids` รายชื่อเดิมจะไม่เปลี่ยน
 - ถ้าส่ง `fields` ต้องส่งฟอร์มฉบับเต็ม ช่องเดิมต้องมี `uuid`; ช่องใหม่ไม่ส่ง `uuid`; ช่องเดิมที่ไม่อยู่ในรายการจะถูกลบหรือซ่อนหากมีคำตอบแล้ว
-- เปลี่ยน `type` ของ field หลังมี submission ไม่ได้: `409 TOPIC_FIELD_TYPE_LOCKED`
+- เปลี่ยน `type` ของ field หลังมี submission ไม่ได้และตอบ `409`
 - ช่องเดิมที่ไม่ส่ง `required` จะคงค่าเดิม ช่องใหม่ใช้ `true`
 
 Response `200 OK`: Topic ล่าสุดพร้อม `assignee_uuids`
@@ -472,7 +489,7 @@ Response `200 OK`: Topic ล่าสุดพร้อม `assignee_uuids`
 
 ### `DELETE /topics/{uuid}`
 
-Response `204 No Content` หัวข้อที่มี submission แล้วลบไม่ได้และตอบ `409 TOPIC_HAS_SUBMISSIONS`
+Response `200 OK` ใช้ success envelope แบบไม่มี `data`; หัวข้อที่มี submission แล้วลบไม่ได้และตอบ `409`
 
 ## 4. การส่งคำตอบและตารางคำตอบ
 
@@ -552,10 +569,10 @@ Response `200 OK` มีรูปแบบเดียวกับ `GET /topics/
 - `submitted_at` เก็บเวลาส่งครั้งแรกและไม่เปลี่ยนเมื่อแก้
 - ต้องเป็นผู้ต้องส่งและหัวข้อต้องเปิดอยู่
 - field ที่ required ต้องมีค่าถูกชนิด
-- validation หลายช่องตอบพร้อมกันใน `details.fields`
+- validation ไม่ผ่านตอบ `400` ด้วย error envelope มาตรฐาน
 - ไฟล์ staged ที่อ้างถึงจะเปลี่ยนเป็น attached; ไฟล์เดิมที่ถอดออกจะถูก trashed
 
-Errors: `TOPIC_NOT_FOUND`, `TOPIC_CLOSED`, `FORBIDDEN`, `VALIDATION_ERROR`
+กรณีผิดพลาด: ไม่พบหัวข้อ, หัวข้อปิด, ไม่มีสิทธิ์ หรือข้อมูลไม่ผ่าน validation
 
 ### `GET /topics/{uuid}`
 
@@ -625,7 +642,7 @@ curl -b cookies.txt \
   http://localhost:8081/api/uploads
 ```
 
-Response `201 Created`:
+Response `200 OK`:
 
 ```json
 {
@@ -642,11 +659,11 @@ Response `201 Created`:
 
 ไฟล์ staged ที่ไม่ถูกแนบกับ submission จะหมดอายุตามค่าตั้งต้น 24 ชั่วโมง
 
-Errors: `FILE_TOO_LARGE`, `EMPTY_FILE`, `TOPIC_NOT_FOUND`, `TOPIC_FIELD_NOT_FOUND`, `FIELD_NOT_FILE`, `TOPIC_CLOSED`, `FORBIDDEN`
+กรณีผิดพลาด: ไฟล์ใหญ่เกิน/ว่าง, ไม่พบหัวข้อหรือ field, field ไม่ใช่ชนิดไฟล์, หัวข้อปิด หรือไม่มีสิทธิ์
 
 ### `DELETE /uploads/{uuid}`
 
-ลบได้เฉพาะไฟล์ staged ของผู้ใช้เอง Response `204 No Content` ไฟล์ attached ต้องถอดผ่านการแก้ submission และจะตอบ `409 FILE_ALREADY_ATTACHED`
+ลบได้เฉพาะไฟล์ staged ของผู้ใช้เอง Response `200 OK` ใช้ success envelope แบบไม่มี `data`; ไฟล์ attached ต้องถอดผ่านการแก้ submission และจะตอบ `409`
 
 ### `GET /files/{uuid}`
 
@@ -659,7 +676,7 @@ Response เป็น binary stream พร้อม header:
 - `Cache-Control: private, no-store`
 - `X-Content-Type-Options: nosniff`
 
-เปิดได้เฉพาะไฟล์สถานะ attached และใช้ scope เดียวกับตารางคำตอบ หัวข้อลับที่ไม่มีสิทธิ์ตอบ `403`; UUID ที่ไม่มีหรือเป็น staged/trashed ตอบ `404 FILE_NOT_FOUND`
+เปิดได้เฉพาะไฟล์สถานะ attached และใช้ scope เดียวกับตารางคำตอบ หัวข้อลับที่ไม่มีสิทธิ์ตอบ `403`; UUID ที่ไม่มีหรือเป็น staged/trashed ตอบ `404`
 
 ## 6. หน้าแรกและสถิติ
 
@@ -717,7 +734,7 @@ Response `200 OK`:
 }
 ```
 
-Errors: `403 FORBIDDEN`, `404 DIVISION_NOT_FOUND`
+กรณีผิดพลาด: ไม่มีสิทธิ์ตอบ `403`; ไม่พบฝ่ายตอบ `404`
 
 ## 7. แฟ้มของฉัน
 
@@ -890,9 +907,9 @@ Request:
 - `prefix` ไม่เกิน 30 ตัวอักษร, `first_name` บังคับและไม่เกิน 120, `last_name` ไม่เกิน 120
 - ยังรับ `full_name` เพื่อรองรับ client เก่า แต่ห้ามส่งพร้อม `prefix`, `first_name` หรือ `last_name`
 
-Response `201 Created`: admin user object
+Response `200 OK`: admin user object
 
-Errors: `VALIDATION_ERROR`, `INVALID_DIVISION`, `409 USERNAME_EXISTS`
+กรณีผิดพลาด: ข้อมูลไม่ผ่าน validation, ไม่พบฝ่าย หรือ username ซ้ำ (`409`)
 
 ### `PATCH /admin/users/{uuid}`
 
@@ -924,7 +941,7 @@ Request:
 Response `200 OK`:
 
 ```json
-{"message":"Password updated"}
+{"status":200,"message":"success"}
 ```
 
 การตั้งรหัสผ่านใหม่ยกเลิก session เดิมทั้งหมดของผู้ใช้นั้น
@@ -940,7 +957,7 @@ Content-Type: `multipart/form-data` ใช้ field ชื่อ `file` รอ�
 
 คอลัมน์ฝ่ายรับรหัส ชื่อเต็ม หรือชื่อย่อ หลายฝ่ายคั่นด้วย `|`, `,` หรือ `;` ผู้ใช้ที่นำเข้าเป็นบุคลากรทั่วไป ไม่เป็นผู้บริหารหรือแอดมิน
 
-Response `201 Created`:
+Response `200 OK`:
 
 ```json
 {"imported":25}
@@ -950,17 +967,12 @@ Response `201 Created`:
 
 ```json
 {
-  "code": "IMPORT_VALIDATION_FAILED",
-  "message": "Import file contains invalid rows",
-  "details": {
-    "rows": [
-      {"row":3,"field":"username","message":"username already exists"}
-    ]
-  }
+  "status": 400,
+  "message": "Import file contains invalid rows"
 }
 ```
 
-Errors อื่น: `FILE_REQUIRED`, `FILE_TOO_LARGE`, `INVALID_FILE`, `UNSUPPORTED_FILE_TYPE`
+กรณีผิดพลาดอื่น: ไม่ได้ส่งไฟล์, ไฟล์ใหญ่เกิน, อ่านไฟล์ไม่ได้ หรือชนิดไฟล์ไม่รองรับ
 
 ### `GET /admin/users/import/template.csv`
 
@@ -1008,7 +1020,7 @@ Request:
 
 ผู้ใช้ต้องเปิดใช้งาน ไม่ใช่ผู้บริหาร และยังไม่เป็นหัวหน้าฝ่ายอื่น Response `200 OK` เป็น admin division object ล่าสุด
 
-Errors: `DIVISION_NOT_FOUND`, `USER_NOT_FOUND`, `EXECUTIVE_CANNOT_BE_DIVISION_HEAD`, `INACTIVE_USER_CANNOT_BE_DIVISION_HEAD`, `USER_ALREADY_DIVISION_HEAD`
+กรณีผิดพลาด: ไม่พบฝ่าย/ผู้ใช้, ผู้ใช้เป็นผู้บริหาร, บัญชีถูกปิด หรือเป็นหัวหน้าฝ่ายอื่นอยู่แล้ว
 
 ### `GET /admin/years`
 
@@ -1040,9 +1052,9 @@ Request:
 
 `year` ต้องอยู่ระหว่าง 2400-3000 และ semester เป็น 1 หรือ 2 หากไม่ส่ง semester ใช้ 1 ปีใหม่จะยังไม่เป็นปีปัจจุบัน
 
-Response `201 Created`: academic year object แบบเดียวกับ `/admin/years`
+Response `200 OK`: academic year object แบบเดียวกับ `/admin/years`
 
-Errors: `VALIDATION_ERROR`, `409 ACADEMIC_YEAR_EXISTS`
+กรณีผิดพลาด: ข้อมูลไม่ผ่าน validation หรือปีการศึกษาซ้ำ (`409`)
 
 ### `POST /admin/years/{year}/current`
 
@@ -1056,31 +1068,17 @@ Body ไม่บังคับ:
 
 Response `200 OK`: academic year object ล่าสุด
 
-Errors: `INVALID_YEAR`, `VALIDATION_ERROR`, `ACADEMIC_YEAR_NOT_FOUND`
+กรณีผิดพลาด: ปีหรือภาคเรียนไม่ถูกต้อง หรือไม่พบปีการศึกษา
 
-## Error codes เฉพาะโดเมน
+## HTTP status เฉพาะโดเมน
 
-| HTTP | Code | กรณี |
-| --- | --- | --- |
-| `400` | `INVALID_UUID`, `INVALID_YEAR` | path parameter ไม่ถูกต้อง |
-| `400` | `INVALID_DIVISION` | UUID ฝ่ายของผู้ใช้ไม่ถูกต้อง |
-| `400` | `FIELD_NOT_FILE` | อัปโหลดไปยัง field ที่ไม่ใช่ไฟล์ |
-| `400` | `UNSUPPORTED_FILE_TYPE` | import ไม่ใช่ CSV/XLSX |
-| `404` | `USER_NOT_FOUND` | ไม่พบผู้ใช้ |
-| `404` | `DIVISION_NOT_FOUND` | ไม่พบฝ่าย |
-| `404` | `ACADEMIC_YEAR_NOT_FOUND` | ไม่พบปีการศึกษา |
-| `404` | `TOPIC_NOT_FOUND` | ไม่พบหัวข้อ |
-| `404` | `TOPIC_FIELD_NOT_FOUND` | ไม่พบ field ของหัวข้อ |
-| `404` | `FILE_NOT_FOUND`, `UPLOAD_NOT_FOUND` | ไม่พบไฟล์ที่เปิดดูหรือลบได้ |
-| `409` | `USERNAME_EXISTS` | username ซ้ำ |
-| `409` | `ACADEMIC_YEAR_EXISTS` | ปีการศึกษาซ้ำ |
-| `409` | `CURRENT_ACADEMIC_YEAR_NOT_SET` | ยังไม่ได้ตั้งปีปัจจุบัน |
-| `409` | `TOPIC_HAS_NO_ASSIGNEES` | ฝ่ายไม่มีผู้มีสิทธิ์เป็นผู้ต้องส่ง |
-| `409` | `TOPIC_ASSIGNEE_HAS_SUBMISSION` | พยายามถอดผู้ที่ส่งแล้ว |
-| `409` | `TOPIC_FIELD_TYPE_LOCKED` | เปลี่ยนชนิด field หลังมีคำตอบ |
-| `409` | `TOPIC_HAS_SUBMISSIONS` | ลบหัวข้อที่มีคำตอบแล้ว |
-| `409` | `TOPIC_CLOSED` | ส่งคำตอบหรืออัปโหลดหลังปิดหัวข้อ |
-| `409` | `FILE_ALREADY_ATTACHED` | ลบไฟล์ที่แนบ submission แล้วโดยตรง |
+error response จะไม่มี field `code` หรือ `details`; client ใช้ HTTP status ร่วมกับ `message`
+
+| HTTP | กรณี |
+| --- | --- |
+| `400` | UUID/ปี/ฝ่ายไม่ถูกต้อง, field ไม่ใช่ชนิดไฟล์ หรือ import ไม่ใช่ CSV/XLSX |
+| `404` | ไม่พบผู้ใช้ ฝ่าย ปีการศึกษา หัวข้อ field หรือไฟล์ |
+| `409` | username/ปีซ้ำ, ยังไม่มีปีปัจจุบัน, ไม่มีผู้ต้องส่ง, พยายามถอดผู้ที่ส่งแล้ว, เปลี่ยนชนิด field หลังมีคำตอบ, ลบหัวข้อที่มีคำตอบ, ส่งหลังปิดหัวข้อ หรือลบไฟล์ attached โดยตรง |
 
 ## Flow แนะนำสำหรับ frontend
 
@@ -1091,7 +1089,7 @@ Errors: `INVALID_YEAR`, `VALIDATION_ERROR`, `ACADEMIC_YEAR_NOT_FOUND`
 3. ส่ง UUID ที่เลือกทั้งหมดใน `assignee_uuids` ตอน `POST /topics`
 4. หน้าแก้ไขโหลด `GET /topics/{uuid}` และตั้งค่าตัวเลือกจาก `topic.assignee_uuids`
 5. ตอนบันทึก `PATCH /topics/{uuid}` ให้ส่งรายชื่อฉบับเต็ม
-6. หากได้ `TOPIC_ASSIGNEE_HAS_SUBMISSION` ให้โหลดข้อมูลใหม่และไม่อนุญาตให้ถอดผู้ที่ส่งแล้ว
+6. หากได้ `409` ตอนแก้รายชื่อ ให้โหลดข้อมูลใหม่และไม่อนุญาตให้ถอดผู้ที่ส่งแล้ว
 
 ### ส่งคำตอบที่มีไฟล์
 

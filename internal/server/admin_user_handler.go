@@ -99,7 +99,7 @@ func (h adminUserHandler) list(c fiber.Ctx) error {
 	for _, user := range users {
 		responses = append(responses, newAdminUserResponse(user))
 	}
-	return c.Status(fiber.StatusOK).JSON(responses)
+	return ResponseSuccess(c, responses)
 }
 
 // listDirectory gives every authenticated user a safe, active-only personnel
@@ -128,7 +128,7 @@ func (h adminUserHandler) listDirectory(c fiber.Ctx) error {
 			IsTopicAssigneeEligible: !user.IsExec,
 		})
 	}
-	return c.Status(fiber.StatusOK).JSON(responses)
+	return ResponseSuccess(c, responses)
 }
 
 // create ตรวจ request แล้วส่งต่อให้ service บันทึกผู้ใช้ ฝ่าย และรหัสผ่านแบบ hash.
@@ -155,7 +155,7 @@ func (h adminUserHandler) create(c fiber.Ctx) error {
 	if err != nil {
 		return mapAdminUserError(err)
 	}
-	return c.Status(fiber.StatusCreated).JSON(newAdminUserResponse(user))
+	return ResponseSuccess(c, newAdminUserResponse(user))
 }
 
 // update ใช้ pointer fields เพื่อให้ PATCH เปลี่ยนเฉพาะค่าที่ client ส่งมา.
@@ -186,7 +186,7 @@ func (h adminUserHandler) update(c fiber.Ctx) error {
 	if err != nil {
 		return mapAdminUserError(err)
 	}
-	return c.Status(fiber.StatusOK).JSON(newAdminUserResponse(user))
+	return ResponseSuccess(c, newAdminUserResponse(user))
 }
 
 // resetPassword เปลี่ยนรหัสผ่านผ่าน endpoint แยก เพื่อไม่ให้ PATCH ทั่วไป
@@ -207,7 +207,7 @@ func (h adminUserHandler) resetPassword(c fiber.Ctx) error {
 	if err := h.service.ResetPassword(c.Context(), userUUID, request.Password); err != nil {
 		return mapAdminUserError(err)
 	}
-	return c.Status(fiber.StatusOK).JSON(messageResponse{Message: "Password updated"})
+	return ResponseSuccess(c, nil)
 }
 
 // importUsers รับไฟล์ multipart field ชื่อ file และจำกัดขนาดก่อนอ่านเข้า memory.
@@ -244,7 +244,7 @@ func (h adminUserHandler) importUsers(c fiber.Ctx) error {
 	if err != nil {
 		return mapAdminUserError(err)
 	}
-	return c.Status(fiber.StatusCreated).JSON(result)
+	return ResponseSuccess(c, result)
 }
 
 // downloadImportTemplate ส่งไฟล์ตัวอย่างที่สร้างจาก header ชุดเดียวกับ parser

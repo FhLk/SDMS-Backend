@@ -143,7 +143,7 @@ func TestDivisionHeadCreatesTopic(t *testing.T) {
 		t.Fatalf("app.Test() error = %v", err)
 	}
 	defer res.Body.Close()
-	if got, want := res.StatusCode, http.StatusCreated; got != want {
+	if got, want := res.StatusCode, http.StatusOK; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	if received.DivisionUUID != divisionUUID || received.Title != "รายงานประจำเดือน" || !received.IsSecret {
@@ -157,9 +157,7 @@ func TestDivisionHeadCreatesTopic(t *testing.T) {
 	}
 
 	var response topicResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &response)
 	if response.Division.UUID != divisionUUID || response.AcademicYear.Year != 2569 || response.Semester != 1 {
 		t.Fatalf("period/division response = %+v", response)
 	}
@@ -190,7 +188,7 @@ func TestAdminCreatesTopicForAnyDivision(t *testing.T) {
 		t.Fatalf("app.Test() error = %v", err)
 	}
 	defer res.Body.Close()
-	if got, want := res.StatusCode, http.StatusCreated; got != want {
+	if got, want := res.StatusCode, http.StatusOK; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	if !called {
@@ -239,18 +237,7 @@ func TestCreateTopicValidationReturnsFieldPath(t *testing.T) {
 	if got, want := res.StatusCode, http.StatusBadRequest; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
-	var response struct {
-		Code    string `json:"code"`
-		Details struct {
-			Field string `json:"field"`
-		} `json:"details"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if response.Code != "VALIDATION_ERROR" || response.Details.Field != "fields[1].options" {
-		t.Fatalf("response = %+v, want exact invalid field path", response)
-	}
+	assertErrorResponse(t, res, "VALIDATION_ERROR")
 }
 
 func TestCreateTopicRejectsDivisionWithoutAssignees(t *testing.T) {

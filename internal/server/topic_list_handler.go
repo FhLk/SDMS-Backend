@@ -64,7 +64,7 @@ func (h topicHandler) listDivisions(c fiber.Ctx) error {
 	for _, division := range divisions {
 		response = append(response, newTopicListDivisionResponse(division))
 	}
-	return c.JSON(response)
+	return ResponseSuccess(c, response)
 }
 
 // listDivisionTopics ใช้ user UUID จาก session เพื่อให้ service คำนวณสถานะของฉัน
@@ -85,7 +85,7 @@ func (h topicHandler) listDivisionTopics(c fiber.Ctx) error {
 	if err != nil {
 		return mapTopicError(err)
 	}
-	return c.JSON(newDivisionTopicsResponse(result))
+	return ResponseSuccess(c, newDivisionTopicsResponse(result))
 }
 
 func parseOptionalTopicYear(value string) (*int16, error) {

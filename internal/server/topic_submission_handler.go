@@ -57,7 +57,7 @@ func (h submissionHandler) listTopicTable(c fiber.Ctx) error {
 	if err != nil {
 		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
 	}
-	return c.JSON(response)
+	return ResponseSuccess(c, response)
 }
 
 // listPendingNames ใช้สำหรับคัดลอกรายชื่อคนที่ยังไม่ส่ง และ service จะตรวจ
@@ -82,7 +82,7 @@ func (h submissionHandler) listPendingNames(c fiber.Ctx) error {
 	for _, user := range users {
 		response = append(response, newTopicSubmissionUserResponse(user))
 	}
-	return c.JSON(response)
+	return ResponseSuccess(c, response)
 }
 
 func newTopicSubmissionTableResponse(table submission.TopicTable, includeAssigneeUUIDs bool) (topicSubmissionTableResponse, error) {

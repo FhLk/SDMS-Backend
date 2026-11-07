@@ -88,7 +88,7 @@ flowchart LR
 
 1. หัวหน้าฝ่ายหรือแอดมินสร้างหัวข้อในปีและภาคเรียนปัจจุบัน พร้อมกำหนดส่ง ระดับความลับ และฟอร์มอย่างน้อย 1 ช่อง
 2. ผู้สร้างเลือกผู้ต้องส่งผ่าน `assignee_uuids` จากสมาชิกที่ยังเปิดใช้งานในฝ่ายนั้น โดยไม่รวมผู้บริหาร แล้วระบบบันทึกหัวข้อ ฟอร์ม และ `topic_assignees` ใน transaction เดียว; หาก client รุ่นเดิมไม่ส่ง property นี้ ระบบจะเลือกผู้เข้าเงื่อนไขทั้งหมด
-3. ตอนแก้หัวข้อ `assignee_uuids` เป็นรายชื่อฉบับเต็ม ระบบเพิ่ม/ถอดแบบ atomic เพิ่มได้เฉพาะคนที่ยังเข้าเงื่อนไข และถอดคนที่มี submission แล้วไม่ได้ (`TOPIC_ASSIGNEE_HAS_SUBMISSION`)
+3. ตอนแก้หัวข้อ `assignee_uuids` เป็นรายชื่อฉบับเต็ม ระบบเพิ่ม/ถอดแบบ atomic เพิ่มได้เฉพาะคนที่ยังเข้าเงื่อนไข และถอดคนที่มี submission แล้วไม่ได้ (ตอบ `409`)
 4. ผู้ที่อยู่ในรายชื่อผู้ต้องส่งอัปโหลดไฟล์ไปยัง field ชนิด `file` ได้ขณะหัวข้อเปิด ไฟล์ยังเป็น `staged` จนกว่าจะถูกอ้างในคำตอบ
 5. `PUT my-submission` เป็น upsert: ครั้งแรกสร้างคำตอบ ครั้งถัดไปแก้คำตอบเดิม โดยคง `submitted_at` ครั้งแรกไว้และเปลี่ยน `updated_at`
 6. การผูก/ถอดไฟล์เกิดใน transaction เดียวกับคำตอบ ไฟล์ที่ถอดออกถูกลบจาก storage และเปลี่ยนเป็น `trashed`
@@ -124,15 +124,26 @@ flowchart LR
 
 ## HTTP API
 
-ทุก route ใช้ prefix `/api` และตอบ error รูปแบบเดียวกัน:
+ทุก route ใช้ prefix `/api` โดย JSON success มีรูปแบบเดียวกัน:
 
 ```json
 {
-  "code": "VALIDATION_ERROR",
-  "message": "Request validation failed",
-  "details": {}
+  "status": 200,
+  "data": {},
+  "message": "success"
 }
 ```
+
+เมื่อ endpoint ไม่มีข้อมูลตอบกลับ จะตัด `data` ออก ส่วน error ใช้ HTTP status เดียวกับ `status` ใน body:
+
+```json
+{
+  "status": 400,
+  "message": "Request validation failed"
+}
+```
+
+Swagger UI อยู่ที่ `/api/docs` และ OpenAPI YAML อยู่ที่ `/api/openapi.yaml`
 
 ยกเว้น health, login และ logout route อื่นต้องมี session cookie ที่ถูกต้อง
 
@@ -149,7 +160,7 @@ flowchart LR
 | Admin ผู้ใช้ | `GET /admin/users` · `POST /admin/users` · `POST /admin/users/import` · `GET /admin/users/import/template.csv` · `GET /admin/users/import/template.xlsx` · `PATCH /admin/users/:uuid` · `POST /admin/users/:uuid/password` |
 | Admin โครงสร้าง | `GET /admin/divisions` · `PUT /admin/divisions/:code/head` · `GET /admin/years` · `POST /admin/years` · `POST /admin/years/:year/current` |
 
-รายละเอียด request/response, query parameters, สิทธิ์ และ error codes ของทั้ง 38 routes อยู่ใน [api.md](api.md) ส่วน acceptance criteria และประวัติงานอยู่ใน [README.md](README.md) และ [sdms-be-issues.md](sdms-be-issues.md)
+รายละเอียด request/response, query parameters, สิทธิ์ และ HTTP status ของทั้ง 38 routes อยู่ใน [api.md](api.md) ส่วน acceptance criteria และประวัติงานอยู่ใน [README.md](README.md) และ [sdms-be-issues.md](sdms-be-issues.md)
 
 ## แบบฟอร์มและข้อจำกัดข้อมูล
 
@@ -268,9 +279,9 @@ go test ./...
 ช่องว่างเชิงปฏิบัติการที่พบจาก repository:
 
 - ยังไม่มี Dockerfile สำหรับ API, deployment manifest, CI/CD, metrics/tracing, centralized logging configuration หรือ production runbook
-- มี API contract แบบ Markdown ที่ [api.md](api.md) แล้ว แต่ยังไม่มี OpenAPI/Swagger schema และไม่มี generated client
+- มี API contract แบบ Markdown ที่ [api.md](api.md), OpenAPI 3.0 แบบ embedded และ Swagger UI แล้ว แต่ยังไม่มี generated client
 - `server.New` ยังไม่ได้ติดตั้ง CORS middleware; deployment ปัจจุบันจึงควรให้ frontend เรียกแบบ same-origin/reverse proxy หรือเพิ่ม policy ที่ชัดเจนก่อนแยก origin
-- health endpoint เป็น liveness (`{"status":"ok"}`) และไม่ query database หลัง startup; ถ้าต้องการ readiness ต้องมี endpoint/health check แยก
+- health endpoint เป็น liveness (`{"status":200,"data":{"status":"ok"},"message":"success"}`) และไม่ query database หลัง startup; ถ้าต้องการ readiness ต้องมี endpoint/health check แยก
 - ยังไม่มี rate limiting หรือกลไกป้องกัน brute-force login ในตัว application
 - migration เป็น initializer สำหรับฐานข้อมูลใหม่ ไม่ใช่ชุด migration ที่ version และ rollback ได้
 - มี `internal/sampledata` และ `sample-data/users.json` แต่ไม่มี `cmd/seed-sample` ใน tree ปัจจุบัน แม้ README จะอ้างถึงคำสั่งนี้
@@ -279,6 +290,7 @@ go test ./...
 ## เอกสารที่เกี่ยวข้อง
 
 - [api.md](api.md) — API contract ฉบับเต็มของทั้ง 38 routes
+- [internal/server/openapi.yaml](internal/server/openapi.yaml) — OpenAPI 3.0 contract ที่ Swagger UI ใช้งาน
 - [README.md](README.md) — วิธีรันระบบ สถานะฟีเจอร์ และ acceptance criteria ของงาน backend
 - [sdms-database.md](sdms-database.md) — ER diagram, data dictionary และรูปแบบ JSON ของ 10 ตาราง
 - [sdms-be-issues.md](sdms-be-issues.md) — สถานะและรายละเอียดงาน backend 17 รายการ

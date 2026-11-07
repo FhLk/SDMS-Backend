@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -137,7 +136,7 @@ func TestAdminClosesReopensAndDeletesTopic(t *testing.T) {
 	}{
 		{name: "close", method: http.MethodPost, path: "/close", wantStatus: http.StatusOK, wantOpen: boolPointer(false)},
 		{name: "reopen", method: http.MethodPost, path: "/reopen", wantStatus: http.StatusOK, wantOpen: boolPointer(true)},
-		{name: "delete", method: http.MethodDelete, wantStatus: http.StatusNoContent},
+		{name: "delete", method: http.MethodDelete, wantStatus: http.StatusOK},
 	}
 
 	for _, tt := range tests {
@@ -153,12 +152,12 @@ func TestAdminClosesReopensAndDeletesTopic(t *testing.T) {
 			}
 			if tt.wantOpen != nil {
 				var response topicResponse
-				if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-					t.Fatalf("decode response: %v", err)
-				}
+				decodeSuccessData(t, res, &response)
 				if response.IsOpen != *tt.wantOpen {
 					t.Fatalf("is_open = %v, want %v", response.IsOpen, *tt.wantOpen)
 				}
+			} else {
+				decodeSuccessData(t, res, nil)
 			}
 		})
 	}

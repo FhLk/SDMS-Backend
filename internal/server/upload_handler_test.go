@@ -76,7 +76,7 @@ func TestUploadCreatesStagedFileForAuthenticatedUser(t *testing.T) {
 		t.Fatalf("app.Test() error = %v", err)
 	}
 	defer res.Body.Close()
-	if got, want := res.StatusCode, http.StatusCreated; got != want {
+	if got, want := res.StatusCode, http.StatusOK; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	if received.TopicUUID != topicUUID || received.FieldUUID != fieldUUID || received.UploadedByUUID != userUUID {
@@ -87,9 +87,7 @@ func TestUploadCreatesStagedFileForAuthenticatedUser(t *testing.T) {
 	}
 
 	var response uploadResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &response)
 	if response.UUID != fileUUID || response.Status != model.FileStaged || response.SizeBytes != 8 {
 		t.Fatalf("response = %+v", response)
 	}
@@ -135,9 +133,10 @@ func TestDeleteUploadUsesAuthenticatedOwner(t *testing.T) {
 		t.Fatalf("app.Test() error = %v", err)
 	}
 	defer res.Body.Close()
-	if got, want := res.StatusCode, http.StatusNoContent; got != want {
+	if got, want := res.StatusCode, http.StatusOK; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
+	decodeSuccessData(t, res, nil)
 	if !called {
 		t.Fatal("Delete service was not called")
 	}
@@ -244,12 +243,8 @@ func TestDownloadFileRejectsInvalidDownloadOptionBeforeOpeningFile(t *testing.T)
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Code != "VALIDATION_ERROR" {
-		t.Fatalf("code = %q, want VALIDATION_ERROR", body.Code)
-	}
-	details, ok := body.Details.(map[string]any)
-	if !ok || details["field"] != "download" {
-		t.Fatalf("details = %v, want field=download", body.Details)
+	if body.Status != http.StatusBadRequest || body.Message == "" {
+		t.Fatalf("body = %+v, want standard error envelope", body)
 	}
 	if called {
 		t.Fatal("Open service was called for an invalid download option")

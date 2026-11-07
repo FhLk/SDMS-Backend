@@ -185,9 +185,7 @@ func TestMeReturnsIdentityRoleAndDivisions(t *testing.T) {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	var body meResponse
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &body)
 	if body.Prefix != "นาง" || body.FirstName != "หัวหน้าฝ่าย" || body.LastName != "ตัวอย่าง" || body.FullName != "นางหัวหน้าฝ่าย ตัวอย่าง" || body.Role != "division_head" {
 		t.Fatalf("identity = %+v, want name and division_head role", body)
 	}

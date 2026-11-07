@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -64,9 +63,7 @@ func TestAdminListsDivisionsWithHeads(t *testing.T) {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	var body []adminDivisionResponse
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &body)
 	if len(body) != 2 {
 		t.Fatalf("body length = %d, want 2", len(body))
 	}
@@ -153,9 +150,7 @@ func TestAdminSetsDivisionHead(t *testing.T) {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	var body adminDivisionResponse
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &body)
 	if body.Code != "aca" || body.HeadUser == nil || body.HeadUser.UUID != userUUID {
 		t.Fatalf("body = %+v, want academic division with selected head", body)
 	}
@@ -200,9 +195,7 @@ func TestAdminListsAcademicYearsWithTopicCounts(t *testing.T) {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	var body []admin.AcademicYearSummary
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &body)
 	if len(body) != 1 || body[0].TopicCount != 4 || !body[0].IsCurrent {
 		t.Fatalf("body = %+v, want current year with four topics", body)
 	}
@@ -231,9 +224,7 @@ func TestAuthenticatedUserListsAcademicYearsWithoutAdminMetadata(t *testing.T) {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 	var body []map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	decodeSuccessData(t, res, &body)
 	if len(body) != 1 || body[0]["uuid"] != yearUUID.String() || body[0]["year"] != float64(2569) || body[0]["current_semester"] != float64(2) {
 		t.Fatalf("body = %+v", body)
 	}
@@ -263,7 +254,7 @@ func TestAdminCreatesAndSetsCurrentAcademicYear(t *testing.T) {
 			t.Fatalf("app.Test() error = %v", err)
 		}
 		defer res.Body.Close()
-		if got, want := res.StatusCode, http.StatusCreated; got != want {
+		if got, want := res.StatusCode, http.StatusOK; got != want {
 			t.Fatalf("status = %d, want %d", got, want)
 		}
 	})
@@ -289,9 +280,7 @@ func TestAdminCreatesAndSetsCurrentAcademicYear(t *testing.T) {
 			t.Fatalf("status = %d, want %d", got, want)
 		}
 		var body admin.AcademicYearSummary
-		if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-			t.Fatalf("decode response: %v", err)
-		}
+		decodeSuccessData(t, res, &body)
 		if !body.IsCurrent || body.CurrentSemester != 2 {
 			t.Fatalf("body = %+v, want current second semester", body)
 		}

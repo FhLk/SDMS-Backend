@@ -94,7 +94,7 @@ func (h authHandler) login(c fiber.Ctx) error {
 	}
 
 	h.setSessionCookie(c, result.Token, result.ExpiresAt)
-	return c.Status(fiber.StatusOK).JSON(messageResponse{Message: "Logged in"})
+	return ResponseSuccess(c, nil)
 }
 
 // logout revokes the server-side session and expires its matching browser cookie.
@@ -109,7 +109,7 @@ func (h authHandler) logout(c fiber.Ctx) error {
 	if err := h.service.Logout(c.Context(), token); err != nil {
 		return mapAuthError(err)
 	}
-	return c.Status(fiber.StatusOK).JSON(messageResponse{Message: "Logged out"})
+	return ResponseSuccess(c, nil)
 }
 
 // me นำ profile ที่ middleware ตรวจสอบแล้วมาสร้าง response โดยไม่ query ซ้ำ.
@@ -118,7 +118,7 @@ func (h authHandler) me(c fiber.Ctx) error {
 	if !ok {
 		return apperror.New(fiber.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
 	}
-	return c.Status(fiber.StatusOK).JSON(newMeResponse(profile))
+	return ResponseSuccess(c, newMeResponse(profile))
 }
 
 // setSessionCookie keeps the token inaccessible to JavaScript and limits normal

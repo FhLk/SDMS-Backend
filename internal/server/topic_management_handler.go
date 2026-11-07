@@ -1,8 +1,6 @@
 package server
 
 import (
-	"net/http"
-
 	"github.com/FhLk/SDMS-Backend/internal/admin"
 	"github.com/FhLk/SDMS-Backend/internal/apperror"
 	"github.com/FhLk/SDMS-Backend/internal/authorization"
@@ -75,7 +73,7 @@ func (h topicHandler) update(c fiber.Ctx) error {
 	if err != nil {
 		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
 	}
-	return c.JSON(response)
+	return ResponseSuccess(c, response)
 }
 
 func (h topicHandler) close(c fiber.Ctx) error {
@@ -102,7 +100,7 @@ func (h topicHandler) changeOpenState(c fiber.Ctx, open bool) error {
 	if err != nil {
 		return apperror.Wrap(fiber.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", err)
 	}
-	return c.JSON(response)
+	return ResponseSuccess(c, response)
 }
 
 func (h topicHandler) delete(c fiber.Ctx) error {
@@ -116,7 +114,7 @@ func (h topicHandler) delete(c fiber.Ctx) error {
 	if err := h.service.Delete(c.Context(), topicUUID); err != nil {
 		return mapTopicError(err)
 	}
-	return c.SendStatus(http.StatusNoContent)
+	return ResponseSuccess(c, nil)
 }
 
 // authorizedTopic โหลดข้อมูลเจ้าของหัวข้อก่อนใช้ policy กลาง เพื่อรองรับสิทธิ์
