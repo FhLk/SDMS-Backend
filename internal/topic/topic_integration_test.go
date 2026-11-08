@@ -57,15 +57,12 @@ func TestTopicServiceWithPostgreSQL(t *testing.T) {
 	if err := tx.Create(&users).Error; err != nil {
 		t.Fatalf("create users: %v", err)
 	}
-	memberships := []model.UserDivision{
-		{UserUUID: users[0].UUID, DivisionUUID: divisions[0].UUID},
-		{UserUUID: users[1].UUID, DivisionUUID: divisions[0].UUID},
-		{UserUUID: users[2].UUID, DivisionUUID: divisions[0].UUID},
-		{UserUUID: users[3].UUID, DivisionUUID: divisions[0].UUID},
-		{UserUUID: users[4].UUID, DivisionUUID: divisions[1].UUID},
+	if err := tx.Model(&divisions[0]).Update("head_user_uuid", users[1].UUID).Error; err != nil {
+		t.Fatalf("set division head: %v", err)
 	}
-	if err := tx.Create(&memberships).Error; err != nil {
-		t.Fatalf("create memberships: %v", err)
+	var activeAccountCount int64
+	if err := tx.Model(&model.User{}).Where("deactivated_at IS NULL").Count(&activeAccountCount).Error; err != nil {
+		t.Fatalf("count active accounts: %v", err)
 	}
 
 	service := NewService(tx)
@@ -102,13 +99,13 @@ func TestTopicServiceWithPostgreSQL(t *testing.T) {
 			t.Fatalf("field %d position = %d, want %d", index, field.Position, index+1)
 		}
 	}
-	if len(created.Assignees) != 2 {
-		t.Fatalf("assignees = %d, want active non-executive members only", len(created.Assignees))
+	if int64(len(created.Assignees)) != activeAccountCount {
+		t.Fatalf("assignees = %d, want all %d active accounts", len(created.Assignees), activeAccountCount)
 	}
 
 	assertTopicRelatedCount(t, tx, &model.TopicField{}, "topic_uuid = ?", 6, created.UUID)
 	assertTopicRelatedCount(t, tx, &model.TopicField{}, "topic_uuid = ? AND required = ?", 2, created.UUID, false)
-	assertTopicRelatedCount(t, tx, &model.TopicAssignee{}, "topic_uuid = ?", 2, created.UUID)
+	assertTopicRelatedCount(t, tx, &model.TopicAssignee{}, "topic_uuid = ?", activeAccountCount, created.UUID)
 	var assigneeUUIDs []uuid.UUID
 	if err := tx.Model(&model.TopicAssignee{}).
 		Where("topic_uuid = ?", created.UUID).
@@ -116,7 +113,12 @@ func TestTopicServiceWithPostgreSQL(t *testing.T) {
 		Pluck("user_uuid", &assigneeUUIDs).Error; err != nil {
 		t.Fatalf("list assignee UUIDs: %v", err)
 	}
-	wantAssignees := map[uuid.UUID]bool{users[0].UUID: false, users[1].UUID: false}
+	wantAssignees := map[uuid.UUID]bool{
+		users[0].UUID: false,
+		users[1].UUID: false,
+		users[2].UUID: false,
+		users[4].UUID: false,
+	}
 	for _, userUUID := range assigneeUUIDs {
 		if _, expected := wantAssignees[userUUID]; expected {
 			wantAssignees[userUUID] = true
@@ -124,12 +126,12 @@ func TestTopicServiceWithPostgreSQL(t *testing.T) {
 	}
 	for userUUID, found := range wantAssignees {
 		if !found {
-			t.Errorf("active division member %s is missing from assignees: %v", userUUID, assigneeUUIDs)
+			t.Errorf("active account %s is missing from assignees: %v", userUUID, assigneeUUIDs)
 		}
 	}
 
 	// เมื่อระบุรายชื่อเอง ต้องสร้าง assignment เฉพาะคนที่เลือกและปฏิเสธคนที่ไม่เข้าเงื่อนไข.
-	selectedAssignees := []uuid.UUID{users[1].UUID}
+	selectedAssignees := []uuid.UUID{users[2].UUID}
 	selectedTitle := title + " selected assignee"
 	selectedTopic, err := service.Create(context.Background(), CreateInput{
 		DivisionUUID:  divisions[0].UUID,
@@ -142,11 +144,11 @@ func TestTopicServiceWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create(selected assignee) error = %v", err)
 	}
-	if len(selectedTopic.Assignees) != 1 || selectedTopic.Assignees[0].UserUUID != users[1].UUID {
+	if len(selectedTopic.Assignees) != 1 || selectedTopic.Assignees[0].UserUUID != users[2].UUID {
 		t.Fatalf("selected assignees = %+v", selectedTopic.Assignees)
 	}
 
-	ineligibleAssignees := []uuid.UUID{users[2].UUID}
+	ineligibleAssignees := []uuid.UUID{users[3].UUID}
 	ineligibleTitle := title + " ineligible assignee"
 	_, err = service.Create(context.Background(), CreateInput{
 		DivisionUUID:  divisions[0].UUID,
@@ -179,7 +181,7 @@ func TestTopicServiceWithPostgreSQL(t *testing.T) {
 	}
 	assertTopicRelatedCount(t, tx, &model.Topic{}, "title = ?", 0, invalidTitle)
 
-	// ฝ่ายที่ไม่มีสมาชิกต้องไม่ทิ้งหัวข้อว่างซึ่งไม่มีใครสามารถส่งได้.
+	// ฝ่ายใหม่ใช้กลุ่มผู้ส่งสากลชุดเดียวกันโดยไม่ต้องสร้าง membership.
 	emptyDivision := model.Division{
 		Code:      "x" + suffix[:6],
 		Name:      "ฝ่ายทดสอบว่าง " + suffix,
@@ -190,17 +192,19 @@ func TestTopicServiceWithPostgreSQL(t *testing.T) {
 		t.Fatalf("create empty division: %v", err)
 	}
 	emptyTitle := title + " empty division"
-	_, err = service.Create(context.Background(), CreateInput{
+	emptyDivisionTopic, err := service.Create(context.Background(), CreateInput{
 		DivisionUUID:  emptyDivision.UUID,
 		CreatedByUUID: users[0].UUID,
 		Title:         emptyTitle,
 		DueDate:       "2026-10-31",
 		Fields:        []FieldInput{{Type: model.FieldText, Label: "ข้อความ"}},
 	})
-	if !errors.Is(err, ErrNoEligibleAssignees) {
-		t.Fatalf("Create(empty division) error = %v, want ErrNoEligibleAssignees", err)
+	if err != nil {
+		t.Fatalf("Create(new division) error = %v", err)
 	}
-	assertTopicRelatedCount(t, tx, &model.Topic{}, "title = ?", 0, emptyTitle)
+	if int64(len(emptyDivisionTopic.Assignees)) != activeAccountCount {
+		t.Fatalf("new division assignees = %d, want %d active accounts", len(emptyDivisionTopic.Assignees), activeAccountCount)
+	}
 
 	// หากไม่มีปีปัจจุบัน transaction ต้องหยุดก่อนสร้าง topic.
 	if err := tx.Model(&model.AcademicYear{}).
@@ -252,9 +256,6 @@ func TestTopicManagementServiceWithPostgreSQL(t *testing.T) {
 	if err := tx.Create(&creator).Error; err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	if err := tx.Create(&model.UserDivision{UserUUID: creator.UUID, DivisionUUID: division.UUID}).Error; err != nil {
-		t.Fatalf("create membership: %v", err)
-	}
 	secondAssignee := model.User{
 		Username:     "be09." + suffix + ".second",
 		PasswordHash: "integration-hash",
@@ -262,9 +263,6 @@ func TestTopicManagementServiceWithPostgreSQL(t *testing.T) {
 	}
 	if err := tx.Create(&secondAssignee).Error; err != nil {
 		t.Fatalf("create second assignee: %v", err)
-	}
-	if err := tx.Create(&model.UserDivision{UserUUID: secondAssignee.UUID, DivisionUUID: division.UUID}).Error; err != nil {
-		t.Fatalf("create second assignee membership: %v", err)
 	}
 
 	service := NewService(tx)

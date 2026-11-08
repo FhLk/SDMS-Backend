@@ -44,16 +44,15 @@ func TestUserServiceWithPostgreSQL(t *testing.T) {
 	service := NewUserService(tx)
 	username := "be05." + uuid.NewString()[:8]
 	created, err := service.CreateUser(context.Background(), CreateUserInput{
-		Username:      username,
-		Password:      "old-password",
-		FullName:      "ผู้ใช้ทดสอบ BE-05",
-		DivisionUUIDs: []uuid.UUID{divisions[0].UUID, divisions[1].UUID},
+		Username: username,
+		Password: "old-password",
+		FullName: "ผู้ใช้ทดสอบ BE-05",
 	})
 	if err != nil {
 		t.Fatalf("CreateUser() error = %v", err)
 	}
-	if created.UUID == uuid.Nil || len(created.Divisions) != 2 {
-		t.Fatalf("created user = %+v, want UUID and two divisions", created)
+	if created.UUID == uuid.Nil || len(created.Divisions) < len(divisions) {
+		t.Fatalf("created user = %+v, want UUID and all universal divisions", created)
 	}
 	if bcrypt.CompareHashAndPassword([]byte(created.PasswordHash), []byte("old-password")) != nil {
 		t.Fatal("created password is not a bcrypt hash of the supplied password")
@@ -166,32 +165,21 @@ func TestUserImportServiceWithPostgreSQL(t *testing.T) {
 		t.Fatalf("open PostgreSQL: %v", err)
 	}
 	// ใช้ outer transaction แล้ว rollback หลัง test เพื่อพิสูจน์การบันทึกจริง
-	// โดยไม่ทิ้งบัญชีหรือความสัมพันธ์ฝ่ายไว้ในฐานข้อมูลของผู้พัฒนา.
+	// โดยไม่ทิ้งบัญชีไว้ในฐานข้อมูลของผู้พัฒนา.
 	tx := db.Begin()
 	if tx.Error != nil {
 		t.Fatalf("begin transaction: %v", tx.Error)
 	}
 	t.Cleanup(func() { _ = tx.Rollback().Error })
 
-	var divisions []model.Division
-	if err := tx.Order("sort_order").Limit(2).Find(&divisions).Error; err != nil {
-		t.Fatalf("find seeded divisions: %v", err)
-	}
-	if len(divisions) != 2 {
-		t.Fatalf("seeded divisions = %d, want at least 2", len(divisions))
-	}
-
 	service := NewUserService(tx)
 	suffix := uuid.NewString()[:8]
 	firstUsername := "be06." + suffix + ".one"
 	secondUsername := "be06." + suffix + ".two"
 	validCSV := fmt.Sprintf(
-		"ชื่อ-สกุล,username,รหัสผ่านเริ่มต้น,ฝ่าย\nครู หนึ่ง,%s,safe-password,%s|%s\nครู สอง,%s,other-password,%s\n",
+		"ชื่อ-สกุล,username,รหัสผ่านเริ่มต้น\nครู หนึ่ง,%s,safe-password\nครู สอง,%s,other-password\n",
 		firstUsername,
-		divisions[0].Code,
-		divisions[1].ShortName,
 		secondUsername,
-		divisions[1].Name,
 	)
 	result, err := service.ImportUsers(context.Background(), "users.csv", []byte(validCSV))
 	if err != nil {
@@ -212,15 +200,12 @@ func TestUserImportServiceWithPostgreSQL(t *testing.T) {
 	if bcrypt.CompareHashAndPassword([]byte(firstUser.PasswordHash), []byte("safe-password")) != nil {
 		t.Fatal("imported password is not stored as the expected bcrypt hash")
 	}
-	assertIntegrationRowCount(t, tx, &model.UserDivision{}, "user_uuid = ?", firstUser.UUID, 2)
-
 	// เมื่อไฟล์มีทั้งแถวที่ถูกและผิด ต้องรายงาน error แล้วไม่เขียนแม้แต่แถวที่ถูก.
 	atomicUsername := "be06." + suffix + ".atomic"
 	invalidUsername := "be06." + suffix + ".invalid"
 	invalidCSV := fmt.Sprintf(
-		"ชื่อ-สกุล,username,รหัสผ่านเริ่มต้น,ฝ่าย\nครู ผ่าน,%s,safe-password,%s\nครู ไม่ผ่าน,%s,safe-password,ฝ่ายที่ไม่มี\n",
+		"ชื่อ-สกุล,username,รหัสผ่านเริ่มต้น\nครู ผ่าน,%s,safe-password\nครู ไม่ผ่าน,%s,short\n",
 		atomicUsername,
-		divisions[0].Code,
 		invalidUsername,
 	)
 	_, err = service.ImportUsers(context.Background(), "users.csv", []byte(invalidCSV))

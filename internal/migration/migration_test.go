@@ -33,7 +33,7 @@ func TestCurrentAcademicPeriod(t *testing.T) {
 }
 
 func TestSchemaModelsContainsCurrentTables(t *testing.T) {
-	if got, want := len(SchemaModels()), 10; got != want {
+	if got, want := len(SchemaModels()), 9; got != want {
 		t.Fatalf("len(SchemaModels()) = %d, want %d", got, want)
 	}
 }

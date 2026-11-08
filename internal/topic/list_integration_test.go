@@ -56,22 +56,17 @@ func TestListDivisionTopicsWithPostgreSQL(t *testing.T) {
 	if err := tx.Create(&users).Error; err != nil {
 		t.Fatalf("create users: %v", err)
 	}
-	for _, user := range users {
-		if err := tx.Create(&model.UserDivision{UserUUID: user.UUID, DivisionUUID: division.UUID}).Error; err != nil {
-			t.Fatalf("create membership: %v", err)
-		}
-	}
-
 	service := NewService(tx)
 	service.now = func() time.Time {
 		return time.Date(2026, time.October, 13, 12, 0, 0, 0, topicBangkokLocation)
 	}
+	assigneeUUIDs := []uuid.UUID{users[0].UUID, users[1].UUID, users[2].UUID}
 	topics := []model.Topic{
-		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, "BE-10 submitted "+suffix, "2026-10-10"),
-		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, "BE-10 late "+suffix, "2026-10-11"),
-		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, "BE-10 overdue "+suffix, "2026-10-12"),
-		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, "BE-10 pending "+suffix, "2026-10-14"),
-		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, "BE-10 closed "+suffix, "2026-10-09"),
+		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, assigneeUUIDs, "BE-10 submitted "+suffix, "2026-10-10"),
+		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, assigneeUUIDs, "BE-10 late "+suffix, "2026-10-11"),
+		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, assigneeUUIDs, "BE-10 overdue "+suffix, "2026-10-12"),
+		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, assigneeUUIDs, "BE-10 pending "+suffix, "2026-10-14"),
+		createListIntegrationTopic(t, service, division.UUID, users[0].UUID, assigneeUUIDs, "BE-10 closed "+suffix, "2026-10-09"),
 	}
 	if _, err := service.SetOpen(context.Background(), topics[4].UUID, false); err != nil {
 		t.Fatalf("close topic: %v", err)
@@ -119,8 +114,8 @@ func TestListDivisionTopicsWithPostgreSQL(t *testing.T) {
 		if item.UUID != topics[index].UUID {
 			t.Fatalf("topic %d UUID = %s, want %s", index, item.UUID, topics[index].UUID)
 		}
-		if item.AssigneeCount != 2 {
-			t.Fatalf("topic %d assignee_count = %d, want active non-executive snapshot size 2", index, item.AssigneeCount)
+		if item.AssigneeCount != 3 {
+			t.Fatalf("topic %d assignee_count = %d, want selected snapshot size 3", index, item.AssigneeCount)
 		}
 		wantSubmitted := int64(0)
 		if index < 2 {
@@ -137,14 +132,14 @@ func TestListDivisionTopicsWithPostgreSQL(t *testing.T) {
 		t.Fatal("closed topic was not sorted at the end")
 	}
 
-	// ผู้บริหารไม่อยู่ใน snapshot แต่ยังดูรายการได้ และ x/y ต้องไม่เปลี่ยนตามผู้ดู.
+	// ผู้บริหารเลือกเป็นผู้ต้องส่งได้เหมือนบัญชีที่เปิดใช้งานอื่น.
 	executiveResult, err := service.ListDivisionTopics(context.Background(), division.Code, &currentYear.Year, users[2].UUID)
 	if err != nil {
 		t.Fatalf("ListDivisionTopics(executive) error = %v", err)
 	}
 	for index, item := range executiveResult.Topics {
-		if item.IsAssigned || item.MyStatus != nil {
-			t.Fatalf("executive topic %d assignment/status = %v/%v, want false/nil", index, item.IsAssigned, item.MyStatus)
+		if !item.IsAssigned || item.MyStatus == nil {
+			t.Fatalf("executive topic %d assignment/status = %v/%v, want assigned status", index, item.IsAssigned, item.MyStatus)
 		}
 		if item.AssigneeCount != result.Topics[index].AssigneeCount || item.SubmittedCount != result.Topics[index].SubmittedCount {
 			t.Fatalf("counts changed by viewer: target=%+v executive=%+v", result.Topics[index], item)
@@ -169,7 +164,7 @@ func TestListDivisionTopicsWithPostgreSQL(t *testing.T) {
 	}
 }
 
-func createListIntegrationTopic(t *testing.T, service *Service, divisionUUID, creatorUUID uuid.UUID, title, dueDate string) model.Topic {
+func createListIntegrationTopic(t *testing.T, service *Service, divisionUUID, creatorUUID uuid.UUID, assigneeUUIDs []uuid.UUID, title, dueDate string) model.Topic {
 	t.Helper()
 	created, err := service.Create(context.Background(), CreateInput{
 		DivisionUUID:  divisionUUID,
@@ -177,6 +172,7 @@ func createListIntegrationTopic(t *testing.T, service *Service, divisionUUID, cr
 		Title:         title,
 		DueDate:       dueDate,
 		Fields:        []FieldInput{{Type: model.FieldText, Label: "รายละเอียด"}},
+		AssigneeUUIDs: &assigneeUUIDs,
 	})
 	if err != nil {
 		t.Fatalf("Create(%q) error = %v", title, err)

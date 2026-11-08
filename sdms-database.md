@@ -30,8 +30,6 @@ ER diagram พจนานุกรมข้อมูล และ GORM models �
 
 ```mermaid
 erDiagram
-  accounts ||--o{ user_divisions : "สังกัด"
-  divisions ||--o{ user_divisions : "มีสมาชิก"
   accounts |o--o| divisions : "เป็นหัวหน้า"
   academic_years ||--o{ topics : "มี"
   divisions ||--o{ topics : "เปิด"
@@ -68,11 +66,6 @@ erDiagram
     varchar name
     varchar short_name
     uuid head_user_uuid FK,UK
-  }
-  user_divisions {
-    uuid uuid PK
-    uuid user_uuid FK
-    uuid division_uuid FK
   }
   academic_years {
     uuid uuid PK
@@ -144,7 +137,7 @@ erDiagram
 - เปลี่ยนชนิดของช่องที่มีคำตอบแล้วไม่ได้ (409)
 - ช่องตัวเลือกต้องมีอย่างน้อย 2 ข้อ
 - ค่าใน `submissions.values` ต้องตรงกับชนิดของช่อง (หัวข้อ 5)
-- ส่งได้เฉพาะคนที่อยู่ใน `topic_assignees` และหัวข้อยังเปิดรับ; รายชื่อใหม่ต้องเป็นสมาชิกฝ่ายที่เปิดใช้งานและไม่ใช่ผู้บริหาร
+- ส่งได้เฉพาะคนที่อยู่ใน `topic_assignees` และหัวข้อยังเปิดรับ; รายชื่อใหม่ต้องเป็นบัญชีที่เปิดใช้งาน แต่เป็นหัวหน้าฝ่าย ผู้บริหาร หรือแอดมินได้
 - ไฟล์ที่แนบต้องเป็นของคนส่ง อยู่หัวข้อเดียวกัน และช่องเดียวกัน
 
 ## 4. พจนานุกรมข้อมูล
@@ -165,7 +158,7 @@ erDiagram
 | `prefix` | varchar(30) | – | `''` | คำนำหน้า เช่น นาย นาง นางสาว |
 | `first_name` | varchar(120) | – | – | ชื่อ |
 | `last_name` | varchar(120) | – | `''` | นามสกุล; ว่างได้ในเชิงธุรกิจสำหรับบัญชีระบบ แต่เก็บเป็นข้อความว่างแทน NULL |
-| `is_exec` | boolean | – | `false` | ผู้บริหาร: ไม่ต้องส่ง เห็นภาพรวมทุกฝ่าย |
+| `is_exec` | boolean | – | `false` | ผู้บริหาร: เห็นภาพรวมทุกฝ่าย และเป็นผู้ต้องส่งได้เมื่อถูกเลือก |
 | `is_admin` | boolean | – | `false` | แอดมินกลาง: จัดการบุคลากร ฝ่าย ปีการศึกษา |
 | `deactivated_at` | timestamptz | ✓ | – | เวลาที่ปิดใช้งาน ว่าง = ใช้งานอยู่ ปิดแล้วเข้าระบบไม่ได้ แต่คำตอบเดิมยังอยู่ |
 | `created_at / updated_at` | timestamptz | ✓ | – | GORM ใส่ให้อัตโนมัติ |
@@ -234,27 +227,6 @@ erDiagram
 **หมายเหตุ**
 
 - ตั้งผู้บริหารเป็นหัวหน้าฝ่ายไม่ได้ (ตรวจในโค้ด BE-07)
-
-#### `user_divisions`
-
-การสังกัดฝ่าย 1 คนสังกัดได้หลายฝ่าย
-
-| คอลัมน์ | ชนิด | ว่างได้ | ค่าเริ่มต้น | ความหมาย |
-| --- | --- | --- | --- | --- |
-| `uuid` | uuid | – | UUIDv7 | รหัสการสังกัดฝ่าย |
-| `user_uuid` | uuid | – | – | → accounts.uuid |
-| `division_uuid` | uuid | – | – | → divisions.uuid |
-
-**คีย์และ index**
-
-- PK uuid
-- UNIQUE (user_uuid, division_uuid)
-- FK ทั้งสองคอลัมน์ ON DELETE CASCADE
-- INDEX user_uuid, division_uuid
-
-**หมายเหตุ**
-
-- ใช้หาว่าใครต้องส่งหัวข้อของฝ่ายไหน
 
 #### `academic_years`
 
@@ -358,8 +330,8 @@ erDiagram
 
 **หมายเหตุ**
 
-- ตอนสร้างหัวข้อ: ใส่ทุกคนที่สังกัดฝ่ายของหัวข้อ ไม่ใช่ผู้บริหาร และยังไม่ถูกปิดใช้งาน
-- ครูที่เข้าใหม่หรือย้ายเข้าฝ่ายทีหลังไม่ถูกนับในหัวข้อที่เปิดไปแล้ว
+- ตอนสร้างหัวข้อ: เลือกบัญชีที่เปิดใช้งานได้ทุกบทบาท รวมทั้งหัวหน้าฝ่ายและผู้บริหาร; ถ้าไม่ระบุรายชื่อจะใส่บัญชีเปิดใช้งานทั้งหมด
+- บัญชีที่สร้างใหม่ภายหลังไม่ถูกนับในหัวข้อที่เปิดไปแล้ว เพราะตารางนี้เป็น snapshot
 - แนะนำ: เมื่อปิดใช้งานบุคลากร ลบแถวของคนนั้นในหัวข้อที่ยังเปิดและยังไม่ได้ส่ง
 
 ### คำตอบและไฟล์
@@ -497,8 +469,9 @@ object ที่ key คือ `topic_fields.uuid` (เป็นข้อคว�
 โมเดลที่ใช้งานจริงอยู่ใน [`internal/model/models.go`](internal/model/models.go) และ initializer/migration อยู่ใน [`internal/migration/migration.go`](internal/migration/migration.go)
 
 - ทุก model embed `UUIDModel` ซึ่งสร้าง UUIDv7 อัตโนมัติใน `BeforeCreate`
-- ตารางเชื่อม `user_divisions` และ `topic_assignees` มี `uuid` ของตัวเอง พร้อม unique composite key ป้องกันความสัมพันธ์ซ้ำ
+- `topic_assignees` มี `uuid` ของตัวเอง พร้อม unique composite key ป้องกันความสัมพันธ์ซ้ำ
 - migration เปลี่ยนชื่อตารางเดิม `users` เป็น `accounts` โดยรักษาข้อมูลและ foreign key เดิมไว้ แล้วลบคอลัมน์ `position`
+- migration ลบตารางเดิม `user_divisions` เพราะบุคลากรทุกคนอยู่ทุกฝ่ายโดยอัตโนมัติ
 - ฐานข้อมูลใหม่สร้าง schema ด้วย AutoMigrate และเติมข้อมูลตั้งต้นใน transaction เดียว
 - รายการ model ทั้งหมดอยู่ใน `migration.SchemaModels()` เพื่อให้ตารางที่ initializer สร้างตรงกับระบบปัจจุบัน
 
@@ -723,8 +696,8 @@ func Migrate(db *gorm.DB) error {
 
 | Issue | ปรับ |
 | --- | --- |
-| BE-02 | รายการตารางเพิ่ม `topic_assignees`, `sessions` (รวม 10 ตาราง) |
+| BE-02 | รายการตารางเพิ่ม `topic_assignees`, `sessions` และเลิกใช้ `user_divisions` (รวม 9 ตาราง) |
 | BE-05 | ปิดใช้งานหรือตั้งรหัสใหม่ → ลบแถวใน `sessions` ของคนนั้น · แนะนำให้ลบออกจาก `topic_assignees` ของหัวข้อที่ยังเปิดและยังไม่ส่ง |
 | BE-08 | สร้างหัวข้อ + ช่อง + `topic_assignees` ใน transaction เดียว |
-| BE-10, BE-13, BE-15 | y และแถวในตารางคำตอบนับจาก `topic_assignees` ไม่ใช่สมาชิกฝ่ายในวันนี้ |
+| BE-10, BE-13, BE-15 | y และแถวในตารางคำตอบนับจาก snapshot ใน `topic_assignees` |
 | BE-12 | ตรวจว่าคนส่งอยู่ใน `topic_assignees` ของหัวข้อนั้น |

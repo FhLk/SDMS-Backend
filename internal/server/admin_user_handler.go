@@ -35,22 +35,20 @@ type createUserRequest struct {
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 	// FullName remains accepted as a backward-compatible fallback.
-	FullName      string      `json:"full_name"`
-	DivisionUUIDs []uuid.UUID `json:"division_uuids"`
-	IsExec        bool        `json:"is_exec"`
-	IsAdmin       bool        `json:"is_admin"`
+	FullName string `json:"full_name"`
+	IsExec   bool   `json:"is_exec"`
+	IsAdmin  bool   `json:"is_admin"`
 }
 
 type updateUserRequest struct {
-	Username      *string      `json:"username"`
-	Prefix        *string      `json:"prefix"`
-	FirstName     *string      `json:"first_name"`
-	LastName      *string      `json:"last_name"`
-	FullName      *string      `json:"full_name"`
-	DivisionUUIDs *[]uuid.UUID `json:"division_uuids"`
-	IsExec        *bool        `json:"is_exec"`
-	IsAdmin       *bool        `json:"is_admin"`
-	IsActive      *bool        `json:"is_active"`
+	Username  *string `json:"username"`
+	Prefix    *string `json:"prefix"`
+	FirstName *string `json:"first_name"`
+	LastName  *string `json:"last_name"`
+	FullName  *string `json:"full_name"`
+	IsExec    *bool   `json:"is_exec"`
+	IsAdmin   *bool   `json:"is_admin"`
+	IsActive  *bool   `json:"is_active"`
 }
 
 type resetPasswordRequest struct {
@@ -125,7 +123,7 @@ func (h adminUserHandler) listDirectory(c fiber.Ctx) error {
 			LastName:                user.LastName,
 			FullName:                user.DisplayName(),
 			Divisions:               divisionResponses(user.Divisions),
-			IsTopicAssigneeEligible: !user.IsExec,
+			IsTopicAssigneeEligible: true,
 		})
 	}
 	return ResponseSuccess(c, responses)
@@ -142,15 +140,14 @@ func (h adminUserHandler) create(c fiber.Ctx) error {
 		return apperror.Wrap(fiber.StatusBadRequest, "INVALID_REQUEST", "Invalid request body", err)
 	}
 	user, err := h.service.CreateUser(c.Context(), admin.CreateUserInput{
-		Username:      request.Username,
-		Password:      request.Password,
-		Prefix:        request.Prefix,
-		FirstName:     request.FirstName,
-		LastName:      request.LastName,
-		FullName:      request.FullName,
-		DivisionUUIDs: request.DivisionUUIDs,
-		IsExec:        request.IsExec,
-		IsAdmin:       request.IsAdmin,
+		Username:  request.Username,
+		Password:  request.Password,
+		Prefix:    request.Prefix,
+		FirstName: request.FirstName,
+		LastName:  request.LastName,
+		FullName:  request.FullName,
+		IsExec:    request.IsExec,
+		IsAdmin:   request.IsAdmin,
 	})
 	if err != nil {
 		return mapAdminUserError(err)
@@ -173,15 +170,14 @@ func (h adminUserHandler) update(c fiber.Ctx) error {
 		return apperror.Wrap(fiber.StatusBadRequest, "INVALID_REQUEST", "Invalid request body", err)
 	}
 	user, err := h.service.UpdateUser(c.Context(), userUUID, admin.UpdateUserInput{
-		Username:      request.Username,
-		Prefix:        request.Prefix,
-		FirstName:     request.FirstName,
-		LastName:      request.LastName,
-		FullName:      request.FullName,
-		DivisionUUIDs: request.DivisionUUIDs,
-		IsExec:        request.IsExec,
-		IsAdmin:       request.IsAdmin,
-		IsActive:      request.IsActive,
+		Username:  request.Username,
+		Prefix:    request.Prefix,
+		FirstName: request.FirstName,
+		LastName:  request.LastName,
+		FullName:  request.FullName,
+		IsExec:    request.IsExec,
+		IsAdmin:   request.IsAdmin,
+		IsActive:  request.IsActive,
 	})
 	if err != nil {
 		return mapAdminUserError(err)

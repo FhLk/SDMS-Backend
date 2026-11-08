@@ -122,7 +122,8 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	return nil
 }
 
-// CurrentUser validates a session and returns the user's divisions and headed divisions.
+// CurrentUser validates a session and returns all universal divisions plus the
+// subset that the user currently heads.
 func (s *Service) CurrentUser(ctx context.Context, token string) (Profile, error) {
 	if token == "" {
 		return Profile{}, ErrUnauthenticated
@@ -130,9 +131,7 @@ func (s *Service) CurrentUser(ctx context.Context, token string) (Profile, error
 
 	var session model.Session
 	query := s.db.WithContext(ctx).
-		Preload("User.Divisions", func(db *gorm.DB) *gorm.DB {
-			return db.Order("divisions.sort_order")
-		}).
+		Preload("User").
 		Where("token_hash = ?", hashToken(token)).
 		Limit(1).
 		Find(&session)
@@ -149,6 +148,14 @@ func (s *Service) CurrentUser(ctx context.Context, token string) (Profile, error
 		_ = s.db.WithContext(ctx).Where("token_hash = ?", session.TokenHash).Delete(&model.Session{}).Error
 		return Profile{}, ErrUnauthenticated
 	}
+
+	var divisions []model.Division
+	if err := s.db.WithContext(ctx).
+		Order("sort_order, code").
+		Find(&divisions).Error; err != nil {
+		return Profile{}, fmt.Errorf("list universal divisions: %w", err)
+	}
+	session.User.Divisions = divisions
 
 	var headDivisions []model.Division
 	if err := s.db.WithContext(ctx).
@@ -169,7 +176,7 @@ func (s *Service) CurrentUser(ctx context.Context, token string) (Profile, error
 
 	return Profile{
 		User:          session.User,
-		Divisions:     session.User.Divisions,
+		Divisions:     divisions,
 		HeadDivisions: headDivisions,
 	}, nil
 }

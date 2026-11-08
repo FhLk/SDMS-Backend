@@ -62,11 +62,8 @@ func TestUploadServiceWithPostgreSQL(t *testing.T) {
 	if err := tx.Where("username = ?", outsider.Username).Take(&outsider).Error; err != nil {
 		t.Fatalf("reload outsider: %v", err)
 	}
-	if err := tx.Create(&model.UserDivision{UserUUID: user.UUID, DivisionUUID: division.UUID}).Error; err != nil {
-		t.Fatalf("create membership: %v", err)
-	}
-
 	topicService := topic.NewService(tx)
+	assigneeUUIDs := []uuid.UUID{user.UUID}
 	createdTopic, err := topicService.Create(context.Background(), topic.CreateInput{
 		DivisionUUID:  division.UUID,
 		CreatedByUUID: user.UUID,
@@ -76,6 +73,7 @@ func TestUploadServiceWithPostgreSQL(t *testing.T) {
 			{Position: 1, Type: model.FieldFile, Label: "หลักฐาน", Required: true},
 			{Position: 2, Type: model.FieldText, Label: "หมายเหตุ", Required: false},
 		},
+		AssigneeUUIDs: &assigneeUUIDs,
 	})
 	if err != nil {
 		t.Fatalf("create topic: %v", err)

@@ -1029,6 +1029,7 @@ components:
         is_admin: {type: boolean}
         divisions:
           type: array
+          description: All system divisions; personnel membership is universal.
           items: {$ref: '#/components/schemas/Division'}
         head_divisions:
           type: array
@@ -1044,8 +1045,11 @@ components:
         full_name: {type: string}
         divisions:
           type: array
+          description: All system divisions; personnel membership is universal.
           items: {$ref: '#/components/schemas/Division'}
-        is_topic_assignee_eligible: {type: boolean}
+        is_topic_assignee_eligible:
+          type: boolean
+          description: Always true for active accounts, including executives and division heads.
     AcademicYear:
       type: object
       required: [uuid, year, is_current, current_semester]
@@ -1436,13 +1440,14 @@ components:
         is_active: {type: boolean}
         divisions:
           type: array
+          description: All system divisions; personnel membership is universal.
           items: {$ref: '#/components/schemas/Division'}
         deactivated_at: {type: string, format: date-time, nullable: true}
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
     CreateUserRequest:
       type: object
-      required: [username, password, prefix, first_name, last_name, division_uuids]
+      required: [username, password, prefix, first_name, last_name]
       properties:
         username: {type: string}
         password: {type: string, format: password}
@@ -1450,9 +1455,6 @@ components:
         first_name: {type: string}
         last_name: {type: string}
         full_name: {type: string, deprecated: true}
-        division_uuids:
-          type: array
-          items: {type: string, format: uuid}
         is_exec: {type: boolean}
         is_admin: {type: boolean}
     UpdateUserRequest:
@@ -1463,9 +1465,6 @@ components:
         first_name: {type: string}
         last_name: {type: string}
         full_name: {type: string, deprecated: true}
-        division_uuids:
-          type: array
-          items: {type: string, format: uuid}
         is_exec: {type: boolean}
         is_admin: {type: boolean}
         is_active: {type: boolean}

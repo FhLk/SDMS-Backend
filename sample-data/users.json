@@ -2,20 +2,13 @@
   "meta": {
     "environment": "development-only",
     "default_password": "Demo1234!",
-    "division_codes": {
-      "aca": "ฝ่ายวิชาการ",
-      "bud": "ฝ่ายงบประมาณ",
-      "per": "ฝ่ายบุคคล",
-      "gen": "ฝ่ายทั่วไป"
-    },
-    "membership_policy": "ครูและหัวหน้าฝ่ายทุกคนสังกัดทั้ง 4 ฝ่าย ส่วนเจ้าหน้าที่สังกัดเฉพาะฝ่ายตามหน้าที่",
     "division_heads": {
       "aca": "head.aca",
       "bud": "head.bud",
       "per": "head.per",
       "gen": "head.gen"
     },
-    "usage_note": "รัน go run ./cmd/seed-sample เพื่อแปลง division_codes เป็น UUID ผูกสมาชิก ตั้งหัวหน้าฝ่าย และซ่อมหัวข้อเปิดที่เคยไม่มีผู้ต้องส่ง"
+    "usage_note": "รัน go run ./cmd/seed-sample เพื่อสร้างบัญชี ตั้งหัวหน้าฝ่าย และซ่อมหัวข้อเปิดที่เคยไม่มีผู้ต้องส่ง โดยผู้ใช้ที่เปิดใช้งานทุกคนเลือกเป็นผู้ต้องส่งได้"
   },
   "users": [
     {
@@ -24,7 +17,6 @@
       "prefix": "นาย",
       "first_name": "ธนา",
       "last_name": "พิทักษ์ระบบ",
-      "division_codes": ["aca"],
       "is_exec": false,
       "is_admin": true    },
     {
@@ -33,7 +25,6 @@
       "prefix": "นาย",
       "first_name": "นรินทร์",
       "last_name": "วัฒนกิจ",
-      "division_codes": [],
       "is_exec": true,
       "is_admin": false    },
     {
@@ -42,7 +33,6 @@
       "prefix": "นางสาว",
       "first_name": "อรทัย",
       "last_name": "แสงวิชา",
-      "division_codes": ["aca", "bud", "per", "gen"],
       "is_exec": false,
       "is_admin": false
     },
@@ -52,7 +42,6 @@
       "prefix": "นาย",
       "first_name": "วีรพล",
       "last_name": "ทรัพย์มั่น",
-      "division_codes": ["aca", "bud", "per", "gen"],
       "is_exec": false,
       "is_admin": false
     },
@@ -62,7 +51,6 @@
       "prefix": "นาง",
       "first_name": "สุมาลี",
       "last_name": "คนดี",
-      "division_codes": ["aca", "bud", "per", "gen"],
       "is_exec": false,
       "is_admin": false
     },
@@ -72,7 +60,6 @@
       "prefix": "นาย",
       "first_name": "ชาญชัย",
       "last_name": "งานพร้อม",
-      "division_codes": ["aca", "bud", "per", "gen"],
       "is_exec": false,
       "is_admin": false
     },
@@ -82,7 +69,6 @@
       "prefix": "นาย",
       "first_name": "กิตติพงษ์",
       "last_name": "รุ่งเรือง",
-      "division_codes": ["aca", "bud", "per", "gen"],
       "is_exec": false,
       "is_admin": false    
     },
@@ -92,7 +78,6 @@
       "prefix": "นางสาว",
       "first_name": "พิมพ์ชนก",
       "last_name": "จิตมั่น",
-      "division_codes": ["aca", "bud", "per", "gen"],
       "is_exec": false,
       "is_admin": false
     },
@@ -102,7 +87,6 @@
       "prefix": "นางสาว",
       "first_name": "นภัสสร",
       "last_name": "เงินดี",
-      "division_codes": ["bud"],
       "is_exec": false,
       "is_admin": false
     },
@@ -112,7 +96,6 @@
       "prefix": "นาย",
       "first_name": "ธีรภัทร",
       "last_name": "ตั้งใจ",
-      "division_codes": ["aca", "bud", "per", "gen"],
       "is_exec": false,
       "is_admin": false    
     },
@@ -122,7 +105,6 @@
       "prefix": "นางสาว",
       "first_name": "วราภรณ์",
       "last_name": "บุญช่วย",
-      "division_codes": ["per"],
       "is_exec": false,
       "is_admin": false    
     },
@@ -132,7 +114,6 @@
       "prefix": "นาย",
       "first_name": "ณัฐวุฒิ",
       "last_name": "สุขสันต์",
-      "division_codes": ["aca", "bud", "per", "gen"],
       "is_exec": false,
       "is_admin": false    
     },
@@ -142,7 +123,6 @@
       "prefix": "นาย",
       "first_name": "อดิศร",
       "last_name": "พร้อมงาน",
-      "division_codes": ["gen"],
       "is_exec": false,
       "is_admin": false    
     },
@@ -152,7 +132,6 @@
       "prefix": "นางสาว",
       "first_name": "ศิริพร",
       "last_name": "ใจงาม",
-      "division_codes": ["aca", "bud", "per", "gen"],
       "is_exec": false,
       "is_admin": false    
     },
@@ -162,7 +141,6 @@
       "prefix": "นางสาว",
       "first_name": "มณีรัตน์",
       "last_name": "พูนผล",
-      "division_codes": ["aca", "bud", "per", "gen"],
       "is_exec": false,
       "is_admin": false    
     }

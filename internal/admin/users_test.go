@@ -4,8 +4,6 @@ import (
 	"errors"
 	"strings"
 	"testing"
-
-	"github.com/google/uuid"
 )
 
 func TestValidateCreateUserInput(t *testing.T) {
@@ -84,22 +82,6 @@ func TestValidateUpdateUserInputRequiresAField(t *testing.T) {
 	falseValue := false
 	if err := validateUpdateUserInput(UpdateUserInput{IsActive: &falseValue}); err != nil {
 		t.Fatalf("validateUpdateUserInput(false field) error = %v", err)
-	}
-}
-
-func TestUniqueDivisionUUIDs(t *testing.T) {
-	first := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6f840001")
-	second := uuid.MustParse("0199d6d0-bec9-7aa0-b2d8-96dc6f840002")
-	got, err := uniqueDivisionUUIDs([]uuid.UUID{first, second, first})
-	if err != nil {
-		t.Fatalf("uniqueDivisionUUIDs() error = %v", err)
-	}
-	if len(got) != 2 || got[0] != first || got[1] != second {
-		t.Fatalf("uniqueDivisionUUIDs() = %v, want first and second", got)
-	}
-
-	if _, err := uniqueDivisionUUIDs([]uuid.UUID{uuid.Nil}); err == nil {
-		t.Fatal("uniqueDivisionUUIDs(nil UUID) error = nil, want validation error")
 	}
 }
 

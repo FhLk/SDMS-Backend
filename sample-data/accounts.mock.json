@@ -1,0 +1,119 @@
+{
+  "meta": {
+    "data_only": true,
+    "database_synced": false,
+    "default_password": "Mock1234!"
+  },
+  "accounts": [
+    {
+      "username": "admin.mock",
+      "password": "Mock1234!",
+      "prefix": "นาย",
+      "first_name": "ธนกร",
+      "last_name": "ดูแลระบบ",
+      "is_exec": false,
+      "is_admin": true,
+      "is_active": true
+    },
+    {
+      "username": "executive.mock",
+      "password": "Mock1234!",
+      "prefix": "นาง",
+      "first_name": "กมลวรรณ",
+      "last_name": "บริหารกิจ",
+      "is_exec": true,
+      "is_admin": false,
+      "is_active": true
+    },
+    {
+      "username": "head.academic",
+      "password": "Mock1234!",
+      "prefix": "นางสาว",
+      "first_name": "อรทัย",
+      "last_name": "แสงวิชา",
+      "is_exec": false,
+      "is_admin": false,
+      "is_active": true
+    },
+    {
+      "username": "head.budget",
+      "password": "Mock1234!",
+      "prefix": "นาย",
+      "first_name": "วีรพล",
+      "last_name": "ทรัพย์มั่น",
+      "is_exec": false,
+      "is_admin": false,
+      "is_active": true
+    },
+    {
+      "username": "head.personnel",
+      "password": "Mock1234!",
+      "prefix": "นาง",
+      "first_name": "สุมาลี",
+      "last_name": "คนดี",
+      "is_exec": false,
+      "is_admin": false,
+      "is_active": true
+    },
+    {
+      "username": "head.general",
+      "password": "Mock1234!",
+      "prefix": "นาย",
+      "first_name": "ชาญชัย",
+      "last_name": "งานพร้อม",
+      "is_exec": false,
+      "is_admin": false,
+      "is_active": true
+    },
+    {
+      "username": "teacher.mock01",
+      "password": "Mock1234!",
+      "prefix": "นาย",
+      "first_name": "กิตติพงษ์",
+      "last_name": "รุ่งเรือง",
+      "is_exec": false,
+      "is_admin": false,
+      "is_active": true
+    },
+    {
+      "username": "teacher.mock02",
+      "password": "Mock1234!",
+      "prefix": "นางสาว",
+      "first_name": "นภัสสร",
+      "last_name": "เงินดี",
+      "is_exec": false,
+      "is_admin": false,
+      "is_active": true
+    },
+    {
+      "username": "officer.personnel01",
+      "password": "Mock1234!",
+      "prefix": "นางสาว",
+      "first_name": "วราภรณ์",
+      "last_name": "บุญช่วย",
+      "is_exec": false,
+      "is_admin": false,
+      "is_active": true
+    },
+    {
+      "username": "officer.general01",
+      "password": "Mock1234!",
+      "prefix": "นาย",
+      "first_name": "อดิศร",
+      "last_name": "พร้อมงาน",
+      "is_exec": false,
+      "is_admin": false,
+      "is_active": true
+    },
+    {
+      "username": "teacher.inactive",
+      "password": "Mock1234!",
+      "prefix": "นางสาว",
+      "first_name": "พิชญา",
+      "last_name": "ทดสอบปิดบัญชี",
+      "is_exec": false,
+      "is_admin": false,
+      "is_active": false
+    }
+  ]
+}

@@ -55,11 +55,10 @@ func CurrentAcademicPeriod(now time.Time) (year int16, semester int16) {
 // การรันซ้ำทำได้โดยไม่สร้างฝ่ายหรือปีการศึกษาซ้ำ.
 func Up(db *gorm.DB, now time.Time) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		// กำหนด join model เองเพื่อให้ user_divisions มี UUID primary key ตามตารางอื่น.
-		if err := tx.SetupJoinTable(&model.User{}, "Divisions", &model.UserDivision{}); err != nil {
-			return fmt.Errorf("configure user division join table: %w", err)
-		}
 		if err := migrateAccountsTable(tx); err != nil {
+			return err
+		}
+		if err := dropLegacyUserDivisionsTable(tx); err != nil {
 			return err
 		}
 
@@ -75,6 +74,19 @@ func Up(db *gorm.DB, now time.Time) error {
 
 		return nil
 	})
+}
+
+// dropLegacyUserDivisionsTable removes the obsolete per-user membership
+// relation. Division access is universal; only divisions.head_user_uuid keeps
+// a person-to-division relationship for authorization and administration.
+func dropLegacyUserDivisionsTable(db *gorm.DB) error {
+	if !db.Migrator().HasTable("user_divisions") {
+		return nil
+	}
+	if err := db.Migrator().DropTable("user_divisions"); err != nil {
+		return fmt.Errorf("drop obsolete user divisions table: %w", err)
+	}
+	return nil
 }
 
 // migrateAccountsTable preserves existing installations when the personnel
@@ -132,7 +144,6 @@ func SchemaModels() []any {
 	return []any{
 		&model.User{},
 		&model.Division{},
-		&model.UserDivision{},
 		&model.AcademicYear{},
 		&model.Topic{},
 		&model.TopicField{},

@@ -40,10 +40,9 @@ type CreateUserInput struct {
 	LastName  string
 	// FullName is accepted for backward compatibility and is stored verbatim
 	// in first_name when the structured fields are absent.
-	FullName      string
-	DivisionUUIDs []uuid.UUID
-	IsExec        bool
-	IsAdmin       bool
+	FullName string
+	IsExec   bool
+	IsAdmin  bool
 }
 
 // UpdateUserInput ใช้ pointer เพื่อแยก field ที่ไม่ได้ส่งออกจากค่าศูนย์
@@ -55,11 +54,10 @@ type UpdateUserInput struct {
 	LastName  *string
 	// FullName is the legacy replacement form. It cannot be combined with the
 	// structured name fields.
-	FullName      *string
-	DivisionUUIDs *[]uuid.UUID
-	IsExec        *bool
-	IsAdmin       *bool
-	IsActive      *bool
+	FullName *string
+	IsExec   *bool
+	IsAdmin  *bool
+	IsActive *bool
 }
 
 // UserService จัดการข้อมูลบุคลากร ฝ่าย และ session ที่เกี่ยวข้อง.
@@ -77,15 +75,15 @@ func NewUserService(db *gorm.DB) *UserService {
 func (s *UserService) ListUsers(ctx context.Context) ([]model.User, error) {
 	users := make([]model.User, 0)
 	err := s.db.WithContext(ctx).
-		Preload("Divisions", func(db *gorm.DB) *gorm.DB {
-			return db.Order("divisions.sort_order")
-		}).
 		Order("accounts.first_name").
 		Order("accounts.last_name").
 		Order("accounts.username").
 		Find(&users).Error
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
+	}
+	if err := attachUniversalDivisions(s.db.WithContext(ctx), users); err != nil {
+		return nil, err
 	}
 	return users, nil
 }
@@ -95,9 +93,6 @@ func (s *UserService) ListUsers(ctx context.Context) ([]model.User, error) {
 func (s *UserService) ListActiveUsers(ctx context.Context) ([]model.User, error) {
 	users := make([]model.User, 0)
 	err := s.db.WithContext(ctx).
-		Preload("Divisions", func(db *gorm.DB) *gorm.DB {
-			return db.Order("divisions.sort_order")
-		}).
 		Where("accounts.deactivated_at IS NULL").
 		Order("accounts.first_name").
 		Order("accounts.last_name").
@@ -105,6 +100,9 @@ func (s *UserService) ListActiveUsers(ctx context.Context) ([]model.User, error)
 		Find(&users).Error
 	if err != nil {
 		return nil, fmt.Errorf("list active users: %w", err)
+	}
+	if err := attachUniversalDivisions(s.db.WithContext(ctx), users); err != nil {
+		return nil, err
 	}
 	return users, nil
 }
@@ -116,10 +114,6 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (mo
 		return model.User{}, err
 	}
 
-	divisionUUIDs, err := uniqueDivisionUUIDs(input.DivisionUUIDs)
-	if err != nil {
-		return model.User{}, err
-	}
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return model.User{}, fmt.Errorf("hash user password: %w", err)
@@ -127,10 +121,6 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (mo
 
 	var created model.User
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := ensureDivisionsExist(tx, divisionUUIDs); err != nil {
-			return err
-		}
-
 		user := model.User{
 			Username:     input.Username,
 			PasswordHash: string(passwordHash),
@@ -146,10 +136,6 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (mo
 			}
 			return fmt.Errorf("create user: %w", err)
 		}
-		if err := replaceUserDivisions(tx, user.UUID, divisionUUIDs); err != nil {
-			return err
-		}
-
 		loaded, err := findUser(tx, user.UUID, false)
 		if err != nil {
 			return err
@@ -217,19 +203,6 @@ func (s *UserService) UpdateUser(ctx context.Context, userUUID uuid.UUID, input 
 					return ErrUsernameExists
 				}
 				return fmt.Errorf("update user: %w", err)
-			}
-		}
-
-		if input.DivisionUUIDs != nil {
-			divisionUUIDs, err := uniqueDivisionUUIDs(*input.DivisionUUIDs)
-			if err != nil {
-				return err
-			}
-			if err := ensureDivisionsExist(tx, divisionUUIDs); err != nil {
-				return err
-			}
-			if err := replaceUserDivisions(tx, userUUID, divisionUUIDs); err != nil {
-				return err
 			}
 		}
 
@@ -339,7 +312,7 @@ func validateCreateUserInput(input CreateUserInput) error {
 
 func validateUpdateUserInput(input UpdateUserInput) error {
 	if input.Username == nil && input.Prefix == nil && input.FirstName == nil && input.LastName == nil && input.FullName == nil &&
-		input.DivisionUUIDs == nil && input.IsExec == nil && input.IsAdmin == nil && input.IsActive == nil {
+		input.IsExec == nil && input.IsAdmin == nil && input.IsActive == nil {
 		return &ValidationError{Field: "request", Message: "at least one field is required"}
 	}
 	if input.Username != nil {
@@ -390,58 +363,6 @@ func validateRequiredText(field, value string, maximum int) error {
 	return nil
 }
 
-func uniqueDivisionUUIDs(values []uuid.UUID) ([]uuid.UUID, error) {
-	result := make([]uuid.UUID, 0, len(values))
-	seen := make(map[uuid.UUID]struct{}, len(values))
-	for _, value := range values {
-		if value == uuid.Nil {
-			return nil, &ValidationError{Field: "division_uuids", Message: "division UUID must not be empty"}
-		}
-		if _, exists := seen[value]; exists {
-			continue
-		}
-		seen[value] = struct{}{}
-		result = append(result, value)
-	}
-	return result, nil
-}
-
-func ensureDivisionsExist(db *gorm.DB, divisionUUIDs []uuid.UUID) error {
-	if len(divisionUUIDs) == 0 {
-		return nil
-	}
-
-	var count int64
-	if err := db.Model(&model.Division{}).Where("uuid IN ?", divisionUUIDs).Count(&count).Error; err != nil {
-		return fmt.Errorf("validate user divisions: %w", err)
-	}
-	if count != int64(len(divisionUUIDs)) {
-		return ErrDivisionNotFound
-	}
-	return nil
-}
-
-func replaceUserDivisions(db *gorm.DB, userUUID uuid.UUID, divisionUUIDs []uuid.UUID) error {
-	if err := db.Where("user_uuid = ?", userUUID).Delete(&model.UserDivision{}).Error; err != nil {
-		return fmt.Errorf("clear user divisions: %w", err)
-	}
-	if len(divisionUUIDs) == 0 {
-		return nil
-	}
-
-	memberships := make([]model.UserDivision, 0, len(divisionUUIDs))
-	for _, divisionUUID := range divisionUUIDs {
-		memberships = append(memberships, model.UserDivision{
-			UserUUID:     userUUID,
-			DivisionUUID: divisionUUID,
-		})
-	}
-	if err := db.Create(&memberships).Error; err != nil {
-		return fmt.Errorf("save user divisions: %w", err)
-	}
-	return nil
-}
-
 func findUser(db *gorm.DB, userUUID uuid.UUID, lock bool) (model.User, error) {
 	query := db
 	if lock {
@@ -456,15 +377,31 @@ func findUser(db *gorm.DB, userUUID uuid.UUID, lock bool) (model.User, error) {
 		return model.User{}, fmt.Errorf("find user: %w", err)
 	}
 
-	if err := db.Table("divisions").
-		Select("divisions.*").
-		Joins("JOIN user_divisions ON user_divisions.division_uuid = divisions.uuid").
-		Where("user_divisions.user_uuid = ?", userUUID).
-		Order("divisions.sort_order").
-		Find(&user.Divisions).Error; err != nil {
-		return model.User{}, fmt.Errorf("find user divisions: %w", err)
+	divisions, err := listUniversalDivisions(db)
+	if err != nil {
+		return model.User{}, err
 	}
+	user.Divisions = divisions
 	return user, nil
+}
+
+func listUniversalDivisions(db *gorm.DB) ([]model.Division, error) {
+	divisions := make([]model.Division, 0)
+	if err := db.Order("sort_order, code").Find(&divisions).Error; err != nil {
+		return nil, fmt.Errorf("list universal user divisions: %w", err)
+	}
+	return divisions, nil
+}
+
+func attachUniversalDivisions(db *gorm.DB, users []model.User) error {
+	divisions, err := listUniversalDivisions(db)
+	if err != nil {
+		return err
+	}
+	for index := range users {
+		users[index].Divisions = divisions
+	}
+	return nil
 }
 
 func revokeUserSessions(db *gorm.DB, userUUID uuid.UUID) error {

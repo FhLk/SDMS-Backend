@@ -27,29 +27,25 @@ type Dataset struct {
 }
 
 type Metadata struct {
-	Environment      string            `json:"environment"`
-	DefaultPassword  string            `json:"default_password"`
-	DivisionCodes    map[string]string `json:"division_codes"`
-	MembershipPolicy string            `json:"membership_policy"`
-	DivisionHeads    map[string]string `json:"division_heads"`
-	UsageNote        string            `json:"usage_note"`
+	Environment     string            `json:"environment"`
+	DefaultPassword string            `json:"default_password"`
+	DivisionHeads   map[string]string `json:"division_heads"`
+	UsageNote       string            `json:"usage_note"`
 }
 
 type SampleUser struct {
-	Username      string   `json:"username"`
-	Password      string   `json:"password"`
-	Prefix        string   `json:"prefix"`
-	FirstName     string   `json:"first_name"`
-	LastName      string   `json:"last_name"`
-	DivisionCodes []string `json:"division_codes"`
-	IsExec        bool     `json:"is_exec"`
-	IsAdmin       bool     `json:"is_admin"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	Prefix    string `json:"prefix"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	IsExec    bool   `json:"is_exec"`
+	IsAdmin   bool   `json:"is_admin"`
 }
 
 type Result struct {
 	CreatedUsers      int
 	UpdatedUsers      int
-	Memberships       int
 	DivisionHeads     int
 	RepairedTopics    int
 	RepairedAssignees int
@@ -75,8 +71,8 @@ func Read(path string) (Dataset, error) {
 	return dataset, nil
 }
 
-// Sync creates missing sample users, updates existing sample profiles and
-// memberships, and assigns the configured division heads in one transaction.
+// Sync creates missing sample users, updates existing sample profiles, and
+// assigns the configured division heads in one transaction.
 // Existing passwords and activation state are preserved; passwords from the
 // file are used only when a sample account is first created.
 func Sync(ctx context.Context, db *gorm.DB, dataset Dataset, repairEmptyTopics bool) (Result, error) {
@@ -104,11 +100,6 @@ func Sync(ctx context.Context, db *gorm.DB, dataset Dataset, repairEmptyTopics b
 
 		syncedByUsername := make(map[string]model.User, len(dataset.Users))
 		for _, sample := range dataset.Users {
-			memberships, err := resolveDivisionUUIDs(sample.DivisionCodes, divisionUUIDs)
-			if err != nil {
-				return fmt.Errorf("resolve divisions for %q: %w", sample.Username, err)
-			}
-
 			user, exists := existingByUsername[sample.Username]
 			if exists {
 				prefix := sample.Prefix
@@ -117,12 +108,11 @@ func Sync(ctx context.Context, db *gorm.DB, dataset Dataset, repairEmptyTopics b
 				isExec := sample.IsExec
 				isAdmin := sample.IsAdmin
 				user, err = userService.UpdateUser(ctx, user.UUID, admin.UpdateUserInput{
-					Prefix:        &prefix,
-					FirstName:     &firstName,
-					LastName:      &lastName,
-					DivisionUUIDs: &memberships,
-					IsExec:        &isExec,
-					IsAdmin:       &isAdmin,
+					Prefix:    &prefix,
+					FirstName: &firstName,
+					LastName:  &lastName,
+					IsExec:    &isExec,
+					IsAdmin:   &isAdmin,
 				})
 				if err != nil {
 					return fmt.Errorf("update sample user %q: %w", sample.Username, err)
@@ -130,14 +120,13 @@ func Sync(ctx context.Context, db *gorm.DB, dataset Dataset, repairEmptyTopics b
 				result.UpdatedUsers++
 			} else {
 				user, err = userService.CreateUser(ctx, admin.CreateUserInput{
-					Username:      sample.Username,
-					Password:      sample.Password,
-					Prefix:        sample.Prefix,
-					FirstName:     sample.FirstName,
-					LastName:      sample.LastName,
-					DivisionUUIDs: memberships,
-					IsExec:        sample.IsExec,
-					IsAdmin:       sample.IsAdmin,
+					Username:  sample.Username,
+					Password:  sample.Password,
+					Prefix:    sample.Prefix,
+					FirstName: sample.FirstName,
+					LastName:  sample.LastName,
+					IsExec:    sample.IsExec,
+					IsAdmin:   sample.IsAdmin,
 				})
 				if err != nil {
 					return fmt.Errorf("create sample user %q: %w", sample.Username, err)
@@ -145,7 +134,6 @@ func Sync(ctx context.Context, db *gorm.DB, dataset Dataset, repairEmptyTopics b
 				result.CreatedUsers++
 			}
 
-			result.Memberships += len(memberships)
 			syncedByUsername[sample.Username] = user
 		}
 
@@ -199,10 +187,6 @@ func normalize(dataset Dataset) Dataset {
 	for index := range dataset.Users {
 		user := &dataset.Users[index]
 		user.Username = strings.ToLower(strings.TrimSpace(user.Username))
-		user.DivisionCodes = append([]string(nil), user.DivisionCodes...)
-		for codeIndex := range user.DivisionCodes {
-			user.DivisionCodes[codeIndex] = strings.ToLower(strings.TrimSpace(user.DivisionCodes[codeIndex]))
-		}
 	}
 
 	heads := make(map[string]string, len(dataset.Meta.DivisionHeads))
@@ -258,24 +242,6 @@ func loadDivisionUUIDs(db *gorm.DB) (map[string]uuid.UUID, error) {
 	return result, nil
 }
 
-func resolveDivisionUUIDs(codes []string, divisions map[string]uuid.UUID) ([]uuid.UUID, error) {
-	result := make([]uuid.UUID, 0, len(codes))
-	seen := make(map[uuid.UUID]struct{}, len(codes))
-	for _, value := range codes {
-		code := strings.ToLower(strings.TrimSpace(value))
-		divisionUUID, exists := divisions[code]
-		if !exists {
-			return nil, fmt.Errorf("division code %q does not exist", code)
-		}
-		if _, duplicate := seen[divisionUUID]; duplicate {
-			continue
-		}
-		seen[divisionUUID] = struct{}{}
-		result = append(result, divisionUUID)
-	}
-	return result, nil
-}
-
 type missingAssignment struct {
 	TopicUUID uuid.UUID
 	UserUUID  uuid.UUID
@@ -283,15 +249,13 @@ type missingAssignment struct {
 
 // repairEmptyOpenTopics is intentionally narrow: it repairs only open topics
 // that have never had an assignee or submission. Normal topics retain their
-// original assignment snapshot when memberships change later.
+// original assignment snapshot when account state changes later.
 func repairEmptyOpenTopics(db *gorm.DB) (int, int, error) {
 	var missing []missingAssignment
 	err := db.Table("topics AS t").
 		Select("t.uuid AS topic_uuid, u.uuid AS user_uuid").
-		Joins("JOIN user_divisions AS ud ON ud.division_uuid = t.division_uuid").
-		Joins("JOIN accounts AS u ON u.uuid = ud.user_uuid").
+		Joins("CROSS JOIN accounts AS u").
 		Where("t.is_open = ?", true).
-		Where("u.is_exec = ?", false).
 		Where("u.deactivated_at IS NULL").
 		Where("NOT EXISTS (SELECT 1 FROM topic_assignees AS existing WHERE existing.topic_uuid = t.uuid)").
 		Where("NOT EXISTS (SELECT 1 FROM submissions AS submitted WHERE submitted.topic_uuid = t.uuid)").

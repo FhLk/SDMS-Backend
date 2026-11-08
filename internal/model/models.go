@@ -66,7 +66,9 @@ type User struct {
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 
-	Divisions []Division `gorm:"many2many:user_divisions;foreignKey:UUID;joinForeignKey:UserUUID;references:UUID;joinReferences:DivisionUUID"`
+	// Divisions is derived at read time. Every active account belongs to every
+	// division, so no per-user membership rows are persisted.
+	Divisions []Division `gorm:"-"`
 }
 
 // TableName keeps the domain model named User while storing accounts in the
@@ -85,16 +87,6 @@ type Division struct {
 	HeadUserUUID *uuid.UUID `gorm:"type:uuid;uniqueIndex"`
 
 	HeadUser *User `gorm:"foreignKey:HeadUserUUID;references:UUID;constraint:OnDelete:SET NULL"`
-}
-
-// UserDivision การสังกัดฝ่าย (1 คนสังกัดได้หลายฝ่าย)
-type UserDivision struct {
-	UUIDModel
-	UserUUID     uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uq_user_divisions_user_division,priority:1;index"`
-	DivisionUUID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uq_user_divisions_user_division,priority:2;index"`
-
-	User     User     `gorm:"foreignKey:UserUUID;references:UUID;constraint:OnDelete:CASCADE"`
-	Division Division `gorm:"foreignKey:DivisionUUID;references:UUID;constraint:OnDelete:CASCADE"`
 }
 
 // AcademicYear ปีการศึกษา (พ.ศ.) — ปีปัจจุบันมีได้ปีเดียว

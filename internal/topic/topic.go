@@ -109,7 +109,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (model.Topic, e
 		if err != nil {
 			return err
 		}
-		assignees, err := createTopicAssignees(tx, topic.UUID, division.UUID, input.AssigneeUUIDs)
+		assignees, err := createTopicAssignees(tx, topic.UUID, input.AssigneeUUIDs)
 		if err != nil {
 			return err
 		}
@@ -357,8 +357,8 @@ func createTopicFields(db *gorm.DB, topicUUID uuid.UUID, inputs []FieldInput) ([
 	return fields, nil
 }
 
-func createTopicAssignees(db *gorm.DB, topicUUID, divisionUUID uuid.UUID, requested *[]uuid.UUID) ([]model.TopicAssignee, error) {
-	userUUIDs, err := listEligibleTopicAssigneeUUIDs(db, divisionUUID, requested)
+func createTopicAssignees(db *gorm.DB, topicUUID uuid.UUID, requested *[]uuid.UUID) ([]model.TopicAssignee, error) {
+	userUUIDs, err := listEligibleTopicAssigneeUUIDs(db, requested)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +371,7 @@ func createTopicAssignees(db *gorm.DB, topicUUID, divisionUUID uuid.UUID, reques
 			if _, exists := eligible[userUUID]; !exists {
 				return nil, validationError(
 					fmt.Sprintf("assignee_uuids[%d]", index),
-					"assignee must be an active, non-executive member of the topic division",
+					"assignee must be an active account",
 				)
 			}
 		}
@@ -390,13 +390,10 @@ func createTopicAssignees(db *gorm.DB, topicUUID, divisionUUID uuid.UUID, reques
 	return assignees, nil
 }
 
-func listEligibleTopicAssigneeUUIDs(db *gorm.DB, divisionUUID uuid.UUID, requested *[]uuid.UUID) ([]uuid.UUID, error) {
+func listEligibleTopicAssigneeUUIDs(db *gorm.DB, requested *[]uuid.UUID) ([]uuid.UUID, error) {
 	var userUUIDs []uuid.UUID
 	query := db.Table("accounts").
 		Select("accounts.uuid").
-		Joins("JOIN user_divisions ON user_divisions.user_uuid = accounts.uuid").
-		Where("user_divisions.division_uuid = ?", divisionUUID).
-		Where("accounts.is_exec = ?", false).
 		Where("accounts.deactivated_at IS NULL")
 	if requested != nil {
 		query = query.Where("accounts.uuid IN ?", *requested)

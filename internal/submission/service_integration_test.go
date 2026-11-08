@@ -45,13 +45,9 @@ func TestSubmissionServiceWithPostgreSQL(t *testing.T) {
 	if err := tx.Create(&users).Error; err != nil {
 		t.Fatalf("create users: %v", err)
 	}
-	for _, user := range users[:2] {
-		if err := tx.Create(&model.UserDivision{UserUUID: user.UUID, DivisionUUID: division.UUID}).Error; err != nil {
-			t.Fatalf("create membership: %v", err)
-		}
-	}
 
 	topicService := topic.NewService(tx)
+	assigneeUUIDs := []uuid.UUID{users[0].UUID, users[1].UUID}
 	createdTopic, err := topicService.Create(context.Background(), topic.CreateInput{
 		DivisionUUID:  division.UUID,
 		CreatedByUUID: users[0].UUID,
@@ -64,6 +60,7 @@ func TestSubmissionServiceWithPostgreSQL(t *testing.T) {
 			{Position: 4, Type: model.FieldFile, Label: "หลักฐาน", Required: true},
 			{Position: 5, Type: model.FieldPara, Label: "หมายเหตุ", Required: false},
 		},
+		AssigneeUUIDs: &assigneeUUIDs,
 	})
 	if err != nil {
 		t.Fatalf("create topic: %v", err)

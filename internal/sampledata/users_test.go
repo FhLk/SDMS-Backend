@@ -2,8 +2,6 @@ package sampledata
 
 import (
 	"testing"
-
-	"github.com/google/uuid"
 )
 
 func TestValidateRejectsNonDevelopmentDataset(t *testing.T) {
@@ -26,11 +24,5 @@ func TestValidateRejectsDuplicateUsername(t *testing.T) {
 	}
 	if err := validate(dataset); err == nil {
 		t.Fatal("validate() error = nil, want duplicate username rejection")
-	}
-}
-
-func TestResolveDivisionUUIDsRejectsUnknownCode(t *testing.T) {
-	if _, err := resolveDivisionUUIDs([]string{"missing"}, map[string]uuid.UUID{}); err == nil {
-		t.Fatal("resolveDivisionUUIDs() error = nil, want unknown division rejection")
 	}
 }

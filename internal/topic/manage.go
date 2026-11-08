@@ -285,7 +285,7 @@ func synchronizeTopicAssignees(db *gorm.DB, topic model.Topic, requested []uuid.
 	}
 
 	if len(newUserUUIDs) > 0 {
-		eligibleUUIDs, err := listEligibleTopicAssigneeUUIDs(db, topic.DivisionUUID, &newUserUUIDs)
+		eligibleUUIDs, err := listEligibleTopicAssigneeUUIDs(db, &newUserUUIDs)
 		if err != nil {
 			return err
 		}
@@ -300,7 +300,7 @@ func synchronizeTopicAssignees(db *gorm.DB, topic model.Topic, requested []uuid.
 			if _, canAssign := eligible[userUUID]; !canAssign {
 				return validationError(
 					fmt.Sprintf("assignee_uuids[%d]", index),
-					"assignee must be an active, non-executive member of the topic division",
+					"assignee must be an active account",
 				)
 			}
 		}

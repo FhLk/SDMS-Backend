@@ -2,11 +2,16 @@
 
 เอกสารนี้เป็นสัญญา API ฉบับรวมของ SDMS ครอบคลุม route ที่ประกาศใช้งานอยู่ใน backend ทั้งหมด รวมถึงการกำหนดผู้ต้องส่งเป็นรายคนในแต่ละหัวข้อ
 
+อัปเดตล่าสุด: 8 พฤศจิกายน 2569 — ตรวจเทียบกับ routes, request/response structs และ response helpers ใน `internal/server`
+
 ## ข้อมูลทั่วไป
 
 - Base URL สำหรับ local development ตามค่า default: `http://localhost:8081/api`
+- Base URL บน Cloudflare: `https://<โดเมนของระบบ>/api` โดยใช้โดเมน Worker เดิมหรือ custom domain ที่ผูกไว้
 - Swagger UI: `http://localhost:8081/api/docs`
 - OpenAPI 3.0 YAML: `http://localhost:8081/api/openapi.yaml`
+- บน Cloudflare ใช้ path `/api/docs` และ `/api/openapi.yaml` ต่อจากโดเมนเดียวกับ API
+- Path ของ endpoint ในเอกสารนี้ไม่รวม prefix `/api` เช่น `GET /me` เรียกจริงที่ `GET /api/me`
 - Authentication ใช้ server-side session cookie ชื่อ `sdms_session`
 - Request และ response ปกติใช้ `application/json; charset=utf-8`
 - UUID ส่งเป็น JSON string ตามรูปแบบ UUID
@@ -15,7 +20,7 @@
 - การตัดสินกำหนดส่งใช้วันที่ตามเขตเวลา `Asia/Bangkok` และถือว่าส่งทันจนจบวันกำหนดส่ง
 - Array ที่ไม่มีข้อมูลจะคืนเป็น `[]` และค่าที่ไม่มีจะคืนเป็น `null` เว้นแต่ระบุไว้เป็นอย่างอื่น
 - ตัวอย่างที่ใช้ `{}` แทน object แบบย่อ ให้ดู schema เต็มของ object นั้นจากหัวข้อก่อนหน้า; response จริงจะคืน property ครบ ไม่ได้คืน object ว่าง
-- ตัวอย่าง response ของแต่ละ endpoint ด้านล่างแสดงเฉพาะค่าภายใน `data` เพื่อให้อ่าน schema ง่าย ยกเว้นตัวอย่างที่ระบุว่าเป็น envelope เต็ม
+- ตัวอย่าง JSON response ของ endpoint ด้านล่างแสดง envelope เต็ม ส่วนตัวอย่างในหัวข้อ Object ที่ใช้ร่วมกันแสดงเฉพาะตัว object
 
 ตัวอย่างเรียก API หลัง login ด้วย `curl`:
 
@@ -30,7 +35,9 @@ curl -b cookies.txt http://localhost:8081/api/me
 
 ## Authentication และสิทธิ์
 
-ยกเว้น `GET /health`, `POST /auth/login` และ `POST /auth/logout` ทุก endpoint ต้องส่ง session cookie ที่ยังใช้งานได้
+ยกเว้น `GET /health`, `POST /auth/login`, `POST /auth/logout` และหน้าเอกสาร `GET /docs`, `GET /openapi.yaml` ทุก endpoint ต้องส่ง session cookie ที่ยังใช้งานได้
+
+cookie ชื่อ `sdms_session` เป็น `HttpOnly`, path `/` และ `SameSite=Lax`; บน Cloudflare ตั้ง `Secure=true` ใน Worker ตัว token ไม่ถูกส่งกลับใน JSON body การเรียกจาก browser ให้ใช้ session cookie และอ่าน profile จาก `GET /me`
 
 | คำที่ใช้ในเอกสาร | สิทธิ์ |
 | --- | --- |
@@ -43,6 +50,14 @@ curl -b cookies.txt http://localhost:8081/api/me
 หมายเหตุ: แอดมินเป็นสิทธิ์ดูแลระบบ ไม่ได้ทำให้เห็นข้อมูลลับหรือสถิติฝ่ายโดยอัตโนมัติ เว้นแต่ endpoint นั้นกำหนดสิทธิ์แอดมินไว้โดยตรงหรือบัญชีมีบทบาทด้านเนื้อหาร่วมด้วย
 
 ## รูปแบบ response
+
+JSON success ทุก endpoint ใช้ HTTP `200 OK` รวมทั้ง create, update, delete, upload และ import; ค่า `status` ที่ระดับบนสุดตรงกับ HTTP status เสมอ
+
+| Field | Success มีข้อมูล | Success ไม่มีข้อมูล | Error |
+| --- | --- | --- | --- |
+| `status` | `200` | `200` | HTTP status ของ error |
+| `data` | object, array หรือค่าที่ API คืน | ไม่มี property นี้ | ไม่มี property นี้ |
+| `message` | `"success"` | `"success"` | ข้อความอธิบาย error |
 
 JSON response ที่สำเร็จและมีข้อมูล:
 
@@ -72,12 +87,19 @@ JSON response ที่สำเร็จแต่ไม่มีข้อมู
 }
 ```
 
+error response ไม่มี `code`, `details` หรือ `data` ให้ใช้ HTTP status จัดการประเภทความผิดพลาด และใช้ `message` แสดงข้อความจาก server
+
+`data.status`, `data.submission.status` หรือ status ภายในรายการเป็นสถานะทางธุรกิจ เช่น `staged`, `submitted`, `late`, `pending` ซึ่งต่างจาก `status` ที่ระดับบนสุด
+
+endpoint ดาวน์โหลดไฟล์, ZIP, CSV/XLSX template และหน้าเอกสารตอบตาม Content-Type ของแต่ละรายการโดยไม่มี JSON envelope; หาก handler ของ API ตอบ error จะใช้ JSON error pattern ข้างต้น
+
 | HTTP | ความหมาย |
 | --- | --- |
 | `400` | body, path หรือ query ไม่ถูกต้อง |
 | `401` | ไม่มี session, session หมดอายุ หรือ login ไม่สำเร็จ |
 | `403` | login แล้วแต่ไม่มีสิทธิ์ |
 | `404` | ไม่พบข้อมูล |
+| `405` | HTTP method ไม่รองรับสำหรับ path ที่เรียก |
 | `409` | สถานะปัจจุบันไม่อนุญาตให้ทำรายการ |
 | `413` | request หรือไฟล์ใหญ่เกินกำหนด |
 | `500` | ข้อผิดพลาดภายในระบบ |
@@ -144,6 +166,17 @@ JSON response ที่สำเร็จแต่ไม่มีข้อมู
 | `POST` | `/admin/years/{year}/current` | ตั้งปี/ภาคเรียนปัจจุบัน |
 
 ทุก endpoint ในกลุ่ม `/admin` ต้องเป็นแอดมิน
+
+### เอกสาร API
+
+สอง route นี้เพิ่มจาก API หลัก 38 operations และไม่ต้อง login:
+
+| Method | Path | Content-Type | ผลลัพธ์ |
+| --- | --- | --- | --- |
+| `GET` | `/docs` | `text/html` | Swagger UI |
+| `GET` | `/openapi.yaml` | `application/yaml` | OpenAPI 3.0.3 contract |
+
+ใช้ `POST /auth/login` ใน Swagger UI เพื่อรับ session cookie ก่อนทดลอง protected endpoints บน origin เดียวกัน
 
 ## Object ที่ใช้ร่วมกัน
 
@@ -292,21 +325,30 @@ Response `200 OK`:
 
 ```json
 {
-  "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
-  "username": "teacher.one",
-  "prefix": "นาง",
-  "first_name": "สมหญิง",
-  "last_name": "ใจดี",
-  "full_name": "นางสมหญิง ใจดี",
-  "role": "division_head",
-  "is_exec": false,
-  "is_admin": false,
-  "divisions": [],
-  "head_divisions": []
+  "status": 200,
+  "data": {
+    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
+    "username": "teacher.one",
+    "prefix": "นาง",
+    "first_name": "สมหญิง",
+    "last_name": "ใจดี",
+    "full_name": "นางสมหญิง ใจดี",
+    "role": "division_head",
+    "is_exec": false,
+    "is_admin": false,
+    "divisions": [
+      {"uuid":"0199d6d0-bec9-7aa0-b2d8-96dc6fb30001","code":"aca","name":"ฝ่ายวิชาการ","short_name":"วิชาการ"},
+      {"uuid":"0199d6d0-bec9-7aa0-b2d8-96dc6fb30002","code":"bud","name":"ฝ่ายงบประมาณ","short_name":"งบประมาณ"},
+      {"uuid":"0199d6d0-bec9-7aa0-b2d8-96dc6fb30003","code":"per","name":"ฝ่ายบุคคล","short_name":"บุคคล"},
+      {"uuid":"0199d6d0-bec9-7aa0-b2d8-96dc6fb30004","code":"gen","name":"ฝ่ายทั่วไป","short_name":"ทั่วไป"}
+    ],
+    "head_divisions": []
+  },
+  "message": "success"
 }
 ```
 
-`role` เป็นบทบาทหลักที่มีลำดับ `admin` > `executive` > `division_head` > `teacher` ส่วนบทบาทอื่นยังตรวจได้จาก flag และ `head_divisions`
+`role` เป็นบทบาทหลักที่มีลำดับ `admin` > `executive` > `division_head` > `teacher` ส่วนบทบาทอื่นยังตรวจได้จาก flag และ `head_divisions`; `divisions` เป็นรายการทุกฝ่ายเหมือนกันสำหรับผู้ใช้ทุกคน เพราะไม่มี membership รายบุคคล
 
 ## 2. Directory ฝ่าย และปีการศึกษา
 
@@ -317,41 +359,70 @@ Response `200 OK`:
 Response `200 OK`:
 
 ```json
-[
-  {
-    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
-    "prefix": "นาง",
-    "first_name": "สมหญิง",
-    "last_name": "ใจดี",
-    "full_name": "นางสมหญิง ใจดี",
-    "divisions": [],
-    "is_topic_assignee_eligible": true
-  }
-]
+{
+  "status": 200,
+  "data": [
+    {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
+      "prefix": "นาง",
+      "first_name": "สมหญิง",
+      "last_name": "ใจดี",
+      "full_name": "นางสมหญิง ใจดี",
+      "divisions": [
+        {"uuid":"0199d6d0-bec9-7aa0-b2d8-96dc6fb30001","code":"aca","name":"ฝ่ายวิชาการ","short_name":"วิชาการ"},
+        {"uuid":"0199d6d0-bec9-7aa0-b2d8-96dc6fb30002","code":"bud","name":"ฝ่ายงบประมาณ","short_name":"งบประมาณ"},
+        {"uuid":"0199d6d0-bec9-7aa0-b2d8-96dc6fb30003","code":"per","name":"ฝ่ายบุคคล","short_name":"บุคคล"},
+        {"uuid":"0199d6d0-bec9-7aa0-b2d8-96dc6fb30004","code":"gen","name":"ฝ่ายทั่วไป","short_name":"ทั่วไป"}
+      ],
+      "is_topic_assignee_eligible": true
+    }
+  ],
+  "message": "success"
+}
 ```
 
-`is_topic_assignee_eligible` เป็น `false` สำหรับผู้บริหาร การเลือกผู้ต้องส่งต้องกรองทั้ง flag นี้และ membership ของฝ่าย Backend จะตรวจซ้ำเมื่อบันทึก
+บัญชีที่ endpoint นี้คืนมาทุกบัญชีมี `is_topic_assignee_eligible: true` รวมทั้งหัวหน้าฝ่าย ผู้บริหาร และแอดมิน การเลือกผู้ต้องส่งไม่ต้องกรองตามฝ่าย และ Backend จะตรวจว่าบัญชียังเปิดใช้งานเมื่อบันทึก
 
 ### `GET /years`
 
 Response `200 OK`:
 
 ```json
-[
-  {
-    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40002",
-    "year": 2569,
-    "is_current": true,
-    "current_semester": 1
-  }
-]
+{
+  "status": 200,
+  "data": [
+    {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40002",
+      "year": 2569,
+      "is_current": true,
+      "current_semester": 1
+    }
+  ],
+  "message": "success"
+}
 ```
 
 เรียงจากปีล่าสุดไปเก่าสุด
 
 ### `GET /divisions`
 
-Response `200 OK` เป็น array ของ Division ที่มี `sort_order` และเรียงตามค่านี้
+Response `200 OK`: `data` เป็น array ของ Division ที่มี `sort_order` และเรียงตามค่านี้
+
+```json
+{
+  "status": 200,
+  "data": [
+    {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30001",
+      "code": "aca",
+      "name": "ฝ่ายวิชาการ",
+      "short_name": "วิชาการ",
+      "sort_order": 1
+    }
+  ],
+  "message": "success"
+}
+```
 
 ### `GET /divisions/{code}/topics`
 
@@ -365,37 +436,41 @@ Response `200 OK`:
 
 ```json
 {
-  "division": {
-    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30001",
-    "code": "aca",
-    "name": "ฝ่ายวิชาการ",
-    "short_name": "วิชาการ",
-    "sort_order": 1
+  "status": 200,
+  "data": {
+    "division": {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30001",
+      "code": "aca",
+      "name": "ฝ่ายวิชาการ",
+      "short_name": "วิชาการ",
+      "sort_order": 1
+    },
+    "academic_year": {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40002",
+      "year": 2569,
+      "is_current": true
+    },
+    "topics": [
+      {
+        "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40001",
+        "semester": 1,
+        "title": "รายงานประจำเดือน",
+        "due_date": "2026-11-30",
+        "is_open": true,
+        "is_secret": false,
+        "created_by_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30004",
+        "submitted_count": 1,
+        "assignee_count": 2,
+        "is_assigned": true,
+        "my_status": "pending",
+        "my_submitted_at": null,
+        "closed_at": null,
+        "created_at": "2026-11-07T08:00:00Z",
+        "updated_at": "2026-11-07T08:00:00Z"
+      }
+    ]
   },
-  "academic_year": {
-    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40002",
-    "year": 2569,
-    "is_current": true
-  },
-  "topics": [
-    {
-      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40001",
-      "semester": 1,
-      "title": "รายงานประจำเดือน",
-      "due_date": "2026-11-30",
-      "is_open": true,
-      "is_secret": false,
-      "created_by_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30004",
-      "submitted_count": 1,
-      "assignee_count": 2,
-      "is_assigned": true,
-      "my_status": "pending",
-      "my_submitted_at": null,
-      "closed_at": null,
-      "created_at": "2026-11-07T08:00:00Z",
-      "updated_at": "2026-11-07T08:00:00Z"
-    }
-  ]
+  "message": "success"
 }
 ```
 
@@ -445,13 +520,57 @@ Request:
 - `required` มีค่าเริ่มต้นเป็น `true`
 - `choice` ต้องมีตัวเลือกไม่ซ้ำ 2-100 ค่า แต่ละค่าไม่เกิน 120 ตัวอักษร
 - `assignee_uuids` ต้องมีอย่างน้อย 1 UUID และห้ามซ้ำ
-- ผู้ต้องส่งที่เลือกต้องเป็นบัญชีที่เปิดใช้งาน ไม่ใช่ผู้บริหาร และเป็นสมาชิกฝ่ายของหัวข้อ
-- หากไม่ส่ง `assignee_uuids` ระบบเลือกสมาชิกฝ่ายที่เข้าเงื่อนไขทั้งหมดเพื่อรองรับ client รุ่นเดิม
+- ผู้ต้องส่งที่เลือกต้องเป็นบัญชีที่เปิดใช้งาน โดยเลือกหัวหน้าฝ่าย ผู้บริหาร และแอดมินได้
+- หากไม่ส่ง `assignee_uuids` ระบบเลือกบัญชีที่เปิดใช้งานทั้งหมด
 - ปีและภาคเรียนมาจากปีการศึกษาปัจจุบัน
 
-Response `200 OK`: Topic พร้อม `assignee_uuids`
+Response `200 OK`: `data` เป็น Topic พร้อม `assignee_uuids`
 
-กรณีผิดพลาดที่สำคัญ: ไม่พบฝ่ายหรือปีปัจจุบัน, ไม่มีผู้ต้องส่งที่เข้าเงื่อนไข หรือข้อมูลไม่ผ่าน validation
+```json
+{
+  "status": 200,
+  "data": {
+    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40001",
+    "division": {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30001",
+      "code": "aca",
+      "name": "ฝ่ายวิชาการ",
+      "short_name": "วิชาการ"
+    },
+    "academic_year": {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40002",
+      "year": 2569
+    },
+    "semester": 1,
+    "title": "รายงานผลการดำเนินงานประจำเดือน",
+    "due_date": "2026-11-30",
+    "is_open": true,
+    "is_secret": false,
+    "created_by_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30004",
+    "fields": [
+      {
+        "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40003",
+        "position": 1,
+        "type": "text",
+        "label": "ชื่อกิจกรรม",
+        "required": true,
+        "options": []
+      }
+    ],
+    "assignee_count": 2,
+    "assignee_uuids": [
+      "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
+      "0199d6d0-bec9-7aa0-b2d8-96dc6fb30008"
+    ],
+    "closed_at": null,
+    "created_at": "2026-11-07T08:00:00Z",
+    "updated_at": "2026-11-07T08:00:00Z"
+  },
+  "message": "success"
+}
+```
+
+กรณีผิดพลาดที่สำคัญ: ไม่พบฝ่ายหรือปีปัจจุบัน, ระบบไม่มีบัญชีที่เปิดใช้งาน หรือข้อมูลไม่ผ่าน validation
 
 ### `PATCH /topics/{uuid}`
 
@@ -470,26 +589,33 @@ Response `200 OK`: Topic พร้อม `assignee_uuids`
 
 - ต้องส่งอย่างน้อยหนึ่งใน `title`, `due_date`, `is_secret`, `fields`, `assignee_uuids`
 - `assignee_uuids` เป็นรายชื่อฉบับเต็ม: UUID ที่หายไปจะถูกถอด และ UUID ใหม่จะถูกเพิ่ม
-- UUID ที่เพิ่มใหม่ต้องเป็นสมาชิกฝ่ายที่เปิดใช้งานและไม่ใช่ผู้บริหาร ส่วนผู้ที่อยู่ในรายชื่อเดิมสามารถคงไว้ได้แม้สถานะสมาชิกเปลี่ยนภายหลัง
+- UUID ที่เพิ่มใหม่ต้องเป็นบัญชีที่เปิดใช้งาน ส่วนผู้ที่อยู่ในรายชื่อเดิมสามารถคงไว้ได้แม้ถูกปิดบัญชีภายหลัง
 - ถอดผู้ที่มี submission แล้วไม่ได้และตอบ `409`
 - ถ้าไม่ส่ง `assignee_uuids` รายชื่อเดิมจะไม่เปลี่ยน
 - ถ้าส่ง `fields` ต้องส่งฟอร์มฉบับเต็ม ช่องเดิมต้องมี `uuid`; ช่องใหม่ไม่ส่ง `uuid`; ช่องเดิมที่ไม่อยู่ในรายการจะถูกลบหรือซ่อนหากมีคำตอบแล้ว
 - เปลี่ยน `type` ของ field หลังมี submission ไม่ได้และตอบ `409`
 - ช่องเดิมที่ไม่ส่ง `required` จะคงค่าเดิม ช่องใหม่ใช้ `true`
 
-Response `200 OK`: Topic ล่าสุดพร้อม `assignee_uuids`
+Response `200 OK` ใช้ envelope เดียวกับการสร้างหัวข้อ โดย `data` เป็น Topic ล่าสุดพร้อม `assignee_uuids`
 
 ### `POST /topics/{uuid}/close`
 
-ไม่ใช้ request body ปิดรับคำตอบและคืน Topic ล่าสุดเป็น `200 OK`
+ไม่ใช้ request body ปิดรับคำตอบและตอบ `200 OK` ใน success envelope โดย `data` เป็น Topic ล่าสุดที่มี `is_open: false` และเวลาปิดใน `closed_at`
 
 ### `POST /topics/{uuid}/reopen`
 
-ไม่ใช้ request body เปิดรับคำตอบอีกครั้งและคืน Topic ล่าสุดเป็น `200 OK` ค่า `closed_at` ยังคงเวลาปิดล่าสุด
+ไม่ใช้ request body เปิดรับคำตอบอีกครั้งและตอบ `200 OK` ใน success envelope โดย `data` เป็น Topic ล่าสุดที่มี `is_open: true`; ค่า `closed_at` ยังคงเวลาปิดล่าสุด
 
 ### `DELETE /topics/{uuid}`
 
 Response `200 OK` ใช้ success envelope แบบไม่มี `data`; หัวข้อที่มี submission แล้วลบไม่ได้และตอบ `409`
+
+```json
+{
+  "status": 200,
+  "message": "success"
+}
+```
 
 ## 4. การส่งคำตอบและตารางคำตอบ
 
@@ -500,19 +626,26 @@ Response `200 OK` ใช้ success envelope แบบไม่มี `data`; �
 Response `200 OK`:
 
 ```json
-[
-  {
-    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40001",
-    "division": {},
-    "academic_year": {"uuid":"0199d6d0-bec9-7aa0-b2d8-96dc6fb40002","year":2569},
-    "semester": 1,
-    "title": "รายงานประจำเดือน",
-    "due_date": "2026-11-30",
-    "is_secret": false,
-    "status": "pending",
-    "created_by_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30004"
-  }
-]
+{
+  "status": 200,
+  "data": [
+    {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40001",
+      "division": {},
+      "academic_year": {
+        "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40002",
+        "year": 2569
+      },
+      "semester": 1,
+      "title": "รายงานประจำเดือน",
+      "due_date": "2026-11-30",
+      "is_secret": false,
+      "status": "pending",
+      "created_by_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30004"
+    }
+  ],
+  "message": "success"
+}
 ```
 
 `status` ใน endpoint นี้เป็น `pending` หรือ `overdue`
@@ -525,24 +658,28 @@ Response `200 OK`:
 
 ```json
 {
-  "topic": {},
-  "submission": {
-    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb50001",
-    "values": {},
-    "files": [
-      {
-        "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb50002",
-        "field_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40004",
-        "original_name": "evidence.pdf",
-        "mime_type": "application/pdf",
-        "size_bytes": 10240,
-        "position": 1
-      }
-    ],
-    "status": "submitted",
-    "submitted_at": "2026-11-07T08:00:00Z",
-    "updated_at": "2026-11-07T08:00:00Z"
-  }
+  "status": 200,
+  "data": {
+    "topic": {},
+    "submission": {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb50001",
+      "values": {},
+      "files": [
+        {
+          "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb50002",
+          "field_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40004",
+          "original_name": "evidence.pdf",
+          "mime_type": "application/pdf",
+          "size_bytes": 10240,
+          "position": 1
+        }
+      ],
+      "status": "submitted",
+      "submitted_at": "2026-11-07T08:00:00Z",
+      "updated_at": "2026-11-07T08:00:00Z"
+    }
+  },
+  "message": "success"
 }
 ```
 
@@ -590,27 +727,31 @@ Response `200 OK`:
 
 ```json
 {
-  "topic": {},
-  "rows": [
-    {
-      "user": {
-        "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
-        "username": "teacher.one",
-        "prefix": "นาง",
-        "first_name": "สมหญิง",
-        "last_name": "ใจดี",
-        "full_name": "นางสมหญิง ใจดี"
-      },
-      "submission_uuid": null,
-      "values": {
-        "0199d6d0-bec9-7aa0-b2d8-96dc6fb40003": null
-      },
-      "files": [],
-      "status": "pending",
-      "submitted_at": null,
-      "updated_at": null
-    }
-  ]
+  "status": 200,
+  "data": {
+    "topic": {},
+    "rows": [
+      {
+        "user": {
+          "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
+          "username": "teacher.one",
+          "prefix": "นาง",
+          "first_name": "สมหญิง",
+          "last_name": "ใจดี",
+          "full_name": "นางสมหญิง ใจดี"
+        },
+        "submission_uuid": null,
+        "values": {
+          "0199d6d0-bec9-7aa0-b2d8-96dc6fb40003": null
+        },
+        "files": [],
+        "status": "pending",
+        "submitted_at": null,
+        "updated_at": null
+      }
+    ]
+  },
+  "message": "success"
 }
 ```
 
@@ -618,7 +759,28 @@ Response `200 OK`:
 
 ### `GET /topics/{uuid}/pending-names`
 
-ใช้ได้เฉพาะผู้แก้หัวข้อ คืน array ของ user object แบบเดียวกับ `rows[].user` สำหรับผู้ต้องส่งที่ยังไม่มี submission
+ใช้ได้เฉพาะผู้แก้หัวข้อ คืน array ของ user object แบบเดียวกับ `data.rows[].user` สำหรับผู้ต้องส่งที่ยังไม่มี submission
+
+Response `200 OK`:
+
+```json
+{
+  "status": 200,
+  "data": [
+    {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
+      "username": "teacher.one",
+      "prefix": "นาง",
+      "first_name": "สมหญิง",
+      "last_name": "ใจดี",
+      "full_name": "นางสมหญิง ใจดี"
+    }
+  ],
+  "message": "success"
+}
+```
+
+เมื่อทุกคนส่งแล้ว `data` เป็น `[]`
 
 ## 5. อัปโหลด เปิดดู และลบไฟล์
 
@@ -646,14 +808,18 @@ Response `200 OK`:
 
 ```json
 {
-  "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb50002",
-  "topic_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40001",
-  "field_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40004",
-  "original_name": "evidence.pdf",
-  "mime_type": "application/pdf",
-  "size_bytes": 10240,
-  "status": "staged",
-  "created_at": "2026-11-07T08:00:00Z"
+  "status": 200,
+  "data": {
+    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb50002",
+    "topic_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40001",
+    "field_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40004",
+    "original_name": "evidence.pdf",
+    "mime_type": "application/pdf",
+    "size_bytes": 10240,
+    "status": "staged",
+    "created_at": "2026-11-07T08:00:00Z"
+  },
+  "message": "success"
 }
 ```
 
@@ -664,6 +830,13 @@ Response `200 OK`:
 ### `DELETE /uploads/{uuid}`
 
 ลบได้เฉพาะไฟล์ staged ของผู้ใช้เอง Response `200 OK` ใช้ success envelope แบบไม่มี `data`; ไฟล์ attached ต้องถอดผ่านการแก้ submission และจะตอบ `409`
+
+```json
+{
+  "status": 200,
+  "message": "success"
+}
+```
 
 ### `GET /files/{uuid}`
 
@@ -686,27 +859,31 @@ Response `200 OK`:
 
 ```json
 {
-  "my": {
-    "counts": {
-      "topic_count": 4,
-      "required_count": 4,
-      "submitted_count": 2,
-      "pending_count": 1,
-      "overdue_count": 1
+  "status": 200,
+  "data": {
+    "my": {
+      "counts": {
+        "topic_count": 4,
+        "required_count": 4,
+        "submitted_count": 2,
+        "pending_count": 1,
+        "overdue_count": 1
+      },
+      "pending_topics": [],
+      "recent_submissions": [],
+      "divisions": [
+        {
+          "division": {},
+          "counts": {}
+        }
+      ]
     },
-    "pending_topics": [],
-    "recent_submissions": [],
-    "divisions": [
-      {
-        "division": {},
-        "counts": {}
-      }
-    ]
+    "overview": {
+      "school": {},
+      "divisions": []
+    }
   },
-  "overview": {
-    "school": {},
-    "divisions": []
-  }
+  "message": "success"
 }
 ```
 
@@ -723,14 +900,18 @@ Response `200 OK`:
 
 ```json
 {
-  "division": {},
-  "stats": {
-    "topic_count": 4,
-    "required_count": 10,
-    "submitted_count": 7,
-    "pending_count": 2,
-    "overdue_count": 1
-  }
+  "status": 200,
+  "data": {
+    "division": {},
+    "stats": {
+      "topic_count": 4,
+      "required_count": 10,
+      "submitted_count": 7,
+      "pending_count": 2,
+      "overdue_count": 1
+    }
+  },
+  "message": "success"
 }
 ```
 
@@ -751,38 +932,42 @@ Response `200 OK`:
 
 ```json
 {
-  "years": [
-    {
-      "academic_year": 2569,
-      "submissions": [
-        {
-          "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb50001",
-          "topic_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40001",
-          "topic_title": "รายงานประจำเดือน",
-          "division": {},
-          "semester": 1,
-          "due_date": "2026-11-30",
-          "is_open": true,
-          "is_secret": false,
-          "values": {},
-          "status": "submitted",
-          "submitted_at": "2026-11-07T08:00:00Z",
-          "updated_at": "2026-11-07T08:00:00Z",
-          "files": [
-            {
-              "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb50002",
-              "field_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40004",
-              "original_name": "evidence.pdf",
-              "mime_type": "application/pdf",
-              "size_bytes": 10240,
-              "position": 1,
-              "created_at": "2026-11-07T08:00:00Z"
-            }
-          ]
-        }
-      ]
-    }
-  ]
+  "status": 200,
+  "data": {
+    "years": [
+      {
+        "academic_year": 2569,
+        "submissions": [
+          {
+            "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb50001",
+            "topic_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40001",
+            "topic_title": "รายงานประจำเดือน",
+            "division": {},
+            "semester": 1,
+            "due_date": "2026-11-30",
+            "is_open": true,
+            "is_secret": false,
+            "values": {},
+            "status": "submitted",
+            "submitted_at": "2026-11-07T08:00:00Z",
+            "updated_at": "2026-11-07T08:00:00Z",
+            "files": [
+              {
+                "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb50002",
+                "field_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40004",
+                "original_name": "evidence.pdf",
+                "mime_type": "application/pdf",
+                "size_bytes": 10240,
+                "position": 1,
+                "created_at": "2026-11-07T08:00:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "message": "success"
 }
 ```
 
@@ -816,42 +1001,46 @@ Response `200 OK`:
 
 ```json
 {
-  "items": [
-    {
-      "submission_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb50001",
-      "topic": {
-        "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40001",
-        "title": "รายงานประจำเดือน",
-        "division": {},
-        "academic_year": 2569,
-        "semester": 1,
-        "due_date": "2026-11-30",
-        "is_open": true,
-        "is_secret": false
-      },
-      "submitted_by": {
-        "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
-        "username": "teacher.one",
-        "prefix": "นาง",
-        "first_name": "สมหญิง",
-        "last_name": "ใจดี",
-        "full_name": "นางสมหญิง ใจดี"
-      },
-      "values": {},
-      "files": [],
-      "status": "submitted",
-      "submitted_at": "2026-11-07T08:00:00Z",
-      "updated_at": "2026-11-07T08:00:00Z"
+  "status": 200,
+  "data": {
+    "items": [
+      {
+        "submission_uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb50001",
+        "topic": {
+          "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40001",
+          "title": "รายงานประจำเดือน",
+          "division": {},
+          "academic_year": 2569,
+          "semester": 1,
+          "due_date": "2026-11-30",
+          "is_open": true,
+          "is_secret": false
+        },
+        "submitted_by": {
+          "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
+          "username": "teacher.one",
+          "prefix": "นาง",
+          "first_name": "สมหญิง",
+          "last_name": "ใจดี",
+          "full_name": "นางสมหญิง ใจดี"
+        },
+        "values": {},
+        "files": [],
+        "status": "submitted",
+        "submitted_at": "2026-11-07T08:00:00Z",
+        "updated_at": "2026-11-07T08:00:00Z"
+      }
+    ],
+    "topics": [],
+    "topic_total": 0,
+    "pagination": {
+      "page": 1,
+      "page_size": 20,
+      "total": 1,
+      "total_pages": 1
     }
-  ],
-  "topics": [],
-  "topic_total": 0,
-  "pagination": {
-    "page": 1,
-    "page_size": 20,
-    "total": 1,
-    "total_pages": 1
-  }
+  },
+  "message": "success"
 }
 ```
 
@@ -861,26 +1050,30 @@ Response `200 OK`:
 
 ### `GET /admin/users`
 
-Response `200 OK` เป็น array:
+Response `200 OK`: `data` เป็น array ของผู้ใช้:
 
 ```json
-[
-  {
-    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
-    "username": "teacher.one",
-    "prefix": "นาง",
-    "first_name": "สมหญิง",
-    "last_name": "ใจดี",
-    "full_name": "นางสมหญิง ใจดี",
-    "is_exec": false,
-    "is_admin": false,
-    "is_active": true,
-    "divisions": [],
-    "deactivated_at": null,
-    "created_at": "2026-11-07T08:00:00Z",
-    "updated_at": "2026-11-07T08:00:00Z"
-  }
-]
+{
+  "status": 200,
+  "data": [
+    {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
+      "username": "teacher.one",
+      "prefix": "นาง",
+      "first_name": "สมหญิง",
+      "last_name": "ใจดี",
+      "full_name": "นางสมหญิง ใจดี",
+      "is_exec": false,
+      "is_admin": false,
+      "is_active": true,
+      "divisions": [],
+      "deactivated_at": null,
+      "created_at": "2026-11-07T08:00:00Z",
+      "updated_at": "2026-11-07T08:00:00Z"
+    }
+  ],
+  "message": "success"
+}
 ```
 
 ### `POST /admin/users`
@@ -894,9 +1087,6 @@ Request:
   "prefix": "นาง",
   "first_name": "สมหญิง",
   "last_name": "ใจดี",
-  "division_uuids": [
-    "0199d6d0-bec9-7aa0-b2d8-96dc6fb30001"
-  ],
   "is_exec": false,
   "is_admin": false
 }
@@ -907,9 +1097,31 @@ Request:
 - `prefix` ไม่เกิน 30 ตัวอักษร, `first_name` บังคับและไม่เกิน 120, `last_name` ไม่เกิน 120
 - ยังรับ `full_name` เพื่อรองรับ client เก่า แต่ห้ามส่งพร้อม `prefix`, `first_name` หรือ `last_name`
 
-Response `200 OK`: admin user object
+Response `200 OK`: `data` เป็น admin user object
 
-กรณีผิดพลาด: ข้อมูลไม่ผ่าน validation, ไม่พบฝ่าย หรือ username ซ้ำ (`409`)
+```json
+{
+  "status": 200,
+  "data": {
+    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
+    "username": "teacher.one",
+    "prefix": "นาง",
+    "first_name": "สมหญิง",
+    "last_name": "ใจดี",
+    "full_name": "นางสมหญิง ใจดี",
+    "is_exec": false,
+    "is_admin": false,
+    "is_active": true,
+    "divisions": [],
+    "deactivated_at": null,
+    "created_at": "2026-11-07T08:00:00Z",
+    "updated_at": "2026-11-07T08:00:00Z"
+  },
+  "message": "success"
+}
+```
+
+กรณีผิดพลาด: ข้อมูลไม่ผ่าน validation หรือ username ซ้ำ (`409`)
 
 ### `PATCH /admin/users/{uuid}`
 
@@ -921,14 +1133,13 @@ Response `200 OK`: admin user object
   "prefix": "นาง",
   "first_name": "สมหญิง",
   "last_name": "ใจดี",
-  "division_uuids": [],
   "is_exec": false,
   "is_admin": false,
   "is_active": true
 }
 ```
 
-Response `200 OK`: admin user object ล่าสุด ใช้ `is_active: false` เพื่อปิดบัญชีโดยไม่ลบประวัติ
+Response `200 OK` ใช้ envelope เดียวกับการสร้างผู้ใช้ โดย `data` เป็น admin user object ล่าสุด ใช้ `is_active: false` เพื่อปิดบัญชีโดยไม่ลบประวัติ
 
 ### `POST /admin/users/{uuid}/password`
 
@@ -952,15 +1163,21 @@ Content-Type: `multipart/form-data` ใช้ field ชื่อ `file` รอ�
 
 หัวตาราง:
 
-| คำนำหน้า | ชื่อ | นามสกุล | username | รหัสผ่านเริ่มต้น | ฝ่าย |
-| --- | --- | --- | --- | --- | --- |
+| คำนำหน้า | ชื่อ | นามสกุล | username | รหัสผ่านเริ่มต้น |
+| --- | --- | --- | --- | --- |
 
-คอลัมน์ฝ่ายรับรหัส ชื่อเต็ม หรือชื่อย่อ หลายฝ่ายคั่นด้วย `|`, `,` หรือ `;` ผู้ใช้ที่นำเข้าเป็นบุคลากรทั่วไป ไม่เป็นผู้บริหารหรือแอดมิน
+ผู้ใช้ที่นำเข้าเป็นบุคลากรทั่วไป ไม่เป็นผู้บริหารหรือแอดมิน และอยู่ทุกฝ่ายอัตโนมัติ
 
 Response `200 OK`:
 
 ```json
-{"imported":25}
+{
+  "status": 200,
+  "data": {
+    "imported": 25
+  },
+  "message": "success"
+}
 ```
 
 หากมีข้อมูลผิดจะไม่บันทึกทั้งไฟล์:
@@ -989,23 +1206,27 @@ Response `200 OK` เป็น binary XLSX attachment ชื่อ `sdms-users-t
 Response `200 OK`:
 
 ```json
-[
-  {
-    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30001",
-    "code": "aca",
-    "name": "ฝ่ายวิชาการ",
-    "short_name": "วิชาการ",
-    "sort_order": 1,
-    "head_user": {
-      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
-      "username": "teacher.one",
-      "prefix": "นาง",
-      "first_name": "สมหญิง",
-      "last_name": "ใจดี",
-      "full_name": "นางสมหญิง ใจดี"
+{
+  "status": 200,
+  "data": [
+    {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30001",
+      "code": "aca",
+      "name": "ฝ่ายวิชาการ",
+      "short_name": "วิชาการ",
+      "sort_order": 1,
+      "head_user": {
+        "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb30007",
+        "username": "teacher.one",
+        "prefix": "นาง",
+        "first_name": "สมหญิง",
+        "last_name": "ใจดี",
+        "full_name": "นางสมหญิง ใจดี"
+      }
     }
-  }
-]
+  ],
+  "message": "success"
+}
 ```
 
 ฝ่ายที่ยังไม่มีหัวหน้าจะได้ `head_user: null`
@@ -1018,7 +1239,7 @@ Request:
 {"user_uuid":"0199d6d0-bec9-7aa0-b2d8-96dc6fb30007"}
 ```
 
-ผู้ใช้ต้องเปิดใช้งาน ไม่ใช่ผู้บริหาร และยังไม่เป็นหัวหน้าฝ่ายอื่น Response `200 OK` เป็น admin division object ล่าสุด
+ผู้ใช้ต้องเปิดใช้งาน ไม่ใช่ผู้บริหาร และยังไม่เป็นหัวหน้าฝ่ายอื่น Response `200 OK` ใช้ success envelope โดย `data` เป็น admin division object ล่าสุด
 
 กรณีผิดพลาด: ไม่พบฝ่าย/ผู้ใช้, ผู้ใช้เป็นผู้บริหาร, บัญชีถูกปิด หรือเป็นหัวหน้าฝ่ายอื่นอยู่แล้ว
 
@@ -1027,16 +1248,20 @@ Request:
 Response `200 OK` เรียงปีล่าสุดก่อน:
 
 ```json
-[
-  {
-    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40002",
-    "year": 2569,
-    "is_current": true,
-    "current_semester": 1,
-    "topic_count": 10,
-    "created_at": "2026-05-01T00:00:00Z"
-  }
-]
+{
+  "status": 200,
+  "data": [
+    {
+      "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40002",
+      "year": 2569,
+      "is_current": true,
+      "current_semester": 1,
+      "topic_count": 10,
+      "created_at": "2026-05-01T00:00:00Z"
+    }
+  ],
+  "message": "success"
+}
 ```
 
 ### `POST /admin/years`
@@ -1052,7 +1277,22 @@ Request:
 
 `year` ต้องอยู่ระหว่าง 2400-3000 และ semester เป็น 1 หรือ 2 หากไม่ส่ง semester ใช้ 1 ปีใหม่จะยังไม่เป็นปีปัจจุบัน
 
-Response `200 OK`: academic year object แบบเดียวกับ `/admin/years`
+Response `200 OK`: `data` เป็น academic year object แบบเดียวกับรายการใน `/admin/years`
+
+```json
+{
+  "status": 200,
+  "data": {
+    "uuid": "0199d6d0-bec9-7aa0-b2d8-96dc6fb40005",
+    "year": 2570,
+    "is_current": false,
+    "current_semester": 1,
+    "topic_count": 0,
+    "created_at": "2026-11-08T08:00:00Z"
+  },
+  "message": "success"
+}
+```
 
 กรณีผิดพลาด: ข้อมูลไม่ผ่าน validation หรือปีการศึกษาซ้ำ (`409`)
 
@@ -1066,7 +1306,7 @@ Body ไม่บังคับ:
 
 ถ้าไม่ส่ง body จะใช้ semester เดิมของปีนั้น ตั้งสำเร็จแล้วปีอื่นจะถูกเปลี่ยนเป็น `is_current: false`
 
-Response `200 OK`: academic year object ล่าสุด
+Response `200 OK` ใช้ success envelope โดย `data` เป็น academic year object ล่าสุดที่มี `is_current: true`
 
 กรณีผิดพลาด: ปีหรือภาคเรียนไม่ถูกต้อง หรือไม่พบปีการศึกษา
 
@@ -1085,9 +1325,9 @@ error response จะไม่มี field `code` หรือ `details`; client
 ### สร้างหรือแก้หัวข้อ
 
 1. โหลด `GET /divisions` และ `GET /users`
-2. กรองผู้ใช้ที่ `is_topic_assignee_eligible = true` และมี division ตรงกับหัวข้อ
+2. ใช้ผู้ใช้ที่ได้จาก `GET /users` เป็นตัวเลือกได้ทั้งหมด รวมทั้งหัวหน้าฝ่ายและผู้บริหาร
 3. ส่ง UUID ที่เลือกทั้งหมดใน `assignee_uuids` ตอน `POST /topics`
-4. หน้าแก้ไขโหลด `GET /topics/{uuid}` และตั้งค่าตัวเลือกจาก `topic.assignee_uuids`
+4. หน้าแก้ไขโหลด `GET /topics/{uuid}` และตั้งค่าตัวเลือกจาก `data.topic.assignee_uuids`
 5. ตอนบันทึก `PATCH /topics/{uuid}` ให้ส่งรายชื่อฉบับเต็ม
 6. หากได้ `409` ตอนแก้รายชื่อ ให้โหลดข้อมูลใหม่และไม่อนุญาตให้ถอดผู้ที่ส่งแล้ว
 
@@ -1095,6 +1335,50 @@ error response จะไม่มี field `code` หรือ `details`; client
 
 1. โหลด `GET /topics/{uuid}/my-submission`
 2. อัปโหลดแต่ละไฟล์ด้วย `POST /uploads`
-3. นำ `uuid` ของไฟล์ใส่ใน array ของ field ชนิด `file`
+3. นำ `data.uuid` จาก upload response ใส่ใน array ของ field ชนิด `file`
 4. ส่ง `PUT /topics/{uuid}/my-submission`
 5. เมื่อแก้ submission ให้ส่ง UUID ของไฟล์ที่ต้องการคงไว้ทั้งหมด
+
+### อ่าน response จาก browser
+
+เมื่อ frontend เรียก API ผ่าน origin เดียวกัน ใช้ base path `/api` และส่ง session cookie ไปพร้อม request:
+
+```javascript
+async function requestJSON(path, options = {}) {
+  const response = await fetch(`/api${path}`, {
+    ...options,
+    credentials: "include",
+  });
+  const body = await response.json();
+
+  if (!response.ok) {
+    throw new Error(body.message);
+  }
+
+  return body;
+}
+
+await requestJSON("/auth/login", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    username: "teacher.one",
+    password: "safe-password",
+  }),
+});
+
+const { data: profile } = await requestJSON("/me");
+const { data: users } = await requestJSON("/users");
+
+// ใช้ UUID ของไฟล์ staged ที่ต้องการลบ
+// Delete สำเร็จมีเพียง status และ message
+await requestJSON("/uploads/0199d6d0-bec9-7aa0-b2d8-96dc6fb50002", {
+  method: "DELETE",
+});
+```
+
+การอ่าน array ใช้ `body.data` เช่น `/users`, `/years`, `/divisions` และ `/me/pending`; การอ่านรายละเอียดหัวข้อใช้ `body.data.topic` และตารางคำตอบใช้ `body.data.rows`
+
+helper นี้ใช้กับ JSON endpoints ส่วน `/files/{uuid}`, `/me/files.zip` และ import templates ให้อ่าน success response เป็นไฟล์ตาม Content-Type; ถ้า request ไม่สำเร็จให้อ่าน JSON error เพื่อแสดง `message`
+
+สำหรับ upload ให้ส่ง `FormData` โดยไม่กำหนด `Content-Type` เอง เพื่อให้ browser สร้าง multipart boundary ให้ถูกต้อง
